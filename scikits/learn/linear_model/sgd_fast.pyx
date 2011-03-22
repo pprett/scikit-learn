@@ -442,3 +442,152 @@ cdef void l1penalty(double *w_data_ptr, double wscale, double *q_data_ptr,
         q_data_ptr[j] += (wscale * (w_data_ptr[j] - z))
 
 
+@cython.boundscheck(True)
+@cython.wraparound(True)
+@cython.cdivision(True)
+def maxent_sgd(np.ndarray[double, ndim=2, mode='c'] w,
+               np.ndarray[double, ndim=1, mode='c'] intercept,
+               LossFunction loss,
+               int penalty_type,
+               double alpha, double rho,
+               np.ndarray[double, ndim=2] X,
+               np.ndarray[double, ndim=1] Y,
+               int n_iter, int fit_intercept,
+               int verbose, int shuffle, int seed,
+               double weight_pos, double weight_neg,
+               np.ndarray[double, ndim=1] sample_weight,
+               int learning_rate, double eta0,
+               double power_t):
+    
+
+    # get the data information into easy vars
+    cdef unsigned int n_samples = Y.shape[0]
+    cdef unsigned int n_features = w.shape[1]
+    cdef unsigned int k = w.shape[0]
+
+    # Array strides to get to next feature or example
+    cdef int X_row_stride = X.strides[0]
+    cdef int X_elem_stride = X.strides[1]
+
+    # Array strides to get to next weight or class
+    cdef int w_class_stride = w.strides[0] / w.strides[1]
+    
+    cdef double *w_data_ptr = <double *>w.data
+    cdef double *X_data_ptr = <double *>X.data
+    cdef double *Y_data_ptr = <double *>Y.data
+    cdef double *intercept_data_ptr = <double *>intercept.data
+
+    cdef double *sample_weight_data = <double *>sample_weight.data
+
+    # Use index array for fast shuffling
+    cdef np.ndarray[int, ndim=1, mode="c"] index = np.arange(n_samples,
+                                                             dtype=np.int32)
+    cdef int *index_data_ptr = <int *>index.data
+
+    cdef np.ndarray[np.float64_t, ndim=1, mode="c"] pd = np.zeros((k,),
+                                                                  dtype=np.float64)
+    
+    cdef double *pd_data_ptr = <double *>pd.data
+    cdef double wnorm = 0.0
+    cdef int e = 0
+    cdef double loglikelihood = 0.0
+    cdef double wscale = 1.0
+    cdef double t = eta0#1.0 / (eta0 * alpha)
+
+    t1=time()
+    for e from 0 <= e < n_iter:
+        if verbose > 0:
+            print("-- Epoch %d" % (e+1))
+        if shuffle:
+            np.random.RandomState(seed).shuffle(index)
+        #if e % 10 == 0:
+        #    print("probing for eta...")
+        #    eta = probe(probeset, w, wscale, wstride, b, k, pd, reg, n)
+
+        loglikelihood = learnsweep(X_data_ptr, X_row_stride, X_elem_stride,
+                                   Y_data_ptr, index_data_ptr,
+                                   w_data_ptr,
+                                   w_class_stride,
+                                   &wscale, intercept_data_ptr,
+                                   k, pd_data_ptr,
+                                   &t, alpha, n_samples, n_features)
+
+        if wscale < 1e-9:
+            print("Scaling w")
+            w *= wscale
+            wscale = 1.0
+
+        # report epoche information
+        if verbose > 0:
+            print("Wscale: %.6f" % (wscale))
+            print("Log-likelihood: %.6f" % loglikelihood)
+            print("Total training time: %.2f seconds." % (time() - t1))
+            print("Current eta: %.9f" % t)#(1.0 / (alpha * t)))
+
+    # floating-point under-/overflow check.
+    if np.any(np.isinf(w)) or np.any(np.isnan(w)):
+        raise ValueError("floating-point under-/overflow occured.")
+
+    print "returning w and intercept"
+    w *= wscale
+    return w, intercept
+
+cdef double learnsweep(double *X_data_ptr, int X_row_stride,
+                       int X_elem_stride,
+                       double *Y_data_ptr, int *index_data_ptr,
+                       double *w_data_ptr,
+                       int w_class_stride,
+                       double *wscale, double *intercept_data_ptr,
+                       int k, double *pd_data_ptr,
+                       double *t, double alpha, int n_samples,
+                       int n_features):
+    """Perform one learn sweep over the dataset. 
+    """
+    cdef int sample_idx = 0
+    cdef int offset
+    cdef int y
+    cdef double *x
+    cdef int j = 0
+    cdef double loglikelihood = 0.0
+    cdef double eta = 0.0
+    
+    for i from 0 <= i < n_samples:
+        sample_idx = index_data_ptr[i]
+        offset = X_row_stride * sample_idx / X_elem_stride # row offset in elem
+        y = <int> (Y_data_ptr[sample_idx])
+
+        eta = t[0]#1.0 / (alpha * t[0])
+        probdist(w_data_ptr, w_class_stride, wscale[0], intercept_data_ptr,
+                 X_data_ptr, offset, n_features, k, pd_data_ptr)
+        loglikelihood += log(pd_data_ptr[y])
+        add(w_data_ptr + (w_class_stride * y), wscale[0],
+            X_data_ptr, offset, n_features, eta)
+        
+        intercept_data_ptr[y] += eta
+        for j from 0 <= j < k:
+           add(w_data_ptr + (w_class_stride * j), wscale[0],
+               X_data_ptr, offset, n_features,
+               -1.0 * eta * pd_data_ptr[j])
+           intercept_data_ptr[j] += -1.0 * eta * pd_data_ptr[j]
+           
+        wscale[0] = wscale[0] * (1 - eta * alpha)
+        #t[0] += 1
+    return loglikelihood
+
+cdef double probdist(double *w_data_ptr, int w_class_stride, double wscale,
+                     double *intercept_data_ptr, double *X_data_ptr,
+                     int offset, unsigned int n_features, unsigned int k,
+                     double *pd_data_ptr):
+    
+    cdef int j
+    cdef double *wk_data_ptr
+    cdef double sum = 0.0
+    for j from 0 <= j < k:
+        wk_data_ptr = w_data_ptr + (w_class_stride * j)
+        pd_data_ptr[j] = exp(dot(wk_data_ptr, X_data_ptr, offset,
+                                 n_features) * wscale + intercept_data_ptr[j])
+        sum += pd_data_ptr[j]
+    for j from 0 <= j < k:
+        pd_data_ptr[j] /= sum
+    return sum
+

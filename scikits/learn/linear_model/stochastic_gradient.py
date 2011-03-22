@@ -7,7 +7,7 @@ import numpy as np
 
 from ..externals.joblib import Parallel, delayed
 from .base import BaseSGDClassifier, BaseSGDRegressor
-from .sgd_fast import plain_sgd
+from .sgd_fast import plain_sgd, maxent_sgd
 
 
 class SGDClassifier(BaseSGDClassifier):
@@ -153,25 +153,52 @@ class SGDClassifier(BaseSGDClassifier):
         """
         X = np.asanyarray(X, dtype=np.float64, order='C')
 
-        # Use joblib to run OVA in parallel.
-        res = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
-                delayed(_train_ova_classifier)(i, c, X, y, self.coef_[i],
-                                               self.intercept_[i],
-                                               self.loss_function,
-                                               self.penalty_type, self.alpha,
-                                               self.rho, self.n_iter,
-                                               self.fit_intercept,
-                                               self.verbose, self.shuffle,
-                                               self.seed,
-                                               self.class_weight[i],
-                                               self.sample_weight,
-                                               self.learning_rate_code,
-                                               self.eta0, self.power_t)
-            for i, c in enumerate(self.classes))
+        if self.multi_class:  # multinomial model
+            # reindex targets
+            y = np.searchsorted(self.classes, y)
+            y = y.astype(np.float64)
+            print "INTERCEPT.shape:", self.intercept_.shape
+            print "COEF.shape:", self.coef_.shape        
+            coef_, intercept_ = maxent_sgd(self.coef_,
+                                          self.intercept_,
+                                          self.loss_function,
+                                          self.penalty_type,
+                                          self.alpha, self.rho,
+                                          X, y,
+                                          self.n_iter,
+                                          int(self.fit_intercept),
+                                          int(self.verbose),
+                                          int(self.shuffle),
+                                          self.seed,
+                                          self.class_weight[1],
+                                          self.class_weight[0],
+                                          self.sample_weight,
+                                          self.learning_rate_code, self.eta0,
+                                          self.power_t)
 
-        for i, coef, intercept in res:
-            self.coef_[i] = coef
-            self.intercept_[i] = intercept
+            self.coef_ = coef_
+            self.intercept_ = intercept_
+            
+        else:  # use One-vs-All (OVA)
+            # Use joblib to run OVA in parallel.
+            res = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+                    delayed(_train_ova_classifier)(i, c, X, y, self.coef_[i],
+                                                   self.intercept_[i],
+                                                   self.loss_function,
+                                                   self.penalty_type, self.alpha,
+                                                   self.rho, self.n_iter,
+                                                   self.fit_intercept,
+                                                   self.verbose, self.shuffle,
+                                                   self.seed,
+                                                   self.class_weight[i],
+                                                   self.sample_weight,
+                                                   self.learning_rate_code,
+                                                   self.eta0, self.power_t)
+                for i, c in enumerate(self.classes))
+
+            for i, coef, intercept in res:
+                self.coef_[i] = coef
+                self.intercept_[i] = intercept
 
     def decision_function(self, X):
         """Predict signed 'distance' to the hyperplane (aka confidence score)

@@ -255,7 +255,7 @@ class BaseSGDClassifier(BaseSGD, ClassifierMixin):
     def __init__(self, loss="hinge", penalty='l2', alpha=0.0001,
                  rho=0.85, fit_intercept=True, n_iter=5, shuffle=False,
                  verbose=0, n_jobs=1, seed=0, learning_rate="optimal",
-                 eta0=0.0, power_t=0.5):
+                 eta0=0.0, power_t=0.5, multi_class=False):
         super(BaseSGDClassifier, self).__init__(loss=loss, penalty=penalty,
                                                 alpha=alpha, rho=rho,
                                                 fit_intercept=fit_intercept,
@@ -264,6 +264,13 @@ class BaseSGDClassifier(BaseSGD, ClassifierMixin):
                                                 learning_rate=learning_rate,
                                                 eta0=eta0, power_t=power_t)
         self.n_jobs = int(n_jobs)
+        if multi_class:
+            if loss != "log":
+                raise ValueError("multi_class option requires 'log' loss.")
+            if penalty != "l2":
+                raise ValueError("multi_class option requires 'l2' penalty.")
+        self.multi_class = multi_class
+        
 
     def _set_loss_function(self, loss):
         """Set concrete LossFunction."""
