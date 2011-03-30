@@ -180,7 +180,21 @@ class SGDClassifier(BaseSGDClassifier):
         X_indices = np.array(X.indices, dtype=np.int32, order="C")
         X_indptr = np.array(X.indptr, dtype=np.int32, order="C")
 
-        res = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
+        if self.multi_class:  # multinomial model
+            # reindex targets
+            y = np.searchsorted(self.classes, y)
+            y = y.astype(np.float64)
+            print "INTERCEPT.shape:", self.intercept_.shape
+            print "COEF.shape:", self.coef_.shape        
+            print "FIXME"
+            assert False
+
+            self.coef_ = coef_
+            self.intercept_ = intercept_
+            
+        else:  # use One-vs-All (OVA)
+
+            res = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
                 delayed(_train_ova_classifier)(i, c, X_data, X_indices,
                                                X_indptr, y, self.coef_[i],
                                                self.intercept_[i],
@@ -194,11 +208,11 @@ class SGDClassifier(BaseSGDClassifier):
                                                self.sample_weight,
                                                self.learning_rate_code,
                                                self.eta0, self.power_t)
-            for i, c in enumerate(self.classes))
+                for i, c in enumerate(self.classes))
 
-        for i, coef, intercept in res:
-            self.coef_[i] = coef
-            self.intercept_[i] = intercept
+            for i, coef, intercept in res:
+                self.coef_[i] = coef
+                self.intercept_[i] = intercept
 
         self._set_coef(self.coef_)
         self.intercept_ = self.intercept_
