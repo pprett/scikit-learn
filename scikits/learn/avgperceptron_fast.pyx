@@ -92,7 +92,6 @@ def fit_sparse(np.ndarray[double, ndim=1, mode="c"] X_data,
                                                              dtype=np.int32)
     cdef int *index_data_ptr = <int *>index.data
 
-    cdef unsigned int count = 0
     cdef unsigned int epoch = 0
     cdef unsigned int i = 0
     cdef int sample_idx = 0
@@ -102,7 +101,7 @@ def fit_sparse(np.ndarray[double, ndim=1, mode="c"] X_data,
     cdef int nadds = 0
     cdef double u = 0.0
     cdef int w_offset = 0
-    cdef int offset = 0
+    cdef int X_offset = 0
 
     t1=time()
     for epoch from 0 <= epoch < epochs:
@@ -114,22 +113,22 @@ def fit_sparse(np.ndarray[double, ndim=1, mode="c"] X_data,
         i = 0
         for i from 0 <= i < n_samples:
             sample_idx = index_data_ptr[i]
-            offset = X_indptr_ptr[sample_idx]
-            xnnz = X_indptr_ptr[sample_idx + 1] - offset
+            X_offset = X_indptr_ptr[sample_idx]
+            xnnz = X_indptr_ptr[sample_idx + 1] - X_offset
             y = <int>Y_data_ptr[sample_idx]
             z = argmax(w_data_ptr, wstride, X_data_ptr, X_indices_ptr,
-                       offset, xnnz, y, n_classes)
+                       X_offset, xnnz, y, n_classes)
             if z != y:
                 u = <double>(epochs * n_samples - (epoch * n_samples + i + 1))
                 
-                add(w_data_ptr, y * wstride, X_data_ptr, X_indices_ptr, offset, xnnz,
+                add(w_data_ptr, y * wstride, X_data_ptr, X_indices_ptr, X_offset, xnnz,
                     1.0)
-                add(w_bar_data_ptr, y * wstride, X_data_ptr, X_indices_ptr, offset, xnnz,
+                add(w_bar_data_ptr, y * wstride, X_data_ptr, X_indices_ptr, X_offset, xnnz,
                     u)
                 
-                add(w_data_ptr, z * wstride, X_data_ptr, X_indices_ptr, offset, xnnz,
+                add(w_data_ptr, z * wstride, X_data_ptr, X_indices_ptr, X_offset, xnnz,
                     -1.0)
-                add(w_bar_data_ptr, z * wstride, X_data_ptr, X_indices_ptr, offset, xnnz,
+                add(w_bar_data_ptr, z * wstride, X_data_ptr, X_indices_ptr, X_offset, xnnz,
                     -1.0 * u)
                 nadds += 1
 
@@ -137,11 +136,11 @@ def fit_sparse(np.ndarray[double, ndim=1, mode="c"] X_data,
         # report epoche information
         if verbose > 0:
             print("NADDs: %d; NNZs: %d. " % (nadds, w.nonzero()[0].shape[0]))
-            print("Total training time: %.2f seconds." % (time()-t1))
+            print("Total training time: %.2f seconds." % (time() - t1))
 
     # floating-point under-/overflow check.
     if np.any(np.isinf(w)) or np.any(np.isnan(w)):
         raise ValueError("floating-point under-/overflow occured.")
 
-    w_bar *= (1.0 / (n_samples * epochs))
+    w_bar /= (n_samples * epochs)
     return w, w_bar

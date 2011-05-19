@@ -44,6 +44,11 @@ def configuration(parent_package='', top_path=None):
                                   join('src', 'BallTreePoint.h')],
                          include_dirs=[numpy.get_include()])
 
+    config.add_extension('avgperceptron_fast',
+                         sources=['avgperceptron_fast.c'],
+                         include_dirs=[numpy.get_include()]
+                         )
+
     # the following packages depend on cblas, so they have to be build
     # after the above.
     config.add_subpackage('linear_model')

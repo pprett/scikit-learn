@@ -39,6 +39,7 @@ from time import time
 import logging
 import os
 import sys
+import numpy as np
 
 from scikits.learn.datasets import fetch_20newsgroups
 from scikits.learn.feature_extraction.text import Vectorizer
@@ -46,6 +47,7 @@ from scikits.learn.linear_model import RidgeClassifier
 from scikits.learn.svm.sparse import LinearSVC
 from scikits.learn.linear_model.sparse import SGDClassifier
 from scikits.learn.perceptron import Perceptron
+from scikits.learn.averaged_perceptron import AveragedPerceptron
 from scikits.learn import metrics
 
 
@@ -74,7 +76,7 @@ categories = [
     'sci.space',
 ]
 # Uncomment the following to do the analysis on all the categories
-#categories = None
+# categories = None
 
 print "Loading 20 newsgroups dataset for categories:"
 print categories
@@ -109,6 +111,11 @@ print "done in %fs" % (time() - t0)
 print "n_samples: %d, n_features: %d" % X_test.shape
 print
 
+idx = np.arange(X_train.shape[0])
+np.random.seed(13)
+np.random.shuffle(idx)
+X_train = X_train[idx]
+y_train = y_train[idx]
 
 ################################################################################
 # Benchmark classifiers
@@ -145,28 +152,38 @@ def benchmark(clf):
     print
     return score, train_time, test_time
 
-for clf, name in ((RidgeClassifier(), "Ridge Classifier"),):
-    print 80*'='
-    print name
-    results = benchmark(clf)
+## for clf, name in ((RidgeClassifier(), "Ridge Classifier"),):
+##     print 80*'='
+##     print name
+##     results = benchmark(clf)
 
-for penalty in ["l2", "l1"]:
-    print 80 * '='
-    print "%s penalty" % penalty.upper()
-    # Train Liblinear model
-    liblinear_results = benchmark(LinearSVC(loss='l2', penalty=penalty, C=1000,
-                                            dual=False, tol=1e-3))
+## for penalty in ["l2", "l1"]:
+##     print 80 * '='
+##     print "%s penalty" % penalty.upper()
+##     # Train Liblinear model
+##     liblinear_results = benchmark(LinearSVC(loss='l2', penalty=penalty, C=1000,
+##                                             dual=False, tol=1e-3))
 
-    # Train SGD model
-    sgd_results = benchmark(SGDClassifier(alpha=.0001, n_iter=50,
-                                          penalty=penalty))
+##     # Train SGD model
+##     sgd_results = benchmark(SGDClassifier(alpha=.0001, n_iter=50,
+##                                           penalty=penalty))
 
-# Train SGD with Elastic Net penalty
+## # Train SGD with Elastic Net penalty
+## print 80 * '='
+## print "Elastic-Net penalty"
+## sgd_results = benchmark(SGDClassifier(alpha=.0001, n_iter=50,
+##                                       penalty="elasticnet"))
+
+#print 80 * '='
+#print 'Perceptron'
+#perceptron_results = benchmark(Perceptron(averaged=True, n_iter=10))
+
 print 80 * '='
-print "Elastic-Net penalty"
+print 'AveragedPerceptron (cython)'
+perceptron_results = benchmark(AveragedPerceptron(averaged=True, n_iter=10,
+                                                  verbose=0))
+
+print 80 * '='
+print 'SGDClassifier'
 sgd_results = benchmark(SGDClassifier(alpha=.0001, n_iter=50,
-                                      penalty="elasticnet"))
-
-print 80 * '='
-print 'Perceptron'
-perceptron_results = benchmark(Perceptron(averaged=True, n_iter=10, learning_rate=0.8))
+                                      penalty="l2"))
