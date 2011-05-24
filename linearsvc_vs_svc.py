@@ -13,6 +13,7 @@ from scikits.learn.grid_search import GridSearchCV
 from scikits.learn.metrics.metrics import f1_score
 from scikits.learn.cross_val import StratifiedKFold
 from scikits.learn.preprocessing.sparse import Normalizer
+from scikits.learn.preprocessing import Scaler
 
 # Initialize default C and gamma values
 C_start, C_end, C_step = -3, 4, 2
@@ -32,10 +33,10 @@ if __name__ == "__main__":
     train, test = iter(StratifiedKFold(Y, 2, indices=True)).next()
 
     # standardize data - try to comment this out to see the effect!
-    mean, std = X[train].mean(axis=0), X[train].std(axis=0)
-    std[std == 0.0] = 1.0
-    X[train] = (X[train] - mean) / std
-    X[test] = (X[test] - mean) / std
+    scaler = Scaler()
+    scaler.fit(X[train])
+    X[train] = scaler.transform(X[train], copy=False)
+    X[test] = scaler.transform(X[test], copy=False)
 
     # Length normalizes rows of X to L1 == 1
     #X = Normalizer().transform(X, copy=True)

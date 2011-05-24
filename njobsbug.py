@@ -20,13 +20,19 @@ C_start, C_end, C_step = -3, 15, 2
 
 train, test = iter(StratifiedKFold(Y, 2, indices=True)).next()
 
-mean, std = X[train].mean(axis=0), X[train].std(axis=0)
-std[std == 0.0] = 1.0
-X[train] = (X[train] - mean) / std
-X[test] =  (X[test] - mean) / std
+scaler = Scaler()
+scaler.fit(X[train])
+X[train] = scaler.transform(X[train], copy=False)
+X[test] = scaler.transform(X[test], copy=False)
+
+#mean, std = X[train].mean(axis=0), X[train].std(axis=0)
+#std[std == 0.0] = 1.0
+#X[train] = (X[train] - mean) / std
+#X[test] =  (X[test] - mean) / std
 
 #print np.unique(Y)
-#print X[train].mean(axis=0), X[train].std(axis=0)
+print "_" * 80
+print X[train].mean(axis=0), X[train].std(axis=0)
 
 # Generate grid search values for C, gamma
 C_val = 2. ** np.arange(C_start, C_end + C_step, C_step)
