@@ -22,10 +22,10 @@ C_start, C_end, C_step = -3, 4, 2
 if __name__ == "__main__":
     cross_fold = 10
 
-    A = np.load("data.npz")
+    A = np.loadtxt("featset1.csv", delimiter=",")
+    X = A[:, :-1]
+    Y = A[:, -1]
 
-    Y = A["arr_1"]
-    X = A["arr_0"]
     print "X.shape=", X.shape
     print "Y.shape=", Y.shape
 
