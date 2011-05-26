@@ -1,4 +1,13 @@
 #!/usr/bin/python
+"""A script to reproduce issue https://github.com/scikit-learn/scikit-learn/issues/177.
+
+simply run it via
+
+./njobsbug 10
+
+where 10 is the n_jobs parameter. If you standardize the data, you'll notice that
+the results do not change if you vary n_jobs. If not, they'll do.
+"""
 
 import sys
 import numpy as np
@@ -25,14 +34,9 @@ scaler.fit(X[train])
 X[train] = scaler.transform(X[train], copy=False)
 X[test] = scaler.transform(X[test], copy=False)
 
-#mean, std = X[train].mean(axis=0), X[train].std(axis=0)
-#std[std == 0.0] = 1.0
-#X[train] = (X[train] - mean) / std
-#X[test] =  (X[test] - mean) / std
-
 #print np.unique(Y)
 print "_" * 80
-print X[train].mean(axis=0), X[train].std(axis=0)
+#print X[train].mean(axis=0), X[train].std(axis=0)
 
 # Generate grid search values for C, gamma
 C_val = 2. ** np.arange(C_start, C_end + C_step, C_step)
