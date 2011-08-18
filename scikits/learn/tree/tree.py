@@ -18,8 +18,7 @@ from __future__ import division
 from ..utils import check_random_state
 import numpy as np
 from ..base import BaseEstimator, ClassifierMixin, RegressorMixin
-from ._tree import eval_gini, eval_entropy, eval_miss, eval_mse
-import random
+import _tree
 
 __all__ = [
     'DecisionTreeClassifier',
@@ -27,12 +26,12 @@ __all__ = [
     ]
 
 lookup_c = \
-      {'gini': eval_gini,
-       'entropy': eval_entropy,
-       'miss': eval_miss,
+      {'gini': _tree.eval_gini,
+       'entropy': _tree.eval_entropy,
+       'miss': _tree.eval_miss,
        }
 lookup_r = \
-      {'mse': eval_mse,
+      {'mse': _tree.eval_mse,
       }
 
 
@@ -73,7 +72,7 @@ class Node(object):
                % (self.dimension, self.value, self.error)
 
 
-def _find_best_split(features, labels, criterion):
+def _find_best_split(features, labels, criterion, K):
     n_samples, n_features = features.shape
     K = int(np.abs(labels.max())) + 1
     pm = np.zeros((K,), dtype=np.float64)
@@ -101,15 +100,19 @@ def _find_best_split(features, labels, criterion):
 
 def _build_tree(is_classification, features, labels, criterion,
                max_depth, min_split, F, K, random_state):
+    """
+    Parameters
+    ----------
 
+    K : int
+        Number of classes (for regression us 0).
+    """
     n_samples, n_dims = features.shape
-    if len(labels) != len(features):
+    if labels.shape[0] != n_samples:
         raise ValueError("Number of labels does not match "
-                          "number of features\n"
-                         "num labels is %s and num features is %s "
-                         % (len(labels), len(features)))
+                         "number of features\n")
 
-    sample_dims = np.array(xrange(n_dims))
+    sample_dims = np.arange(n_dims)
     if F is not None:
         if F <= 0:
             raise ValueError("F must be > 0.\n"
@@ -136,19 +139,22 @@ def _build_tree(is_classification, features, labels, criterion,
     if max_depth <= 0:
         raise ValueError("max_depth must be greater than zero.\n"
                          "max_depth is %s." % max_depth)
-
+    #n_rec_part_called = np.zeros((1,), dtype=np.int)
     def recursive_partition(features, labels, depth):
         is_split_valid = True
+        #n_rec_part_called[0] += 1
 
         if depth >= max_depth:
             is_split_valid = False
 
-        S = _find_best_split(features, labels, criterion)
-        if S is not None:
-            dim, thresh, error = S
-            split = features[:, dim] < thresh
-            if len(features[split]) < min_split or \
-                len(features[~split]) < min_split:
+        dim, thresh, error = _tree._find_best_split(features,
+                                                    labels.astype(np.float64),
+                                                    criterion, K)
+        
+        if dim != -1:
+            split = (features[:, dim] < thresh)
+            n_true = split.sum()
+            if n_true < min_split or features.shape[0] - n_true < min_split:
                 is_split_valid = False
         else:
             is_split_valid = False
@@ -170,7 +176,9 @@ def _build_tree(is_classification, features, labels, criterion,
                     right=recursive_partition(features[~split],
                                               labels[~split], depth + 1))
 
-    return recursive_partition(features, labels, 0)
+    root = recursive_partition(features, labels, 0)
+    #print "recursive_partition called %d times" % n_rec_part_called[0]
+    return root
 
 
 def _apply_tree(tree, features):
@@ -211,7 +219,7 @@ class BaseDecisionTree(BaseEstimator):
 
     _dtree_types = ['classification', 'regression']
 
-    def __init__(self, K, impl, criterion, max_depth,
+    def __init__(self, impl, criterion, max_depth,
                  min_split, F, random_state):
 
         if not impl in self._dtree_types:
@@ -219,7 +227,6 @@ class BaseDecisionTree(BaseEstimator):
                              % (self._dtree_types, impl))
 
         self.type = impl
-        self.K = K
         self.criterion = criterion
         self.max_depth = max_depth
         self.min_split = min_split
@@ -271,14 +278,14 @@ class BaseDecisionTree(BaseEstimator):
         """
         X = np.asanyarray(X, dtype=np.float64, order='C')
         _, self.n_features = X.shape
-
+        
         if self.type == 'classification':
-            y = np.asanyarray(y, dtype=np.int, order='C')
-            if self.K is None:
-                self.K = y.max() + 1
-            if y.max() >= self.K or y.min() < 0:
-                raise ValueError("Labels must be in the range [0 to %s)",
-                                 self.K)
+            y = np.asanyarray(y, dtype=np.int64)
+            self.classes = np.unique(y)
+            y = np.searchsorted(self.classes, y)
+            self.K = self.classes.shape[0]
+            if y.min() < 0:
+                raise ValueError("Labels must be in the range [0 to %s)", self.K)
             self.tree = _build_tree(True, X, y, lookup_c[self.criterion],
                                     self.max_depth, self.min_split, self.F,
                                     self.K, self.random_state)
@@ -286,7 +293,7 @@ class BaseDecisionTree(BaseEstimator):
             y = np.asanyarray(y, dtype=np.float64, order='C')
             self.tree = _build_tree(False, X, y, lookup_r[self.criterion],
                                     self.max_depth, self.min_split, self.F,
-                                    None, self.random_state)
+                                    0, self.random_state)
         return self
 
     def predict(self, X):
@@ -307,7 +314,7 @@ class BaseDecisionTree(BaseEstimator):
         C : array, shape = [n_samples]
         """
 
-        X = np.atleast_2d(X)
+        X = np.atleast_2d(X).astype(np.float64)
         n_samples, n_features = X.shape
 
         if self.tree is None:
@@ -323,7 +330,8 @@ class BaseDecisionTree(BaseEstimator):
         if self.type == 'classification':
             C = np.zeros(n_samples, dtype=int)
             for idx, sample in enumerate(X):
-                C[idx] = np.argmax(_apply_tree(self.tree, sample))
+                c = np.argmax(_apply_tree(self.tree, sample))
+                C[idx] = self.classes[c]
         else:
             C = np.zeros(n_samples, dtype=float)
             for idx, sample in enumerate(X):            
@@ -337,9 +345,6 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
 
     Parameters
     ----------
-    K : integer, mandatory
-        number of classes
-
     criterion : string
         function to measure goodness of split
 
@@ -382,9 +387,9 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
 
     """
 
-    def __init__(self, K=None, criterion='gini', max_depth=10,
+    def __init__(self, criterion='gini', max_depth=10,
                   min_split=1, F=None, random_state=None):
-        BaseDecisionTree.__init__(self, K, 'classification', criterion,
+        BaseDecisionTree.__init__(self, 'classification', criterion,
                                   max_depth, min_split, F, random_state)
 
     def predict_proba(self, X):
@@ -404,7 +409,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
             order.
 
         """
-        X = np.atleast_2d(X)
+        X = np.atleast_2d(X).astype(np.float64)
         n_samples, n_features = X.shape
 
         if self.tree is None:
@@ -483,5 +488,5 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
 
     def __init__(self, criterion='mse', max_depth=10,
                   min_split=1, F=None, random_state=None):
-        BaseDecisionTree.__init__(self, None, 'regression', criterion,
+        BaseDecisionTree.__init__(self, 'regression', criterion,
                                   max_depth, min_split, F, random_state)
