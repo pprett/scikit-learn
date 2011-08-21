@@ -72,4 +72,7 @@ if __name__ == '__main__':
 
     X = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
     y = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.labels")
-    
+    from scikits.learn.tree import DecisionTreeClassifier
+    clf = DecisionTreeClassifier()
+    clf.fit(X, y)
+

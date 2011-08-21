@@ -111,14 +111,8 @@ def _build_tree(is_classification, features, labels, criterion,
     if labels.shape[0] != n_samples:
         raise ValueError("Number of labels does not match "
                          "number of features\n")
-
-    # make data fortran layout
-    if not features.flags["F_CONTIGUOUS"]:
-        features = np.array(features, "F")
-
-    sorted_features = np.argsort(features, axis=0)
-    if not sorted_features.flags["F_CONTIGUOUS"]:
-        sorted_features = np.array(sorted_features, "F")
+    labels = np.array(labels, dtype=np.float64, order="c")
+    
 
     sample_dims = np.arange(n_dims)
     if F is not None:
@@ -133,6 +127,15 @@ def _build_tree(is_classification, features, labels, criterion,
         sample_dims = random_state.shuffle(np.arange(n_dims))[:F]
         features = features[:, sample_dims]
         n_samples, n_dims = features.shape
+
+    # make data fortran layout
+    if not features.flags["F_CONTIGUOUS"]:
+        features = np.array(features, order="F")
+
+    sorted_features = np.argsort(features, axis=0)
+    sorted_features = sorted_features.astype(np.int32)
+    if not sorted_features.flags["F_CONTIGUOUS"]:
+        sorted_features = np.array(sorted_features, order="F")
 
     if min_split <= 0:
         raise ValueError("min_split must be greater than zero.\n"
@@ -150,6 +153,7 @@ def _build_tree(is_classification, features, labels, criterion,
             is_leaf = True
         # else try to find a split point
         else:
+            # FIXME this segfaults
             dim, thresh, error, nll = _tree._find_best_split(sample_mask,
                                                          parent_split_error,
                                                          features, sorted_features,
