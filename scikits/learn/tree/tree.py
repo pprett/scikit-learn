@@ -99,7 +99,7 @@ def _find_best_split(features, labels, criterion, K):
 
 
 def _build_tree(is_classification, features, labels, criterion,
-               max_depth, min_split, F, K, random_state):
+                max_depth, min_split, F, K, random_state):
     """
     Parameters
     ----------
@@ -112,6 +112,14 @@ def _build_tree(is_classification, features, labels, criterion,
         raise ValueError("Number of labels does not match "
                          "number of features\n")
 
+    # make data fortran layout
+    if not features.flags["F_CONTIGUOUS"]:
+        features = np.array(features, "F")
+
+    sorted_features = np.argsort(features, axis=0)
+    if not sorted_features.flags["F_CONTIGUOUS"]:
+        sorted_features = np.array(sorted_features, "F")
+
     sample_dims = np.arange(n_dims)
     if F is not None:
         if F <= 0:
@@ -121,17 +129,10 @@ def _build_tree(is_classification, features, labels, criterion,
             raise ValueError("F must be < num dimensions of features.\n"
                              "F is %s, n_dims = %s "
                              % (F, n_dims))
-
-        sample_dims = np.unique(random_state.randint(0, n_dims, F))
-        # This ugly construction is required because np.random
-        # does not have a sample(population, K) method that will
-        # return a subset of K elements from the population.
-        # In certain instances, random_state.randint() will return duplicates,
-        # meaning that len(sample_dims) < F.  This breaks the contract with 
-        # the user.
-        while len(sample_dims) != F:
-            sample_dims = np.unique(random_state.randint(0, n_dims, F))
+        
+        sample_dims = random_state.shuffle(np.arange(n_dims))[:F]
         features = features[:, sample_dims]
+        n_samples, n_dims = features.shape
 
     if min_split <= 0:
         raise ValueError("min_split must be greater than zero.\n"
@@ -139,44 +140,58 @@ def _build_tree(is_classification, features, labels, criterion,
     if max_depth <= 0:
         raise ValueError("max_depth must be greater than zero.\n"
                          "max_depth is %s." % max_depth)
+    
     #n_rec_part_called = np.zeros((1,), dtype=np.int)
-    def recursive_partition(features, labels, depth):
-        is_split_valid = True
+    def recursive_partition(sample_mask, parent_split_error, depth):
         #n_rec_part_called[0] += 1
-
+        is_leaf = False
+        # If current depth larger than max return leaf.
         if depth >= max_depth:
-            is_split_valid = False
-
-        dim, thresh, error = _tree._find_best_split(features,
-                                                    labels.astype(np.float64),
-                                                    criterion, K)
-        
-        if dim != -1:
-            split = (features[:, dim] < thresh)
-            n_true = split.sum()
-            if n_true < min_split or features.shape[0] - n_true < min_split:
-                is_split_valid = False
+            is_leaf = True
+        # else try to find a split point
         else:
-            is_split_valid = False
+            dim, thresh, error, nll = _tree._find_best_split(sample_mask,
+                                                         parent_split_error,
+                                                         features, sorted_features,
+                                                         labels, criterion, K)
+            if dim != -1:
+                # we found a split point
+                # check if num samples to the left and right of split point
+                # is larger than min_split
+                if nll < min_split or n_dims - nll < min_split:
+                    # splitting point does not suffice min_split
+                    is_leaf = True
+                else:
+                    # valid splitting point
+                    pass
+            else:
+                # could not find splitting point
+                is_leaf = True
 
-        if is_split_valid == False:
+        new_node = None
+        if is_leaf:
             if is_classification:
                 a = np.zeros((K, ))
-                t = labels.max() + 1
-                a[:t] = np.bincount(labels)
-                return Leaf(a)
+                _tree.fill_counts(a, labels, sample_mask)
+                new_node = Leaf(a)
             else:
-                return Leaf(np.mean(labels))
+                new_node = Leaf(np.mean(labels[sample_mask]))
+        else:
+            # update sample_mask
+            split = features[:, dim] < thresh
+            new_node = Node(dimension=sample_dims[dim],
+                            value=thresh,
+                            error=error,
+                            left=recursive_partition(split & sample_mask,
+                                                     error, depth + 1),
+                            right=recursive_partition(~split & sample_mask,
+                                                      error, depth + 1))
+    
+        # assert new_node != None
+        return new_node
 
-        return Node(dimension=sample_dims[dim],
-                    value=thresh,
-                    error=error,
-                    left=recursive_partition(features[split],
-                                             labels[split], depth + 1),
-                    right=recursive_partition(features[~split],
-                                              labels[~split], depth + 1))
-
-    root = recursive_partition(features, labels, 0)
+    root = recursive_partition(np.ones((n_samples,), dtype=np.bool),
+                               np.inf, 0)
     #print "recursive_partition called %d times" % n_rec_part_called[0]
     return root
 

@@ -19,6 +19,9 @@ cdef extern from "math.h":
     cdef extern double log(double x)
     cdef extern double pow(double base, double exponent)
 
+cdef extern from "float.h":
+    cdef extern double DBL_MIN
+
  
 """
  Classification entropy measures
@@ -33,7 +36,7 @@ cdef extern from "math.h":
     be the proportion of class k observations in node m   
 """  
 
-cpdef double eval_gini(np.ndarray[np.float64_t, ndim=1] labels, 
+cpdef np.float64_t eval_gini(np.ndarray[np.float64_t, ndim=1] labels, 
                        np.ndarray[np.float64_t, ndim=1] pm):
     """
         
@@ -53,60 +56,66 @@ cpdef double eval_gini(np.ndarray[np.float64_t, ndim=1] labels,
         c = (int)(labels[i])
         pm[c] += 1. / n_labels
     
-    cdef double H = 1.
+    cdef np.float64_t H = 1.
     cdef Py_ssize_t k
     for k in range(K): 
         H -=  pow(pm[k],2) 
          
     return H
 
-cdef double gini(np.ndarray[np.float64_t, ndim=1] pm):
+cdef np.float64_t gini(np.float64_t *pm, int K):
     """
         
         Gini index = \sum_{k=0}^{K-1} pmk (1 - pmk)
                    = 1 - \sum_{k=0}^{K-1} pmk ** 2
             
     """       
-    cdef int K = pm.shape[0]
-    cdef double H = 1.0
-    cdef Py_ssize_t k
+    cdef np.float64_t H = 1.0
+    cdef int k
     for k from 0 <= k < K:
         H -= pm[k] * pm[k] 
     return H
 
 
-cdef void fill_pm(np.ndarray[np.float64_t, ndim=1] pm_left,
-                  np.ndarray[np.float64_t, ndim=1] pm_right,
-                  double *nll, double *nlr, 
-                  np.ndarray[np.float64_t, ndim=1] labels,
-                  np.ndarray[np.float64_t, ndim=1] features_at_i,
-                  double t, int n_samples, int K):
-    cdef double *labels_data = <double *> labels.data
-    cdef double *pm_left_data = <double *> pm_left.data
-    cdef double *pm_right_data = <double *> pm_right.data
+cdef void fill_pm(np.float64_t *pm_left,
+                  np.float64_t *pm_right,
+                  int *nll, int *nlr, 
+                  np.float64_t *labels,
+                  np.int8_t *sample_mask,
+                  np.float64_t *features_i,
+                  np.float64_t t, int n_samples, int K):
+    """Fills the count arrays `pm_left` and `pm_right`.
+
+    Fill in the class counts for the left and right side of the split
+    for feature i and threshold `t`.
+    """
     # assert features_at_i.shape == labels.shape
     cdef int c = 0, j = 0, count
-    
-    for c from 0 <= c < K:
-        pm_left_data[c] = 0.0
-        pm_right_data[c] = 0.0
 
+    # init pm counts to zero
+    for c from 0 <= c < K:
+        pm_left[c] = 0.0
+        pm_right[c] = 0.0
+
+    # 
     for j from 0 <= j < n_samples:
-        c = <int>(labels_data[j])
-        if features_at_i[j] < t:
-            pm_left_data[c] += 1.0
+        if sample_mask[j] == 0:
+            continue
+        c = <int>(labels[j])
+        if features_i[j] < t:
+            pm_left[c] += 1.0
             count += 1
         else:
-            pm_right_data[c] += 1.0
+            pm_right[c] += 1.0
             
     nll[0] = count
     nlr[0] = n_samples - count
     for c from 0 <= c < K:
-        pm_left_data[c] /= nll[0]
-        pm_right_data[c] /= nlr[0]
+        pm_left[c] /= nll[0]
+        pm_right[c] /= nlr[0]
     
 
-cpdef double eval_entropy(np.ndarray[np.float64_t, ndim=1] labels,
+cpdef np.float64_t eval_entropy(np.ndarray[np.float64_t, ndim=1] labels,
                           np.ndarray[np.float64_t, ndim=1] pm):
     """
         
@@ -118,7 +127,7 @@ cpdef double eval_entropy(np.ndarray[np.float64_t, ndim=1] labels,
     
     cdef int i = 0
     cdef int c
-    cdef double H = 0.0
+    cdef np.float64_t H = 0.0
     
     for i from 0 <= i < K:
         pm[i] = 0.0
@@ -133,7 +142,7 @@ cpdef double eval_entropy(np.ndarray[np.float64_t, ndim=1] labels,
          
     return H   
 
-cpdef double eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
+cpdef np.float64_t eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
                        np.ndarray[np.float64_t, ndim=1] pm):
     """
         
@@ -152,7 +161,7 @@ cpdef double eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
         value = (int)(labels[i])
         pm[value] += 1. / n_labels
         
-    cdef double H = 1. - pm.max()
+    cdef np.float64_t H = 1. - pm.max()
 
     ## FIXME this is broken!
     
@@ -160,7 +169,7 @@ cpdef double eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
  Regression entropy measures
  
 """      
-cpdef double eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
+cpdef np.float64_t eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
                       np.ndarray[np.float64_t, ndim=1] pm):
     """             
         MSE =  \sum_i (y_i - c0)^2  / N
@@ -175,7 +184,7 @@ cpdef double eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
         c0 += labels[i]
     c0 /= n_labels
 
-    cdef double H = 0.
+    cdef np.float64_t H = 0.
     for i in range(n_labels):
         H += pow(labels[i] - c0, 2) 
     H /= n_labels
@@ -183,43 +192,127 @@ cpdef double eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
     return H
 
 
-def _find_best_split(np.ndarray[np.float64_t, ndim=2, mode="c"] features,
+cdef smallest_sample_larger_than(int sample_idx,
+                                 np.float64_t *features_i,
+                                 int *sorted_features_i,
+                                 np.int8_t *sample_mask,
+                                 int n_samples):
+    """Find index in the `sorted_features` matrix for sample
+    who's feature `i` value is just about
+    greater than those of the sample `sorted_features_i[sample_idx]`.
+    Ignore samples where `sample_mask` is false.
+
+    Returns
+    -------
+    next_sample_idx : int
+        The index of the next smallest sample in `sorted_features`
+        with different feature value than `sample_idx` .
+        I.e. `sorted_features_i[sample_idx] < sorted_features_i[next_sample_idx]`
+        -1 if no such element exists.
+    """
+    cdef int j = 0
+    cdef np.float64_t threshold = DBL_MIN
+    if sample_idx > -1:
+        threshold = features_i[sorted_features_i[sample_idx]]
+    for j from sample_idx < j < n_samples:
+        if sample_mask[j] == 0:
+            continue
+        if features_i[sorted_features_i[j]] > threshold:
+            return j
+    return -1
+
+
+def fill_counts(np.ndarray[np.float64_t, ndim=1, mode="c"] counts,
+                np.ndarray[np.float64_t, ndim=1, mode="c"] labels,
+                np.ndarray sample_mask):
+    cdef int j
+    cdef int n_samples = labels.shape[0]
+    cdef char *sample_mask_ptr = <char *>sample_mask.data
+    for j from 0 <= j < n_samples:
+        if sample_mask_ptr[j] == 0:
+            continue
+        c = <int>labels[j]
+        counts[c] += 1
+
+
+def _find_best_split(np.ndarray sample_mask,
+                     np.float64_t parent_split_error,
+                     np.ndarray[np.float64_t, ndim=2, mode="fortran"] features,
+                     np.ndarray[np.int32_t, ndim=2, mode="fortran"] sorted_features,
                      np.ndarray[np.float64_t, ndim=1, mode="c"] labels,
                      criterion, int K):
     """
     Parameters
     ----------
+    features : ndarray, shape (n_samples, n_features), dtype=float64
+        The feature values (aka `X`).
+    sorted_features : ndarray, shape (n_samples, n_features)
+        Argsort of cols of `features`. `sorted_features[0,j]` gives the example
+        index of the smallest value of feature j.
+    sample_mask : ndarray, shape (n_samples,), dtype=int8
+        A mask for the samples to be considered. Only samples `i` for which
+        sample_mask[j] != 0 are considered.
+    labels : ndarray, shape (n_samples,), dtype=float64
+        The labels.
+    criterion : func
+        The criterion function to be minimized.
     K : int
         The number of classes - for regression use 0.
+
+    Returns
+    -------
+    best_i : int
+        The split feature or -1 if criterion not smaller than `parent_split_error`.
+    best_t : np.float64_t
+        The split threshold
+    best_error : np.float64_t
+        The error (criterion) of the split.
     """
-    # K = int(np.abs(labels.max())) + 1
     cdef int n_samples = features.shape[0]
     cdef int n_features = features.shape[1]
-
+    cdef np.float64_t *labels_ptr = <np.float64_t *>labels.data
     cdef np.ndarray[np.float64_t, ndim=1] pm_left = np.zeros((K,), dtype=np.float64)
     cdef np.ndarray[np.float64_t, ndim=1] pm_right = np.zeros((K,), dtype=np.float64)
-    cdef np.ndarray[np.float64_t, ndim=1] features_at_i = None
-    cdef np.ndarray[np.float64_t, ndim=1] domain_i = None
-    cdef double split_error = eval_gini(labels, pm_left)
-    cdef int i, j, domain_size, best_i = -1
-    cdef np.float64_t d1, d2, e1, e2, t, error, best_error, best_t, nll = 0.0, nlr = 0.0
+    cdef np.float64_t *pm_left_ptr = <np.float64_t *>pm_left.data
+    cdef np.float64_t *pm_right_ptr = <np.float64_t *>pm_right.data
+    cdef np.float64_t *features_i = NULL
+    cdef int *sorted_features_i
+    cdef np.int8_t *sample_mask_ptr = <np.int8_t *>sample_mask.data
+    cdef int i, domain_size, best_i = -1, best_nll, nll = 0, nlr = 0
+    cdef np.float64_t e1, e2, t, error, best_error, best_t
+    cdef int a, b
+    cdef int features_stride = features.strides[1]
+    cdef int sorted_features_stride = sorted_features.strides[1]
     for i from 0 <= i < n_features:
-        features_at_i = features[:, i]
-        domain_i = np.unique(features_at_i)
-        domain_size = domain_i.shape[0]
-        for j from 0 <= j < domain_size - 1:
-            d1 = domain_i[j]
-            d2 = domain_i[j+1]
-            t = (d1 + d2) / 2.0
-            fill_pm(pm_left, pm_right, &nll, &nlr,
-                    labels, features_at_i, t, n_samples, K)
-            e1 = nll / n_samples * gini(pm_left)
-            e2 = nlr / n_samples * gini(pm_right)
+        features_i = (<np.float64_t *>features.data) + features_stride * i
+        sorted_features_i = (<int *>sorted_features.data) + sorted_features_stride * i
+        a = smallest_sample_larger_than(-1, features_i, sorted_features_i,
+                                        sample_mask_ptr, n_samples)
+        while True:
+            b = smallest_sample_larger_than(a, features_i, sorted_features_i,
+                                            sample_mask_ptr, n_samples)
+            if b == -1:
+                break
+
+            # do stuff
+            t = (features_i[sorted_features_i[a]] +
+                 features_i[sorted_features_i[b]]) / 2.0
+            
+            
+            fill_pm(pm_left_ptr, pm_right_ptr, &nll, &nlr, labels_ptr,
+                    sample_mask_ptr, features_i, t, n_samples, K)
+            e1 = nll / n_samples * gini(pm_left_ptr, K)
+            e2 = nlr / n_samples * gini(pm_right_ptr, K)
             error = e1 + e2
-            if error < split_error:
-                split_error = error
+            
+            # check if current criterion smaller than parent criterion
+            # this is never true best_i is -1.
+            if error < parent_split_error:
+                parent_split_error = error
                 best_i = i
                 best_t = t
                 best_error = error
+                best_nll = nll
                 
-    return best_i, best_t, best_error
+            a = b
+    return best_i, best_t, best_error, best_nll

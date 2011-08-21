@@ -32,16 +32,16 @@ def bench_scikit_tree_classifier(X, Y):
     import scikits.learn
     from scikits.learn.tree import DecisionTreeClassifier
 
-    gc.collect()
+    #gc.collect()
 
     # start time
-    tstart = datetime.now()
+    #tstart = datetime.now()
     clf = DecisionTreeClassifier()
     clf.fit(X, Y).predict(X)
-    delta = (datetime.now() - tstart)
+    #delta = (datetime.now() - tstart)
     # stop time
 
-    scikit_classifier_results.append(delta.seconds + delta.microseconds/mu_second)
+    #scikit_classifier_results.append(delta.seconds + delta.microseconds/mu_second)
 
 def bench_scikit_tree_regressor(X, Y):
     """
@@ -61,72 +61,15 @@ def bench_scikit_tree_regressor(X, Y):
 
     scikit_regressor_results.append(delta.seconds + delta.microseconds/mu_second)
 
+def profile(n_samples=1000, dim=50, K=2):
+    np.random.seed(13)
+    X = np.random.randn(n_samples, dim)
+    Y = np.random.randint(0, K, (n_samples,))
+    bench_scikit_tree_classifier(X, Y)
+    
+
 if __name__ == '__main__':
 
-    print '============================================'
-    print 'Warning: this is going to take a looong time'
-    print '============================================'
-
-    n = 10
-    step = 10000
-    n_samples = 10000
-    dim = 10
-    K = 10 
-    for i in range(n):
-        print '============================================'
-        print 'Entering iteration %s of %s' % (i, n)
-        print '============================================'
-        n_samples += step
-        X = np.random.randn(n_samples, dim)
-        Y = np.random.randint(0, K, (n_samples,))
-        bench_scikit_tree_classifier(X, Y)
-        Y = np.random.randn(n_samples)
-        bench_scikit_tree_regressor(X, Y)
-
-
-    import pylab as pl
-    xx = range(0, n*step, step)
-    pl.figure(1)
-    pl.subplot(211)
-    pl.title('Learning with varying number of samples')
-    pl.plot(xx, scikit_classifier_results, 'g-', label='classification')
-    pl.plot(xx, scikit_regressor_results, 'r-', label='regression')
-    pl.legend()
-    pl.xlabel('number of samples')
-    pl.ylabel('time (in microseconds)')
-
-
-    # now do a bench where the number of points is fixed
-    # and the variable is the number of dimensions
-    from scikits.learn.datasets.samples_generator import friedman, \
-                                                         sparse_uncorrelated
-
-    scikit_classifier_results = []
-    scikit_regressor_results = []
-    n = 10
-    step = 500
-    start_dim = 500
-    K = 10 
-
-    dim = start_dim
-    for i in range(0, n):
-        print '============================================'
-        print 'Entering iteration %s of %s' % (i, n)
-        print '============================================'
-        dim += step
-        X = np.random.randn(100, dim)
-        Y = np.random.randint(0, K, (100,))
-        bench_scikit_tree_classifier(X, Y)
-        Y = np.random.randn(100)
-        bench_scikit_tree_regressor(X, Y)
-
-    xx = np.arange(start_dim, start_dim+n*step, step)
-    pl.subplot(212)
-    pl.title('Learning in high dimensional spaces')
-    pl.plot(xx, scikit_classifier_results, 'g-', label='classification')
-    pl.plot(xx, scikit_regressor_results, 'r-', label='regression')
-    pl.legend()
-    pl.xlabel('number of dimensions')
-    pl.ylabel('time (in seconds)')
-    pl.axis('tight')
-    pl.show()
+    X = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
+    y = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.labels")
+    
