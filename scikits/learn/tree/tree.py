@@ -107,8 +107,8 @@ def _build_tree(is_classification, features, labels, criterion,
     K : int
         Number of classes (for regression us 0).
     """
-    n_samples, n_dims = features.shape
-    if labels.shape[0] != n_samples:
+    n_total_samples, n_dims = features.shape
+    if labels.shape[0] != n_total_samples:
         raise ValueError("Number of labels does not match "
                          "number of features\n")
     labels = np.array(labels, dtype=np.float64, order="c")
@@ -126,7 +126,7 @@ def _build_tree(is_classification, features, labels, criterion,
         
         sample_dims = random_state.shuffle(np.arange(n_dims))[:F]
         features = features[:, sample_dims]
-        n_samples, n_dims = features.shape
+        n_total_samples, n_dims = features.shape
 
     # make data fortran layout
     if not features.flags["F_CONTIGUOUS"]:
@@ -143,31 +143,30 @@ def _build_tree(is_classification, features, labels, criterion,
     if max_depth <= 0:
         raise ValueError("max_depth must be greater than zero.\n"
                          "max_depth is %s." % max_depth)
-    
-    #n_rec_part_called = np.zeros((1,), dtype=np.int)
-    def recursive_partition(sample_mask, parent_split_error, depth):
-        #n_rec_part_called[0] += 1
+
+    n_rec_part_called = np.zeros((1,), dtype=np.int)
+    def recursive_partition(sample_mask, parent_split_error, depth, n_samples):
+        n_rec_part_called[0] += 1
         is_leaf = False
         # If current depth larger than max return leaf.
         if depth >= max_depth:
             is_leaf = True
         # else try to find a split point
         else:
-            # FIXME this segfaults
             dim, thresh, error, nll = _tree._find_best_split(sample_mask,
-                                                         parent_split_error,
-                                                         features, sorted_features,
-                                                         labels, criterion, K)
+                                                             parent_split_error,
+                                                             features, sorted_features,
+                                                             labels, criterion, K,
+                                                             n_samples)
             if dim != -1:
                 # we found a split point
                 # check if num samples to the left and right of split point
                 # is larger than min_split
-                if nll < min_split or n_dims - nll < min_split:
+                if nll <= min_split or n_samples - nll <= min_split:
                     # splitting point does not suffice min_split
                     is_leaf = True
                 else:
-                    # valid splitting point
-                    pass
+                    is_leaf = False
             else:
                 # could not find splitting point
                 is_leaf = True
@@ -181,22 +180,23 @@ def _build_tree(is_classification, features, labels, criterion,
             else:
                 new_node = Leaf(np.mean(labels[sample_mask]))
         else:
-            # update sample_mask
             split = features[:, dim] < thresh
+            left_sample_mask = split & sample_mask
+            right_sample_mask = ~split & sample_mask
             new_node = Node(dimension=sample_dims[dim],
-                            value=thresh,
-                            error=error,
-                            left=recursive_partition(split & sample_mask,
-                                                     error, depth + 1),
-                            right=recursive_partition(~split & sample_mask,
-                                                      error, depth + 1))
+                            value=thresh, error=error,
+                            left=recursive_partition(left_sample_mask, error,
+                                                     depth + 1, nll),
+                            right=recursive_partition(right_sample_mask,
+                                                      error, depth + 1,
+                                                      n_samples - nll))
     
         # assert new_node != None
         return new_node
 
-    root = recursive_partition(np.ones((n_samples,), dtype=np.bool),
-                               np.inf, 0)
-    #print "recursive_partition called %d times" % n_rec_part_called[0]
+    root = recursive_partition(np.ones((n_total_samples,), dtype=np.bool),
+                               np.inf, 0, n_total_samples)
+    print "recursive_partition called %d times" % n_rec_part_called[0]
     return root
 
 

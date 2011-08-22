@@ -17,6 +17,7 @@ import numpy as np
 import pylab as pl
 import gc
 from datetime import datetime
+from time import time
 
 # to store the results
 scikit_classifier_results = []
@@ -69,10 +70,13 @@ def profile(n_samples=1000, dim=50, K=2):
     
 
 if __name__ == '__main__':
-
     X = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
     y = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.labels")
     from scikits.learn.tree import DecisionTreeClassifier
     clf = DecisionTreeClassifier()
+    t0 = time()
     clf.fit(X, y)
+    delta = (time() - t0)
+    score = clf.score(X, y)
+    print "score: %.4f, time: %.4fs" % (score, delta)
 
