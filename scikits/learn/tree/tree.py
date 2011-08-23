@@ -27,11 +27,11 @@ __all__ = [
 
 lookup_c = \
       {'gini': _tree.Gini,
-       'entropy': _tree.eval_entropy,
-       'miss': _tree.eval_miss,
+       'entropy': _tree.Entropy,
+       #'miss': _tree.eval_miss,
        }
 lookup_r = \
-      {'mse': _tree.eval_mse,
+      {#'mse': _tree.eval_mse,
       }
 
 
@@ -310,8 +310,8 @@ class BaseDecisionTree(BaseEstimator):
             
             # create new Criterion extension type
             criterion_clazz = lookup_c[self.criterion]
-            pm_left = np.zeros((self.K,), dtype=np.float64)
-            pm_right = np.zeros((self.K,), dtype=np.float64)
+            pm_left = np.zeros((self.K,), dtype=np.int32)
+            pm_right = np.zeros((self.K,), dtype=np.int32)
             criterion = criterion_clazz(self.K, pm_left, pm_right)
     
             self.tree = _build_tree(True, X, y, criterion,

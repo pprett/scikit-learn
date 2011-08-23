@@ -24,167 +24,198 @@ cdef extern from "float.h":
 
 
 cdef class Criterion:
+    """Interface for splitting criteria, both regression and classification.
+    """
     
     cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
                    int n_total_samples):
+        """Init the criteria for each feature `i`. """
         pass
 
     cdef int update(self, int a, int b, np.float64_t *labels,
                      np.int8_t *sample_mask, np.float64_t *features_i,
                      int *sorted_features_i):
+        """Update the criteria for each interval [a,b) where a and b
+        are indices in `sorted_features_i`. """
         pass
 
     cdef double eval(self):
+        """Evaluate the criteria (aka the split error). """
         pass
 
-cdef class Gini(Criterion):
+cdef class ClassificationCriterion(Criterion):
+    """Abstract criterion for classification.
 
-    cdef np.float64_t *pm_left_ptr
-    cdef np.float64_t *pm_right_ptr
+    Attributes
+    ----------
+    pm_left_ptr : int*
+        label counts for samples left of splitting point.
+    pm_right_ptr : int*
+        label counts for samples right of splitting point.
+    nml : int
+        number of samples left of splitting point.
+    nmr : int
+        number of samples right of splitting point.
+    """
+
+    cdef int *pm_left_ptr
+    cdef int *pm_right_ptr
 
     cdef int nml, nmr, K, n_total_samples, n_samples
     
-    def __init__(self, int K, np.ndarray[np.float64_t, ndim=1] pm_left,
-                 np.ndarray[np.float64_t, ndim=1] pm_right):
+    def __init__(self, int K, np.ndarray[np.int32_t, ndim=1] pm_left,
+                 np.ndarray[np.int32_t, ndim=1] pm_right):
         self.K = K
         self.nml = 0
         self.nmr = 0
-        self.pm_left_ptr = <np.float64_t *>pm_left.data
-        self.pm_right_ptr = <np.float64_t *>pm_right.data
+        self.pm_left_ptr = <int *>pm_left.data
+        self.pm_right_ptr = <int *>pm_right.data
 
     cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
                    int n_total_samples):
-        """Initializes the criterion for a new feature (col of `features`).
-        """
+        """Initializes the criterion for a new feature (col of `features`)."""
         cdef int c = 0, j = 0
         self.nml = 0
         self.nmr = 0
         for c from 0 <= c < self.K:
-            self.pm_left_ptr[c] = 0.0
-            self.pm_right_ptr[c] = 0.0
+            self.pm_left_ptr[c] = 0
+            self.pm_right_ptr[c] = 0
 
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
             c = <int>(labels[j])
-            self.pm_right_ptr[c] += 1.0
+            self.pm_right_ptr[c] += 1
             self.nmr += 1
+            
         self.n_samples = self.nmr
         self.n_total_samples = n_total_samples
 
     cdef int update(self, int a, int b, np.float64_t *labels,
-                     np.int8_t *sample_mask, np.float64_t *features_i,
-                     int *sorted_features_i):
+                    np.int8_t *sample_mask, np.float64_t *features_i,
+                    int *sorted_features_i):
         """Update the counts for docs between `sorted_features_i[a]`
-        and `sorted_features_i[b]`.
-        """
+        and `sorted_features_i[b]`. """
+        cdef int c, idx, j
         ## all samples from a to b-1 are on the left side
-        for j from a <= j < b:
+        for idx from a <= idx < b:
+            j = sorted_features_i[idx]
             if sample_mask[j] == 0:
                 continue
             ## we will distribute c from right to left
-            c = <int>(labels[sorted_features_i[j]])
+            #if features_i[j] < t:
+            c = <int>(labels[j])
             self.pm_right_ptr[c] -= 1
             self.pm_left_ptr[c] += 1
             self.nmr -= 1
             self.nml += 1
+            
         return self.nml
 
     cdef double eval(self):
-        cdef np.float64_t gini_left = 1.0, gini_right = 1.0
+        pass
+
+
+cdef class Gini(ClassificationCriterion):
+    """Gini Index splitting criteria.
+    
+    Gini index = \sum_{k=0}^{K-1} pmk (1 - pmk)
+               = 1 - \sum_{k=0}^{K-1} pmk ** 2
+    """
+
+    cdef double eval(self):
+        """Returns Gini index of left branch + Gini index of right branch. """
+        cdef double gini_left = 1.0
+        cdef double gini_right = 1.0
         cdef int k
-        cdef double nml = <double>self.nml
-        cdef double nmr = <double>self.nmr
+        cdef double e1, e2
+        cdef double nml = <double> self.nml
+        cdef double nmr = <double> self.nmr
         
         for k from 0 <= k < self.K:
             gini_left -= (self.pm_left_ptr[k] / nml) * (self.pm_left_ptr[k] / nml)
             gini_right -= (self.pm_right_ptr[k] / nmr) * (self.pm_right_ptr[k] / nmr)
 
-        error = nml / self.n_samples * gini_left + \
-                nmr / self.n_samples * gini_right
-        return error
-        
-
-    def __reduce__(self):
-       return Gini, (self.K,)
+        e1 = (nml / self.n_samples) * gini_left
+        e2 = (nmr / self.n_samples) * gini_right
+        return e1 + e2
 
 
-cpdef np.float64_t eval_entropy(np.ndarray[np.float64_t, ndim=1] labels,
-                          np.ndarray[np.float64_t, ndim=1] pm):
+cdef class Entropy(ClassificationCriterion):
+    """Entropy splitting criteria.
+
+    Cross Entropy = - \sum_{k=0}^{K-1} pmk log(pmk)
+    
     """
+
+    cdef double eval(self):
+        """Returns Entropy of left branch + Entropy index of right branch. """
+        cdef double H_left = 0.0
+        cdef double H_right = 0.0
+        cdef int k
+        cdef double e1, e2
+        cdef double nml = <double> self.nml
+        cdef double nmr = <double> self.nmr
         
-        Cross Entropy = - \sum_{k=0}^{K-1} pmk log(pmk)
+        for k from 0 <= k < self.K:
+            if self.pm_left_ptr[k] > 0:
+                H_left += -(self.pm_left_ptr[k] / nml) * log(self.pm_left_ptr[k] / nml)
+            if self.pm_right_ptr[k] > 0:
+                H_right += -(self.pm_right_ptr[k] / nmr) * log(self.pm_right_ptr[k] / nmr)
+
+        e1 = (nml / self.n_samples) * H_left
+        e2 = (nmr / self.n_samples) * H_right
+        return e1 + e2
+
+
+## cpdef np.float64_t eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
+##                        np.ndarray[np.float64_t, ndim=1] pm):
+##     """
+        
+##         Misclassification error = (1 - pmk)
             
-    """
-    cdef int n_labels = labels.shape[0]
-    cdef int K = pm.shape[0]    
+##     """
+##     cdef int n_labels = labels.shape[0]
+##     cdef int K = pm.shape[0]    
     
-    cdef int i = 0
-    cdef int c
-    cdef np.float64_t H = 0.0
+##     cdef int i = 0
+##     for i in range(K):
+##         pm[i] = 0.
     
-    for i from 0 <= i < K:
-        pm[i] = 0.0
-    
-    for i from 0 <= i < n_labels:
-        c = (int)(labels[i])
-        pm[c] += 1.0 / n_labels
-
-    for i from 0 <= i < K:
-        if pm[i] > 0 :    
-            H +=  -pm[i] * log(pm[i])
-         
-    return H   
-
-
-cpdef np.float64_t eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
-                       np.ndarray[np.float64_t, ndim=1] pm):
-    """
+##     cdef int value
+##     for i in range(n_labels):       
+##         value = (int)(labels[i])
+##         pm[value] += 1. / n_labels
         
-        Misclassification error = (1 - pmk)
-            
-    """
-    cdef int n_labels = labels.shape[0]
-    cdef int K = pm.shape[0]    
-    
-    cdef int i = 0
-    for i in range(K):
-        pm[i] = 0.
-    
-    cdef int value
-    for i in range(n_labels):       
-        value = (int)(labels[i])
-        pm[value] += 1. / n_labels
-        
-    cdef np.float64_t H = 1. - pm.max()
+##     cdef np.float64_t H = 1. - pm.max()
 
-    ## FIXME this is broken!
+##     ## FIXME this is broken!
     
-"""
- Regression entropy measures
+## """
+##  Regression entropy measures
  
-"""      
-cpdef np.float64_t eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
-                      np.ndarray[np.float64_t, ndim=1] pm):
-    """             
-        MSE =  \sum_i (y_i - c0)^2  / N
+## """      
+## cpdef np.float64_t eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
+##                       np.ndarray[np.float64_t, ndim=1] pm):
+##     """             
+##         MSE =  \sum_i (y_i - c0)^2  / N
         
-        pm is a redundant argument (intentional).
-    """     
-    cdef int n_labels = labels.shape[0]
+##         pm is a redundant argument (intentional).
+##     """     
+##     cdef int n_labels = labels.shape[0]
 
-    cdef float c0
-    cdef Py_ssize_t i = 0
-    for i in range(n_labels):
-        c0 += labels[i]
-    c0 /= n_labels
+##     cdef float c0
+##     cdef Py_ssize_t i = 0
+##     for i in range(n_labels):
+##         c0 += labels[i]
+##     c0 /= n_labels
 
-    cdef np.float64_t H = 0.
-    for i in range(n_labels):
-        H += pow(labels[i] - c0, 2) 
-    H /= n_labels
+##     cdef np.float64_t H = 0.
+##     for i in range(n_labels):
+##         H += pow(labels[i] - c0, 2) 
+##     H /= n_labels
         
-    return H
+##     return H
 
 
 
@@ -193,7 +224,7 @@ cdef int smallest_sample_larger_than(int sample_idx,
                                  np.float64_t *features_i,
                                  int *sorted_features_i,
                                  np.int8_t *sample_mask,
-                                 int n_samples):
+                                 int n_total_samples):
     """Find index in the `sorted_features` matrix for sample
     who's feature `i` value is just about
     greater than those of the sample `sorted_features_i[sample_idx]`.
@@ -207,15 +238,15 @@ cdef int smallest_sample_larger_than(int sample_idx,
         I.e. `sorted_features_i[sample_idx] < sorted_features_i[next_sample_idx]`
         -1 if no such element exists.
     """
-    cdef int j = 0
+    cdef int idx = 0
     cdef np.float64_t threshold = DBL_MIN
     if sample_idx > -1:
         threshold = features_i[sorted_features_i[sample_idx]]
-    for j from sample_idx < j < n_samples:
-        if sample_mask[j] == 0:
+    for idx from sample_idx < idx < n_total_samples:
+        if sample_mask[sorted_features_i[idx]] == 0:
             continue
-        if features_i[sorted_features_i[j]] > threshold:
-            return j
+        if features_i[sorted_features_i[idx]] > threshold:
+            return idx
     return -1
 
 
@@ -282,12 +313,17 @@ def _find_best_split(np.ndarray sample_mask,
     """
     cdef int n_total_samples = features.shape[0]
     cdef int n_features = features.shape[1]
-    cdef np.float64_t *labels_ptr = <np.float64_t *>labels.data
-    cdef np.float64_t *features_i = NULL
-    cdef int *sorted_features_i
-    cdef np.int8_t *sample_mask_ptr = <np.int8_t *>sample_mask.data
     cdef int i, best_i = -1, best_nml, nml = 0, a, b
     cdef np.float64_t t, error, best_error, best_t
+
+    # pointer access to ndarray data
+    cdef np.float64_t *labels_ptr = <np.float64_t *>labels.data
+    cdef np.float64_t *features_i = NULL
+    cdef int *sorted_features_i = NULL
+    cdef np.int8_t *sample_mask_ptr = <np.int8_t *>sample_mask.data
+
+    # Compute the column strides (inc in pointer elem to get from col i to i+1)
+    # for `features` and `sorted_features`
     cdef int features_elem_stride = features.strides[0]
     cdef int features_col_stride = features.strides[1]
     cdef int features_stride = features_col_stride / features_elem_stride
@@ -314,21 +350,19 @@ def _find_best_split(np.ndarray sample_mask,
             if b == -1:
                 break
 
-            # compute split point
-            t = (features_i[sorted_features_i[a]] +
-                 features_i[sorted_features_i[b]]) / 2.0
-
             # update criterion for interval [a, b)
             nml = criterion.update(a, b, labels_ptr, sample_mask_ptr, features_i,
-                             sorted_features_i)
+                                   sorted_features_i)
 
             # get criterion value
             error = criterion.eval()
-            #print "a=%d b=%d t=%.4f e=%.4f nml=%d" % (a, b, t, error, nml)
             
             # check if current criterion smaller than parent criterion
             # if this is never true best_i is -1.
             if error < parent_split_error:
+                # compute split point
+                t = (features_i[sorted_features_i[a]] +
+                     features_i[sorted_features_i[b]]) / 2.0
                 parent_split_error = error
                 best_i = i
                 best_t = t
@@ -336,5 +370,4 @@ def _find_best_split(np.ndarray sample_mask,
                 best_nml = nml
                 
             a = b
-    #print "best i=%d t=%.4f e=%.4f nml=%d" % (best_i, best_t, best_error, best_nml)
     return best_i, best_t, best_error, best_nml

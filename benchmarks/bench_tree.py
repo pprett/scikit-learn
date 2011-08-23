@@ -70,13 +70,15 @@ def profile(n_samples=1000, dim=50, K=2):
     
 
 if __name__ == '__main__':
-    X = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
-    y = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.labels")
+    X_train = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
+    y_train = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.labels")
+    X_test = np.loadtxt("/home/pprett/corpora/madelon/madelon_valid.data")
+    y_test = np.loadtxt("/home/pprett/corpora/madelon/madelon_valid.labels")
     from scikits.learn.tree import DecisionTreeClassifier
-    clf = DecisionTreeClassifier()
-    t0 = time()
-    clf.fit(X, y)
-    delta = (time() - t0)
-    score = clf.score(X, y)
-    print "score: %.4f, time: %.4fs" % (score, delta)
+    clf = DecisionTreeClassifier(max_depth=100, min_split=1)
+    t0 = datetime.now()#time()
+    clf.fit(X_train, y_train)
+    delta = (datetime.now() - t0)
+    score = np.mean(clf.predict(X_test) == y_test)
+    print score, delta
 
