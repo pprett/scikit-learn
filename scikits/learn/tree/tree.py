@@ -26,7 +26,7 @@ __all__ = [
     ]
 
 lookup_c = \
-      {'gini': _tree.eval_gini,
+      {'gini': _tree.Gini,
        'entropy': _tree.eval_entropy,
        'miss': _tree.eval_miss,
        }
@@ -106,6 +106,8 @@ def _build_tree(is_classification, features, labels, criterion,
 
     K : int
         Number of classes (for regression us 0).
+    criterion : _tree.Criterion
+        Split criterion extension type.
     """
     n_total_samples, n_dims = features.shape
     if labels.shape[0] != n_total_samples:
@@ -305,7 +307,14 @@ class BaseDecisionTree(BaseEstimator):
             self.K = self.classes.shape[0]
             if y.min() < 0:
                 raise ValueError("Labels must be in the range [0 to %s)", self.K)
-            self.tree = _build_tree(True, X, y, lookup_c[self.criterion],
+            
+            # create new Criterion extension type
+            criterion_clazz = lookup_c[self.criterion]
+            pm_left = np.zeros((self.K,), dtype=np.float64)
+            pm_right = np.zeros((self.K,), dtype=np.float64)
+            criterion = criterion_clazz(self.K, pm_left, pm_right)
+    
+            self.tree = _build_tree(True, X, y, criterion,
                                     self.max_depth, self.min_split, self.F,
                                     self.K, self.random_state)
         else: # regression

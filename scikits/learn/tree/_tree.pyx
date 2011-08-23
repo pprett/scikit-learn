@@ -22,98 +22,92 @@ cdef extern from "math.h":
 cdef extern from "float.h":
     cdef extern double DBL_MIN
 
- 
-"""
- Classification entropy measures
- 
-    From Hastie et al. Elements of Statistical Learning, 2009.
-         
-    If a target is a classification outcome taking on values 0,1,...,K-1
-    In node m, representing a region Rm with Nm observations, let
-            
-       pmk = 1/ Nm \sum_{x_i in Rm} I(yi = k)
-          
-    be the proportion of class k observations in node m   
-"""  
 
-cpdef np.float64_t eval_gini(np.ndarray[np.float64_t, ndim=1] labels, 
-                       np.ndarray[np.float64_t, ndim=1] pm):
-    """
+cdef class Criterion:
+    
+    cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
+                   int n_total_samples):
+        pass
+
+    cdef int update(self, int a, int b, np.float64_t *labels,
+                     np.int8_t *sample_mask, np.float64_t *features_i,
+                     int *sorted_features_i):
+        pass
+
+    cdef double eval(self):
+        pass
+
+cdef class Gini(Criterion):
+
+    cdef np.float64_t *pm_left_ptr
+    cdef np.float64_t *pm_right_ptr
+
+    cdef int nml, nmr, K, n_total_samples, n_samples
+    
+    def __init__(self, int K, np.ndarray[np.float64_t, ndim=1] pm_left,
+                 np.ndarray[np.float64_t, ndim=1] pm_right):
+        self.K = K
+        self.nml = 0
+        self.nmr = 0
+        self.pm_left_ptr = <np.float64_t *>pm_left.data
+        self.pm_right_ptr = <np.float64_t *>pm_right.data
+
+    cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
+                   int n_total_samples):
+        """Initializes the criterion for a new feature (col of `features`).
+        """
+        cdef int c = 0, j = 0
+        self.nml = 0
+        self.nmr = 0
+        for c from 0 <= c < self.K:
+            self.pm_left_ptr[c] = 0.0
+            self.pm_right_ptr[c] = 0.0
+
+        for j from 0 <= j < n_total_samples:
+            if sample_mask[j] == 0:
+                continue
+            c = <int>(labels[j])
+            self.pm_right_ptr[c] += 1.0
+            self.nmr += 1
+        self.n_samples = self.nmr
+        self.n_total_samples = n_total_samples
+
+    cdef int update(self, int a, int b, np.float64_t *labels,
+                     np.int8_t *sample_mask, np.float64_t *features_i,
+                     int *sorted_features_i):
+        """Update the counts for docs between `sorted_features_i[a]`
+        and `sorted_features_i[b]`.
+        """
+        ## all samples from a to b-1 are on the left side
+        for j from a <= j < b:
+            if sample_mask[j] == 0:
+                continue
+            ## we will distribute c from right to left
+            c = <int>(labels[sorted_features_i[j]])
+            self.pm_right_ptr[c] -= 1
+            self.pm_left_ptr[c] += 1
+            self.nmr -= 1
+            self.nml += 1
+        return self.nml
+
+    cdef double eval(self):
+        cdef np.float64_t gini_left = 1.0, gini_right = 1.0
+        cdef int k
+        cdef double nml = <double>self.nml
+        cdef double nmr = <double>self.nmr
         
-        Gini index = \sum_{k=0}^{K-1} pmk (1 - pmk)
-                   = 1 - \sum_{k=0}^{K-1} pmk ** 2
-            
-    """       
-    cdef int n_labels = labels.shape[0]
-    cdef int K = pm.shape[0]
-    
-    cdef int i = 0
-    cdef int c
-    for i from 0 <= i < K:
-        pm[i] = 0.0
-    
-    for i from 0 <= i < n_labels:
-        c = (int)(labels[i])
-        pm[c] += 1. / n_labels
-    
-    cdef np.float64_t H = 1.
-    cdef Py_ssize_t k
-    for k in range(K): 
-        H -=  pow(pm[k],2) 
-         
-    return H
+        for k from 0 <= k < self.K:
+            gini_left -= (self.pm_left_ptr[k] / nml) * (self.pm_left_ptr[k] / nml)
+            gini_right -= (self.pm_right_ptr[k] / nmr) * (self.pm_right_ptr[k] / nmr)
 
-cdef np.float64_t gini(np.float64_t *pm, int K):
-    """
+        error = nml / self.n_samples * gini_left + \
+                nmr / self.n_samples * gini_right
+        return error
         
-        Gini index = \sum_{k=0}^{K-1} pmk (1 - pmk)
-                   = 1 - \sum_{k=0}^{K-1} pmk ** 2
-            
-    """       
-    cdef np.float64_t H = 1.0
-    cdef int k
-    for k from 0 <= k < K:
-        H -= pm[k] * pm[k] 
-    return H
 
+    def __reduce__(self):
+       return Gini, (self.K,)
 
-cdef void fill_pm(np.float64_t *pm_left,
-                  np.float64_t *pm_right,
-                  int *nll, int *nlr, 
-                  np.float64_t *labels,
-                  np.int8_t *sample_mask,
-                  np.float64_t *features_i,
-                  np.float64_t t, int n_samples,
-                  int n_total_samples, int K):
-    """Fills the count arrays `pm_left` and `pm_right`.
-
-    Fill in the class counts for the left and right side of the split
-    for feature i and threshold `t`.
-    """
-    # assert features_at_i.shape == labels.shape
-    cdef int c = 0, j = 0, count
-
-    # init pm counts to zero
-    for c from 0 <= c < K:
-        pm_left[c] = 0.0
-        pm_right[c] = 0.0
-
-    for j from 0 <= j < n_total_samples:
-        if sample_mask[j] == 0:
-            continue
-        c = <int>(labels[j])
-        if features_i[j] < t:
-            pm_left[c] += 1.0
-            count += 1
-        else:
-            pm_right[c] += 1.0
-            
-    nll[0] = count
-    nlr[0] = n_samples - count
-    for c from 0 <= c < K:
-        pm_left[c] /= nll[0]
-        pm_right[c] /= nlr[0]
-    
 
 cpdef np.float64_t eval_entropy(np.ndarray[np.float64_t, ndim=1] labels,
                           np.ndarray[np.float64_t, ndim=1] pm):
@@ -193,6 +187,8 @@ cpdef np.float64_t eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
     return H
 
 
+
+
 cdef int smallest_sample_larger_than(int sample_idx,
                                  np.float64_t *features_i,
                                  int *sorted_features_i,
@@ -252,7 +248,7 @@ def _find_best_split(np.ndarray sample_mask,
                      np.ndarray[np.float64_t, ndim=2, mode="fortran"] features,
                      np.ndarray[np.int32_t, ndim=2, mode="fortran"] sorted_features,
                      np.ndarray[np.float64_t, ndim=1, mode="c"] labels,
-                     criterion, int K, int n_samples):
+                     Criterion criterion, int K, int n_samples):
     """
     Parameters
     ----------
@@ -268,7 +264,7 @@ def _find_best_split(np.ndarray sample_mask,
         index of the smallest value of feature j.
     labels : ndarray, shape (n_samples,), dtype=float64
         The labels.
-    criterion : func
+    criterion : Criterion
         The criterion function to be minimized.
     K : int
         The number of classes - for regression use 0.
@@ -287,15 +283,11 @@ def _find_best_split(np.ndarray sample_mask,
     cdef int n_total_samples = features.shape[0]
     cdef int n_features = features.shape[1]
     cdef np.float64_t *labels_ptr = <np.float64_t *>labels.data
-    cdef np.ndarray[np.float64_t, ndim=1] pm_left = np.zeros((K,), dtype=np.float64)
-    cdef np.ndarray[np.float64_t, ndim=1] pm_right = np.zeros((K,), dtype=np.float64)
-    cdef np.float64_t *pm_left_ptr = <np.float64_t *>pm_left.data
-    cdef np.float64_t *pm_right_ptr = <np.float64_t *>pm_right.data
     cdef np.float64_t *features_i = NULL
     cdef int *sorted_features_i
     cdef np.int8_t *sample_mask_ptr = <np.int8_t *>sample_mask.data
-    cdef int i, best_i = -1, best_nll, nll = 0, nlr = 0, a, b, k
-    cdef np.float64_t e1, e2, t, error, best_error, best_t
+    cdef int i, best_i = -1, best_nml, nml = 0, a, b
+    cdef np.float64_t t, error, best_error, best_t
     cdef int features_elem_stride = features.strides[0]
     cdef int features_col_stride = features.strides[1]
     cdef int features_stride = features_col_stride / features_elem_stride
@@ -304,25 +296,35 @@ def _find_best_split(np.ndarray sample_mask,
     cdef int sorted_features_stride = sorted_features_col_stride / sorted_features_elem_stride   
     
     for i from 0 <= i < n_features:
+        # get i-th col of features and features_sorted
         features_i = (<np.float64_t *>features.data) + features_stride * i
         sorted_features_i = (<int *>sorted_features.data) + sorted_features_stride * i
-        
+
+        # init the criterion for this feature
+        criterion.init(labels_ptr, sample_mask_ptr, n_total_samples)
+
+        # get sample in mask with smallest value for i-th feature
         a = smallest_sample_larger_than(-1, features_i, sorted_features_i,
                                         sample_mask_ptr, n_total_samples)
         while True:
+            # get sample in mask with val for i-th feature just larger than `a`
             b = smallest_sample_larger_than(a, features_i, sorted_features_i,
                                             sample_mask_ptr, n_total_samples)
+            # if -1 there's none and we are fin
             if b == -1:
                 break
 
             # compute split point
             t = (features_i[sorted_features_i[a]] +
                  features_i[sorted_features_i[b]]) / 2.0
-            
-            fill_pm(pm_left_ptr, pm_right_ptr, &nll, &nlr, labels_ptr,
-                    sample_mask_ptr, features_i, t, n_samples, n_total_samples, K)
-            error = (<double>nll) / n_samples * gini(pm_left_ptr, K) + \
-                    (<double>nlr) / n_samples * gini(pm_right_ptr, K)
+
+            # update criterion for interval [a, b)
+            nml = criterion.update(a, b, labels_ptr, sample_mask_ptr, features_i,
+                             sorted_features_i)
+
+            # get criterion value
+            error = criterion.eval()
+            #print "a=%d b=%d t=%.4f e=%.4f nml=%d" % (a, b, t, error, nml)
             
             # check if current criterion smaller than parent criterion
             # if this is never true best_i is -1.
@@ -331,7 +333,8 @@ def _find_best_split(np.ndarray sample_mask,
                 best_i = i
                 best_t = t
                 best_error = error
-                best_nll = nll
+                best_nml = nml
                 
             a = b
-    return best_i, best_t, best_error, best_nll
+    #print "best i=%d t=%.4f e=%.4f nml=%d" % (best_i, best_t, best_error, best_nml)
+    return best_i, best_t, best_error, best_nml
