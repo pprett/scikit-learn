@@ -72,32 +72,6 @@ class Node(object):
                % (self.dimension, self.value, self.error)
 
 
-def _find_best_split(features, labels, criterion, K):
-    n_samples, n_features = features.shape
-    K = int(np.abs(labels.max())) + 1
-    pm = np.zeros((K,), dtype=np.float64)
-
-    best = None
-    split_error = criterion(labels, pm)
-    for i in xrange(n_features):
-        features_at_i = features[:, i]
-        domain_i = sorted(set(features_at_i))
-        for d1, d2 in zip(domain_i[:-1], domain_i[1:]):
-            t = (d1 + d2) / 2.
-            cur_split = (features_at_i < t)
-            left_labels = labels[cur_split]
-            right_labels = labels[~cur_split]
-            e1 = len(left_labels) / n_samples * \
-                criterion(left_labels, pm)
-            e2 = len(right_labels) / n_samples * \
-                criterion(right_labels, pm)
-            error = e1 + e2
-            if error < split_error:
-                split_error = error
-                best = i, t, error
-    return best
-
-
 def _build_tree(is_classification, features, labels, criterion,
                 max_depth, min_split, F, K, random_state):
     """
