@@ -31,7 +31,7 @@ lookup_c = \
        #'miss': _tree.eval_miss,
        }
 lookup_r = \
-      {#'mse': _tree.eval_mse,
+      {'mse': _tree.MSE,
       }
 
 
@@ -293,9 +293,13 @@ class BaseDecisionTree(BaseEstimator):
                                     self.K, self.random_state)
         else: # regression
             y = np.asanyarray(y, dtype=np.float64, order='C')
-            self.tree = _build_tree(False, X, y, lookup_r[self.criterion],
-                                    self.max_depth, self.min_split, self.F,
-                                    0, self.random_state)
+
+            # create new Criterion extension type
+            criterion_clazz = lookup_r[self.criterion]
+            criterion = criterion_clazz()
+            
+            self.tree = _build_tree(False, X, y, criterion, self.max_depth,
+                                    self.min_split, self.F, 0, self.random_state)
         return self
 
     def predict(self, X):

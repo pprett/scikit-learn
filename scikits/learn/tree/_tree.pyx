@@ -168,6 +168,109 @@ cdef class Entropy(ClassificationCriterion):
         return e1 + e2
 
 
+cdef class RegressionCriterion(Criterion):
+    """Abstract criterion for regression.
+
+    Attributes
+    ----------
+    sum_left : double
+        The sum of the samples left of the SP.
+    sum_right : double
+        The sum of the samples right of the SP.
+    nml : int
+        number of samples left of splitting point.
+    nmr : int
+        number of samples right of splitting point.
+    """
+
+    cdef double sum_left
+    cdef double sum_right
+
+    cdef np.float64_t *labels
+    cdef np.int8_t *sample_mask
+
+    cdef int nml, nmr, K, n_total_samples, n_samples
+    
+    def __init__(self):
+        self.sum_left = 0.0
+        self.sum_right = 0.0
+        self.nml = 0
+        self.nmr = 0
+
+    cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
+                   int n_total_samples):
+        """Initializes the criterion for a new feature (col of `features`)."""
+        cdef int j = 0
+        self.nml = 0
+        self.nmr = 0
+        self.sum_left = 0.0
+        self.sum_right = 0.0
+        self.labels = labels
+        self.sample_mask = sample_mask
+
+        for j from 0 <= j < n_total_samples:
+            if sample_mask[j] == 0:
+                continue
+            self.sum_right += labels[j]
+            self.nmr += 1
+            
+        self.n_samples = self.nmr
+        self.n_total_samples = n_total_samples
+
+    cdef int update(self, int a, int b, np.float64_t *labels,
+                    np.int8_t *sample_mask, np.float64_t *features_i,
+                    int *sorted_features_i):
+        """Update the mean of left and right branch for docs between
+        `sorted_features_i[a]` and `sorted_features_i[b]`. """
+        cdef int idx, j
+        cdef double val
+        ## all samples from a to b-1 are on the left side
+        for idx from a <= idx < b:
+            j = sorted_features_i[idx]
+            if sample_mask[j] == 0:
+                continue
+            val = labels[j]
+            self.sum_right -= val
+            self.sum_left += val
+            self.nmr -= 1
+            self.nml += 1
+            
+        return self.nml
+
+    cdef double eval(self):
+        pass
+
+
+cdef class MSE(RegressionCriterion):
+
+    cdef double eval(self):
+        """             
+        MSE =  \sum_i (y_i - c0)^2  / N
+        
+        """
+        cdef double mean_left = self.sum_left / self.nml
+        cdef double mean_right = self.sum_right / self.nmr
+
+        cdef double var_left = 0.0
+        cdef double var_right = 0.0
+        cdef int j
+        cdef double e1, e2
+
+        for j from 0 <= j < self.n_total_samples:
+            if self.sample_mask[j] == 0:
+                continue
+            var_left += (self.labels[j] - mean_left) * (self.labels[j] - mean_left)
+            var_right += (self.labels[j] - mean_right) * (self.labels[j] - mean_right)
+
+        var_left /= self.n_samples
+        var_right /= self.n_samples
+
+        e1 = ((<double> self.nml) / self.n_samples) * var_left
+        e2 = ((<double> self.nmr) / self.n_samples) * var_right
+
+        return e1 + e2
+
+
 ## cpdef np.float64_t eval_miss(np.ndarray[np.float64_t, ndim=1] labels,
 ##                        np.ndarray[np.float64_t, ndim=1] pm):
 ##     """
