@@ -106,12 +106,12 @@ del y
 
 ######################################################################
 ## Standardize first 10 features (the numerical ones)
-mean = X_train.mean(axis=0)
-std = X_train.std(axis=0)
-mean[10:] = 0.0
-std[10:] = 1.0
-X_train = (X_train-mean) / std
-X_test = (X_test-mean) / std
+#mean = X_train.mean(axis=0)
+#std = X_train.std(axis=0)
+#mean[10:] = 0.0
+#std[10:] = 1.0
+#X_train = (X_train-mean) / std
+#X_test = (X_test-mean) / std
 
 ######################################################################
 ## Print dataset statistics
@@ -154,12 +154,12 @@ liblinear_parameters = {
     'dual': False,
     'tol': 1e-3,
     }
-liblinear_res = benchmark(LinearSVC(**liblinear_parameters))
-liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
+#liblinear_res = benchmark(LinearSVC(**liblinear_parameters))
+#liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
 
 ######################################################################
 ## Train GaussianNB model
-gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
+#gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
 
 ######################################################################
 ## Train SGD model
@@ -167,8 +167,14 @@ sgd_parameters = {
     'alpha': 0.001,
     'n_iter': 2,
     }
-sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
-    **sgd_parameters))
+#sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
+#    **sgd_parameters))
+
+######################################################################
+## Train CART
+from scikits.learn.tree import DecisionTreeClassifier
+res = benchmark(DecisionTreeClassifier(max_depth=50, min_split=5))
+cart_err, cart_train_time, cart_test_time = res
 
 ######################################################################
 ## Print classification performance
@@ -187,9 +193,10 @@ def print_row(clf_type, train_time, test_time, err):
 print("%s %s %s %s" % ("Classifier  ", "train-time", "test-time",
                        "error-rate"))
 print("-" * 44)
-print_row("Liblinear", liblinear_train_time, liblinear_test_time,
-          liblinear_err)
-print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
-print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
+#print_row("Liblinear", liblinear_train_time, liblinear_test_time,
+#          liblinear_err)
+#print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
+#print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
+print_row("CART", cart_train_time, cart_test_time, cart_err)
 print("")
 print("")

@@ -69,16 +69,32 @@ def profile(n_samples=1000, dim=50, K=2):
     bench_scikit_tree_classifier(X, Y)
     
 
-if __name__ == '__main__':
+def bench_madelon():
     X_train = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
     y_train = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.labels")
     X_test = np.loadtxt("/home/pprett/corpora/madelon/madelon_valid.data")
     y_test = np.loadtxt("/home/pprett/corpora/madelon/madelon_valid.labels")
     from scikits.learn.tree import DecisionTreeClassifier
-    clf = DecisionTreeClassifier(max_depth=100, min_split=1)
-    t0 = datetime.now()#time()
+    clf = DecisionTreeClassifier(max_depth=100, min_split=5)
+    t0 = datetime.now()
     clf.fit(X_train, y_train)
     delta = (datetime.now() - t0)
     score = np.mean(clf.predict(X_test) == y_test)
     print score, delta
 
+def bench_arcene():
+    X_train = np.loadtxt("/home/pprett/corpora/arcene/arcene_train.data")
+    y_train = np.loadtxt("/home/pprett/corpora/arcene/arcene_train.labels")
+    X_test = np.loadtxt("/home/pprett/corpora/arcene/arcene_valid.data")
+    y_test = np.loadtxt("/home/pprett/corpora/arcene/arcene_valid.labels")
+    from scikits.learn.tree import DecisionTreeClassifier
+    clf = DecisionTreeClassifier(max_depth=100, min_split=5)
+    t0 = datetime.now()
+    clf.fit(X_train, y_train)
+    delta = (datetime.now() - t0)
+    score = np.mean(clf.predict(X_test) == y_test)
+    print score, delta
+
+if __name__ == '__main__':
+    bench_madelon()
+    bench_arcene()
