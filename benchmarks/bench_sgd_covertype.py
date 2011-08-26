@@ -86,6 +86,13 @@ y = np.ones(X.shape[0]) * -1
 y[np.where(X[:, -1] == 1)] = 1
 X = X[:, :-1]
 
+# FIXME convert to fortran layout
+X = np.array(X, order="F")
+
+print X.max(axis=0)
+print X.min(axis=0)
+print X.mean(axis=0)
+
 ######################################################################
 ## Create train-test split (as [Joachims, 2006])
 print("Creating train-test split...")
@@ -104,14 +111,16 @@ y_test = y[test_idx]
 del X
 del y
 
+
+
 ######################################################################
 ## Standardize first 10 features (the numerical ones)
-#mean = X_train.mean(axis=0)
-#std = X_train.std(axis=0)
-#mean[10:] = 0.0
-#std[10:] = 1.0
-#X_train = (X_train-mean) / std
-#X_test = (X_test-mean) / std
+mean = X_train.mean(axis=0)
+std = X_train.std(axis=0)
+mean[10:] = 0.0
+std[10:] = 1.0
+X_train = (X_train-mean) / std
+X_test = (X_test-mean) / std
 
 ######################################################################
 ## Print dataset statistics
@@ -147,28 +156,28 @@ def benchmark(clf):
 
 ######################################################################
 ## Train Liblinear model
-liblinear_parameters = {
-    'loss': 'l2',
-    'penalty': 'l2',
-    'C': 1000,
-    'dual': False,
-    'tol': 1e-3,
-    }
-#liblinear_res = benchmark(LinearSVC(**liblinear_parameters))
-#liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
+## liblinear_parameters = {
+##     'loss': 'l2',
+##     'penalty': 'l2',
+##     'C': 1000,
+##     'dual': False,
+##     'tol': 1e-3,
+##     }
+## liblinear_res = benchmark(LinearSVC(**liblinear_parameters))
+## liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
 
 ######################################################################
 ## Train GaussianNB model
-#gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
+## gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
 
 ######################################################################
 ## Train SGD model
-sgd_parameters = {
-    'alpha': 0.001,
-    'n_iter': 2,
-    }
-#sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
-#    **sgd_parameters))
+## sgd_parameters = {
+##     'alpha': 0.001,
+##     'n_iter': 2,
+##     }
+## sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
+##     **sgd_parameters))
 
 ######################################################################
 ## Train CART
@@ -193,10 +202,10 @@ def print_row(clf_type, train_time, test_time, err):
 print("%s %s %s %s" % ("Classifier  ", "train-time", "test-time",
                        "error-rate"))
 print("-" * 44)
-#print_row("Liblinear", liblinear_train_time, liblinear_test_time,
-#          liblinear_err)
-#print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
-#print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
+## print_row("Liblinear", liblinear_train_time, liblinear_test_time,
+##           liblinear_err)
+## print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
+## print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
 print_row("CART", cart_train_time, cart_test_time, cart_err)
 print("")
 print("")

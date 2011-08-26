@@ -161,10 +161,10 @@ def _build_tree(is_classification, features, labels, criterion,
             right_sample_mask = ~split & sample_mask
             new_node = Node(dimension=sample_dims[dim],
                             value=thresh, error=error,
-                            left=recursive_partition(left_sample_mask, error,
+                            left=recursive_partition(left_sample_mask, np.inf,
                                                      depth + 1, nll),
                             right=recursive_partition(right_sample_mask,
-                                                      error, depth + 1,
+                                                      np.inf, depth + 1,
                                                       n_samples - nll))
     
         # assert new_node != None
