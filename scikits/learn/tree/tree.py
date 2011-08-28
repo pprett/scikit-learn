@@ -88,23 +88,8 @@ def _build_tree(is_classification, features, labels, criterion,
         raise ValueError("Number of labels does not match "
                          "number of features\n")
     labels = np.array(labels, dtype=np.float64, order="c")
-    
 
-    sample_dims = np.arange(n_dims)
-    if F is not None:
-        if F <= 0:
-            raise ValueError("F must be > 0.\n"
-                             "Did you mean to use None to signal no F?")
-        if F > n_dims:
-            raise ValueError("F must be < num dimensions of features.\n"
-                             "F is %s, n_dims = %s "
-                             % (F, n_dims))
-        
-        sample_dims = random_state.shuffle(np.arange(n_dims))[:F]
-        features = features[:, sample_dims]
-        n_total_samples, n_dims = features.shape
-
-    # make data fortran layout
+    # make data fortran layout if not already
     if not features.flags["F_CONTIGUOUS"]:
         features = np.array(features, order="F")
 
@@ -120,7 +105,17 @@ def _build_tree(is_classification, features, labels, criterion,
         raise ValueError("max_depth must be greater than zero.\n"
                          "max_depth is %s." % max_depth)
 
+    if F is not None:
+        if F <= 0:
+            raise ValueError("F must be > 0.\n"
+                             "Did you mean to use None to signal no F?")
+        if F > n_dims:
+            raise ValueError("F must be < num dimensions of features.\n"
+                             "F is %s, n_dims = %d "
+                             % (F, n_dims))
+
     n_rec_part_called = np.zeros((1,), dtype=np.int)
+
     def recursive_partition(sample_mask, parent_split_error, depth, n_samples):
         n_rec_part_called[0] += 1
         is_leaf = False
@@ -129,16 +124,15 @@ def _build_tree(is_classification, features, labels, criterion,
             is_leaf = True
         # else try to find a split point
         else:
-            dim, thresh, error, nll = _tree._find_best_split(sample_mask,
-                                                             parent_split_error,
-                                                             features, sorted_features,
-                                                             labels, criterion, K,
-                                                             n_samples)
+            res = _tree._find_best_split(sample_mask, parent_split_error,
+                                         features, sorted_features, labels,
+                                         criterion, K, n_samples)
+            dim, thresh, error, nll = res
             if dim != -1:
                 # we found a split point
                 # check if num samples to the left and right of split point
                 # is larger than min_split
-                if nll <= min_split or n_samples - nll <= min_split:
+                if nll <= min_split or (n_samples - nll) <= min_split:
                     # splitting point does not suffice min_split
                     is_leaf = True
                 else:
@@ -159,14 +153,13 @@ def _build_tree(is_classification, features, labels, criterion,
             split = features[:, dim] < thresh
             left_sample_mask = split & sample_mask
             right_sample_mask = ~split & sample_mask
-            new_node = Node(dimension=sample_dims[dim],
-                            value=thresh, error=error,
+            new_node = Node(dimension=dim, value=thresh, error=error,
                             left=recursive_partition(left_sample_mask, np.inf,
                                                      depth + 1, nll),
                             right=recursive_partition(right_sample_mask,
                                                       np.inf, depth + 1,
                                                       n_samples - nll))
-    
+
         # assert new_node != None
         return new_node
 
@@ -271,35 +264,40 @@ class BaseDecisionTree(BaseEstimator):
         self : object
             Returns self.
         """
-        X = np.asanyarray(X, dtype=np.float64, order='C')
+        X = np.asanyarray(X, dtype=np.float64, order='F')
         _, self.n_features = X.shape
-        
+
         if self.type == 'classification':
             y = np.asanyarray(y, dtype=np.int64)
             self.classes = np.unique(y)
-            y = np.searchsorted(self.classes, y)
-            self.K = self.classes.shape[0]
+
+            # if labels not [0,K] map to new range.
+            if not np.all(self.classes == np.arange(self.classes[-1])):
+                y = np.searchsorted(self.classes, y)
             if y.min() < 0:
-                raise ValueError("Labels must be in the range [0 to %s)", self.K)
-            
-            # create new Criterion extension type
+                raise ValueError("Labels must be in the range " \
+                                 "[0 to %d)" % self.classes.shape[0] - 1)
+            self.K = self.classes.shape[0]
+
+            # create `ClassificationCriterion` extension type
             criterion_clazz = lookup_c[self.criterion]
             pm_left = np.zeros((self.K,), dtype=np.int32)
             pm_right = np.zeros((self.K,), dtype=np.int32)
             criterion = criterion_clazz(self.K, pm_left, pm_right)
-    
+
             self.tree = _build_tree(True, X, y, criterion,
                                     self.max_depth, self.min_split, self.F,
                                     self.K, self.random_state)
-        else: # regression
+        else:  # regression
             y = np.asanyarray(y, dtype=np.float64, order='C')
 
             # create new Criterion extension type
             criterion_clazz = lookup_r[self.criterion]
             criterion = criterion_clazz()
-            
+
             self.tree = _build_tree(False, X, y, criterion, self.max_depth,
-                                    self.min_split, self.F, 0, self.random_state)
+                                    self.min_split, self.F, 0,
+                                    self.random_state)
         return self
 
     def predict(self, X):
@@ -329,8 +327,8 @@ class BaseDecisionTree(BaseEstimator):
         if self.n_features != n_features:
             raise ValueError("Number of features of the model must "
                              " match the input.\n"
-                             "Model n_features is %s and "
-                             " input n_features is %s "
+                             "Model n_features is %d and "
+                             " input n_features is %d "
                              % (self.n_features, n_features))
 
         if self.type == 'classification':
@@ -340,7 +338,7 @@ class BaseDecisionTree(BaseEstimator):
                 C[idx] = self.classes[c]
         else:
             C = np.zeros(n_samples, dtype=float)
-            for idx, sample in enumerate(X):            
+            for idx, sample in enumerate(X):
                 C[idx] = _apply_tree(self.tree, sample)
 
         return C
@@ -378,7 +376,8 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
     >>> for train_index, test_index in skf:
     ...     clf = DecisionTreeClassifier()
     ...     clf = clf.fit(data.data[train_index], data.target[train_index])
-    ...     print np.mean(clf.predict(data.data[test_index]) == data.target[test_index])
+    ...     print np.mean(clf.predict(data.data[test_index]) == \
+                          data.target[test_index])
     ...
     1.0
     0.933333333333
@@ -485,7 +484,8 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
     >>> for train_index, test_index in kf:
     ...     clf = DecisionTreeRegressor()
     ...     clf = clf.fit(data.data[train_index], data.target[train_index])
-    ...     print np.mean(np.power(clf.predict(data.data[test_index]) - data.target[test_index], 2))
+    ...     print np.mean(np.power(clf.predict(data.data[test_index]) - \
+                          data.target[test_index], 2))
     ...
     19.2264679543
     41.2959435867

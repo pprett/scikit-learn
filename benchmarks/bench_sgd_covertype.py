@@ -39,7 +39,7 @@ The same task has been used in a number of papers including:
 
 To run this example use your favorite python shell::
 
-  % ipython examples/sgd/covertype_dense_sgd.py
+  % ipython benchmarks/bench_sgd_covtype.py
 
 """
 from __future__ import division
@@ -86,21 +86,15 @@ y = np.ones(X.shape[0]) * -1
 y[np.where(X[:, -1] == 1)] = 1
 X = X[:, :-1]
 
-# FIXME convert to fortran layout
-X = np.array(X, order="F")
-
-print X.max(axis=0)
-print X.min(axis=0)
-print X.mean(axis=0)
-
 ######################################################################
 ## Create train-test split (as [Joachims, 2006])
+offset = int(0.9 * X.shape[0])
 print("Creating train-test split...")
 idx = np.arange(X.shape[0])
 np.random.seed(13)
 np.random.shuffle(idx)
-train_idx = idx[:522911]
-test_idx = idx[522911:]
+train_idx = idx[:offset]
+test_idx = idx[offset:]
 
 X_train = X[train_idx]
 y_train = y[train_idx]
@@ -110,8 +104,6 @@ y_test = y[test_idx]
 # free memory
 del X
 del y
-
-
 
 ######################################################################
 ## Standardize first 10 features (the numerical ones)
@@ -141,7 +133,6 @@ print("")
 print("Training classifiers...")
 print("")
 
-
 ######################################################################
 ## Benchmark classifiers
 def benchmark(clf):
@@ -156,31 +147,32 @@ def benchmark(clf):
 
 ######################################################################
 ## Train Liblinear model
-## liblinear_parameters = {
-##     'loss': 'l2',
-##     'penalty': 'l2',
-##     'C': 1000,
-##     'dual': False,
-##     'tol': 1e-3,
-##     }
-## liblinear_res = benchmark(LinearSVC(**liblinear_parameters))
-## liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
+liblinear_parameters = {
+    'loss': 'l2',
+    'penalty': 'l2',
+    'C': 1000,
+    'dual': False,
+    'tol': 1e-3,
+    }
+liblinear_res = benchmark(LinearSVC(**liblinear_parameters))
+liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
 
 ######################################################################
 ## Train GaussianNB model
-## gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
+gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
 
 ######################################################################
 ## Train SGD model
-## sgd_parameters = {
-##     'alpha': 0.001,
-##     'n_iter': 2,
-##     }
-## sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
-##     **sgd_parameters))
+sgd_parameters = {
+    'alpha': 0.001,
+    'n_iter': 2,
+    }
+sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
+    **sgd_parameters))
 
 ######################################################################
 ## Train CART
+
 from scikits.learn.tree import DecisionTreeClassifier
 res = benchmark(DecisionTreeClassifier(max_depth=50, min_split=5))
 cart_err, cart_train_time, cart_test_time = res
@@ -202,10 +194,10 @@ def print_row(clf_type, train_time, test_time, err):
 print("%s %s %s %s" % ("Classifier  ", "train-time", "test-time",
                        "error-rate"))
 print("-" * 44)
-## print_row("Liblinear", liblinear_train_time, liblinear_test_time,
-##           liblinear_err)
-## print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
-## print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
+print_row("Liblinear", liblinear_train_time, liblinear_test_time,
+          liblinear_err)
+print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
+print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
 print_row("CART", cart_train_time, cart_test_time, cart_err)
 print("")
 print("")
