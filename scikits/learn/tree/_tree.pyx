@@ -17,10 +17,10 @@ cimport cython
 
 cdef extern from "math.h":
     cdef extern double log(double x)
-    cdef extern double pow(double base, double exponent)
 
 cdef extern from "float.h":
     cdef extern double DBL_MIN
+    cdef extern double DBL_MAX
 
 
 cdef class Criterion:
@@ -74,7 +74,7 @@ cdef class ClassificationCriterion(Criterion):
     cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
                    int n_total_samples):
         """Initializes the criterion for a new feature (col of `features`)."""
-        cdef int c = 0, j = 0
+        cdef int c, j
         self.nml = 0
         self.nmr = 0
         for c from 0 <= c < self.K:
@@ -103,7 +103,7 @@ cdef class ClassificationCriterion(Criterion):
             if sample_mask[j] == 0:
                 continue
             ## we will distribute c from right to left
-            #if features_i[j] < t:
+            #assert features_i[j] < t
             c = <int>(labels[j])
             self.pm_right_ptr[c] -= 1
             self.pm_left_ptr[c] += 1
@@ -131,6 +131,7 @@ cdef class Gini(ClassificationCriterion):
         cdef double e1, e2
         cdef double nml = <double> self.nml
         cdef double nmr = <double> self.nmr
+        #assert (self.nml + self.nmr) == self.n_samples
         
         for k from 0 <= k < self.K:
             gini_left -= (self.pm_left_ptr[k] / nml) * (self.pm_left_ptr[k] / nml)
@@ -242,6 +243,7 @@ cdef class RegressionCriterion(Criterion):
 
 
 cdef class MSE(RegressionCriterion):
+    """Mean squared error splitting criterion for regression trees. """
 
     cdef double eval(self):
         """             
@@ -293,41 +295,11 @@ cdef class MSE(RegressionCriterion):
 ##     cdef np.float64_t H = 1. - pm.max()
 
 ##     ## FIXME this is broken!
-    
-## """
-##  Regression entropy measures
- 
-## """      
-## cpdef np.float64_t eval_mse(np.ndarray[np.float64_t, ndim=1] labels,
-##                       np.ndarray[np.float64_t, ndim=1] pm):
-##     """             
-##         MSE =  \sum_i (y_i - c0)^2  / N
-        
-##         pm is a redundant argument (intentional).
-##     """     
-##     cdef int n_labels = labels.shape[0]
-
-##     cdef float c0
-##     cdef Py_ssize_t i = 0
-##     for i in range(n_labels):
-##         c0 += labels[i]
-##     c0 /= n_labels
-
-##     cdef np.float64_t H = 0.
-##     for i in range(n_labels):
-##         H += pow(labels[i] - c0, 2) 
-##     H /= n_labels
-        
-##     return H
 
 
-
-
-cdef int smallest_sample_larger_than(int sample_idx,
-                                 np.float64_t *features_i,
-                                 int *sorted_features_i,
-                                 np.int8_t *sample_mask,
-                                 int n_total_samples):
+cdef int smallest_sample_larger_than(int sample_idx, np.float64_t *features_i,
+                                     int *sorted_features_i, np.int8_t *sample_mask,
+                                     int n_total_samples):
     """Find index in the `sorted_features` matrix for sample
     who's feature `i` value is just about
     greater than those of the sample `sorted_features_i[sample_idx]`.
@@ -341,14 +313,15 @@ cdef int smallest_sample_larger_than(int sample_idx,
         I.e. `sorted_features_i[sample_idx] < sorted_features_i[next_sample_idx]`
         -1 if no such element exists.
     """
-    cdef int idx = 0
-    cdef np.float64_t threshold = DBL_MIN
+    cdef int idx = 0, j
+    cdef double threshold = -DBL_MAX
     if sample_idx > -1:
         threshold = features_i[sorted_features_i[sample_idx]]
     for idx from sample_idx < idx < n_total_samples:
-        if sample_mask[sorted_features_i[idx]] == 0:
+        j = sorted_features_i[idx]
+        if sample_mask[j] == 0:
             continue
-        if features_i[sorted_features_i[idx]] > threshold:
+        if features_i[j] > threshold:
             return idx
     return -1
 
@@ -367,13 +340,13 @@ def fill_counts(np.ndarray[np.float64_t, ndim=1, mode="c"] counts,
     sample_mask : ndarray, shape=n_total_samples, dtype=bool
         The samples to be considered.
     """
-    cdef int j
+    cdef int j, c
     cdef int n_total_samples = labels.shape[0]
-    cdef char *sample_mask_ptr = <char *>sample_mask.data
+    cdef np.int8_t *sample_mask_ptr = <np.int8_t *>sample_mask.data
     for j from 0 <= j < n_total_samples:
         if sample_mask_ptr[j] == 0:
             continue
-        c = <int>labels[j]
+        c = <int>(labels[j])
         counts[c] += 1
 
 
@@ -417,7 +390,7 @@ def _find_best_split(np.ndarray sample_mask,
     cdef int n_total_samples = features.shape[0]
     cdef int n_features = features.shape[1]
     cdef int i, best_i = -1, best_nml, nml = 0, a, b
-    cdef np.float64_t t, error, best_error, best_t
+    cdef double t, error, best_error, best_t
 
     # pointer access to ndarray data
     cdef np.float64_t *labels_ptr = <np.float64_t *>labels.data
@@ -432,8 +405,8 @@ def _find_best_split(np.ndarray sample_mask,
     cdef int features_stride = features_col_stride / features_elem_stride
     cdef int sorted_features_elem_stride = sorted_features.strides[0]
     cdef int sorted_features_col_stride = sorted_features.strides[1]
-    cdef int sorted_features_stride = sorted_features_col_stride / sorted_features_elem_stride   
-    
+    cdef int sorted_features_stride = sorted_features_col_stride / sorted_features_elem_stride
+
     for i from 0 <= i < n_features:
         # get i-th col of features and features_sorted
         features_i = (<np.float64_t *>features.data) + features_stride * i
@@ -445,7 +418,7 @@ def _find_best_split(np.ndarray sample_mask,
         # get sample in mask with smallest value for i-th feature
         a = smallest_sample_larger_than(-1, features_i, sorted_features_i,
                                         sample_mask_ptr, n_total_samples)
-        while True:
+        while 1:
             # get sample in mask with val for i-th feature just larger than `a`
             b = smallest_sample_larger_than(a, features_i, sorted_features_i,
                                             sample_mask_ptr, n_total_samples)
