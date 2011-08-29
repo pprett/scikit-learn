@@ -165,7 +165,7 @@ def _build_tree(is_classification, features, labels, criterion,
 
     root = recursive_partition(np.ones((n_total_samples,), dtype=np.bool),
                                np.inf, 0, n_total_samples)
-    print "recursive_partition called %d times" % n_rec_part_called[0]
+    #print "recursive_partition called %d times" % n_rec_part_called[0]
     return root
 
 

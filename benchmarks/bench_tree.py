@@ -67,7 +67,6 @@ def profile(n_samples=1000, dim=50, K=2):
     X = np.random.randn(n_samples, dim)
     Y = np.random.randint(0, K, (n_samples,))
     bench_scikit_tree_classifier(X, Y)
-    
 
 def bench_madelon():
     X_train = np.loadtxt("/home/pprett/corpora/madelon/madelon_train.data")
@@ -80,6 +79,7 @@ def bench_madelon():
     clf.fit(X_train, y_train)
     delta = (datetime.now() - t0)
     score = np.mean(clf.predict(X_test) == y_test)
+    clf.export_to_graphviz()
     print score, delta
 
 def bench_arcene():
@@ -95,6 +95,31 @@ def bench_arcene():
     score = np.mean(clf.predict(X_test) == y_test)
     print score, delta
 
+def bench_boston():
+    from scikits.learn import datasets
+    from scikits.learn.utils import shuffle
+    boston = datasets.load_boston()
+    np.random.seed(13)
+    X, y = shuffle(boston.data, boston.target, random_state=13)
+    offset = int(0.9 * X.shape[0])
+    X_train = X[:offset]
+    y_train = y[:offset]
+    X_test = X[offset:]
+    y_test = y[offset:]
+    from scikits.learn.tree import DecisionTreeRegressor
+    clf = DecisionTreeRegressor()
+    t0 = datetime.now()
+    clf.fit(X_train, y_train)
+    delta = (datetime.now() - t0)
+    score = np.mean(clf.predict(X_test) - y_test)
+
+    from scikits.learn.neighbors import NeighborsRegressor
+    clf = NeighborsRegressor(n_neighbors=5, mode='mean')
+    clf.fit(X_train, y_train)
+    score2 = np.mean(clf.predict(X_test) - y_test)
+    print score2, score, delta
+
 if __name__ == '__main__':
     bench_madelon()
     bench_arcene()
+    bench_boston()

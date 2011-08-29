@@ -250,13 +250,17 @@ cdef class MSE(RegressionCriterion):
         MSE =  \sum_i (y_i - c0)^2  / N
         
         """
-        cdef double mean_left = self.sum_left / self.nml
-        cdef double mean_right = self.sum_right / self.nmr
-
+        cdef double mean_left = 0.0
+        cdef double mean_right = 0.0
         cdef double var_left = 0.0
         cdef double var_right = 0.0
         cdef int j
         cdef double e1, e2
+
+        assert self.nml > 0
+        mean_left = self.sum_left / (<double> self.nml)
+        assert self.nmr > 0
+        mean_right = self.sum_right / (<double> self.nmr)
 
         for j from 0 <= j < self.n_total_samples:
             if self.sample_mask[j] == 0:
