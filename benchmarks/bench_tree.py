@@ -107,7 +107,7 @@ def bench_boston():
     X_test = X[offset:]
     y_test = y[offset:]
     from scikits.learn.tree import DecisionTreeRegressor
-    clf = DecisionTreeRegressor()
+    clf = DecisionTreeRegressor(max_depth=100, min_split=5)
     t0 = datetime.now()
     clf.fit(X_train, y_train)
     delta = (datetime.now() - t0)
@@ -121,5 +121,5 @@ def bench_boston():
 
 if __name__ == '__main__':
     bench_madelon()
-    bench_arcene()
+    #bench_arcene()
     bench_boston()

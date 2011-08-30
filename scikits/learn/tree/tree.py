@@ -115,6 +115,8 @@ def _build_tree(is_classification, features, labels, criterion,
                              % (F, n_dims))
 
     n_rec_part_called = np.zeros((1,), dtype=np.int)
+    n_leaf = np.zeros((1,), dtype=np.int)
+    n_nonterminal = np.zeros((1,), dtype=np.int)
 
     def recursive_partition(sample_mask, parent_split_error, depth, n_samples):
         n_rec_part_called[0] += 1
@@ -132,7 +134,7 @@ def _build_tree(is_classification, features, labels, criterion,
                 # we found a split point
                 # check if num samples to the left and right of split point
                 # is larger than min_split
-                if nll <= min_split or (n_samples - nll) <= min_split:
+                if nll < min_split or (n_samples - nll) < min_split:
                     # splitting point does not suffice min_split
                     is_leaf = True
                 else:
@@ -143,6 +145,7 @@ def _build_tree(is_classification, features, labels, criterion,
 
         new_node = None
         if is_leaf:
+            n_leaf[0] += 1
             if is_classification:
                 a = np.zeros((K, ))
                 _tree.fill_counts(a, labels, sample_mask)
@@ -150,6 +153,7 @@ def _build_tree(is_classification, features, labels, criterion,
             else:
                 new_node = Leaf(np.mean(labels[sample_mask]))
         else:
+            n_nonterminal[0] +=1
             split = features[:, dim] < thresh
             left_sample_mask = split & sample_mask
             right_sample_mask = ~split & sample_mask
@@ -160,12 +164,13 @@ def _build_tree(is_classification, features, labels, criterion,
                                                       np.inf, depth + 1,
                                                       n_samples - nll))
 
-        # assert new_node != None
+        assert new_node != None
         return new_node
 
     root = recursive_partition(np.ones((n_total_samples,), dtype=np.bool),
                                np.inf, 0, n_total_samples)
-    #print "recursive_partition called %d times" % n_rec_part_called[0]
+    print "recursive_partition called %d times" % n_rec_part_called[0]
+    print "Num leafs: %d | num non-terminal nodes: %d" % (n_leaf[0], n_nonterminal[0])
     return root
 
 

@@ -19,7 +19,6 @@ cdef extern from "math.h":
     cdef extern double log(double x)
 
 cdef extern from "float.h":
-    cdef extern double DBL_MIN
     cdef extern double DBL_MAX
 
 
@@ -268,6 +267,7 @@ cdef class MSE(RegressionCriterion):
             var_left += (self.labels[j] - mean_left) * (self.labels[j] - mean_left)
             var_right += (self.labels[j] - mean_right) * (self.labels[j] - mean_right)
 
+        assert (self.nml + self.nmr) == self.n_samples
         var_left /= self.n_samples
         var_right /= self.n_samples
 

@@ -59,6 +59,7 @@ from scikits.learn.svm import LinearSVC
 from scikits.learn.linear_model import SGDClassifier
 from scikits.learn.naive_bayes import GaussianNB
 from scikits.learn import metrics
+from scikits.learn import utils
 
 ######################################################################
 ## Download the data, if not already on disk
@@ -88,20 +89,17 @@ X = X[:, :-1]
 
 ######################################################################
 ## Create train-test split (as [Joachims, 2006])
-offset = int(0.9 * X.shape[0])
+offset = int(X.shape[0] * 0.9)
 print("Creating train-test split...")
-idx = np.arange(X.shape[0])
-np.random.seed(13)
-np.random.shuffle(idx)
-train_idx = idx[:offset]
-test_idx = idx[offset:]
 
-X_train = X[train_idx]
-y_train = y[train_idx]
-X_test = X[test_idx]
-y_test = y[test_idx]
 
-# free memory
+X_train = X[:offset]
+y_train = y[:offset]
+X_test = X[offset:]
+y_test = y[offset:]
+
+X_train, y_train = utils.shuffle(X_train, y_train, random_state=13)
+
 del X
 del y
 
@@ -165,7 +163,7 @@ gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
 ## Train SGD model
 sgd_parameters = {
     'alpha': 0.001,
-    'n_iter': 2,
+    'n_iter': 5,
     }
 sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
     **sgd_parameters))
@@ -174,7 +172,7 @@ sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
 ## Train CART
 
 from scikits.learn.tree import DecisionTreeClassifier
-res = benchmark(DecisionTreeClassifier(max_depth=50, min_split=5))
+res = benchmark(DecisionTreeClassifier(max_depth=100, min_split=5))
 cart_err, cart_train_time, cart_test_time = res
 
 ######################################################################
