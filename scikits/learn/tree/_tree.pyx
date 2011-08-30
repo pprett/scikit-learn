@@ -257,9 +257,9 @@ cdef class MSE(RegressionCriterion):
         cdef double e1, e2
 
         assert self.nml > 0
-        mean_left = self.sum_left / (<double> self.nml)
+        mean_left = self.sum_left / self.nml
         assert self.nmr > 0
-        mean_right = self.sum_right / (<double> self.nmr)
+        mean_right = self.sum_right / self.nmr
 
         for j from 0 <= j < self.n_total_samples:
             if self.sample_mask[j] == 0:
@@ -271,8 +271,8 @@ cdef class MSE(RegressionCriterion):
         var_left /= self.n_samples
         var_right /= self.n_samples
 
-        e1 = ((<double> self.nml) / self.n_samples) * var_left
-        e2 = ((<double> self.nmr) / self.n_samples) * var_right
+        e1 = (<double> self.nml) / self.n_samples * var_left
+        e2 = (<double> self.nmr) / self.n_samples * var_right
 
         return e1 + e2
 
@@ -429,7 +429,7 @@ def _find_best_split(np.ndarray sample_mask,
             # if -1 there's none and we are fin
             if b == -1:
                 break
-
+            
             # update criterion for interval [a, b)
             nml = criterion.update(a, b, labels_ptr, sample_mask_ptr, features_i,
                                    sorted_features_i)

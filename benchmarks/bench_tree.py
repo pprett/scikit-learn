@@ -112,6 +112,7 @@ def bench_boston():
     clf.fit(X_train, y_train)
     delta = (datetime.now() - t0)
     score = np.mean(clf.predict(X_test) - y_test)
+    clf.export_to_graphviz()
 
     from scikits.learn.neighbors import NeighborsRegressor
     clf = NeighborsRegressor(n_neighbors=5, mode='mean')
@@ -120,6 +121,6 @@ def bench_boston():
     print score2, score, delta
 
 if __name__ == '__main__':
-    bench_madelon()
+    #bench_madelon()
     #bench_arcene()
     bench_boston()
