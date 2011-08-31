@@ -121,6 +121,6 @@ def bench_boston():
     print score2, score, delta
 
 if __name__ == '__main__':
-    #bench_madelon()
+    bench_madelon()
     #bench_arcene()
     bench_boston()
