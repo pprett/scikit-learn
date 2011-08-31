@@ -87,7 +87,7 @@ def _build_tree(is_classification, features, labels, criterion,
     if labels.shape[0] != n_total_samples:
         raise ValueError("Number of labels does not match "
                          "number of features\n")
-    labels = np.array(labels, dtype=np.float64, order="c")
+    labels = np.array(labels, dtype=np.float64, order="C")
 
     # make data fortran layout if not already
     if not features.flags["F_CONTIGUOUS"]:
@@ -115,8 +115,6 @@ def _build_tree(is_classification, features, labels, criterion,
                              % (F, n_dims))
 
     n_rec_part_called = np.zeros((1,), dtype=np.int)
-    n_leaf = np.zeros((1,), dtype=np.int)
-    n_nonterminal = np.zeros((1,), dtype=np.int)
 
     def recursive_partition(sample_mask, parent_split_error, depth, n_samples):
         n_rec_part_called[0] += 1
@@ -145,15 +143,14 @@ def _build_tree(is_classification, features, labels, criterion,
 
         new_node = None
         if is_leaf:
-            n_leaf[0] += 1
             if is_classification:
                 a = np.zeros((K, ))
                 _tree.fill_counts(a, labels, sample_mask)
                 new_node = Leaf(a)
             else:
+                assert labels.shape[0] == sample_mask.shape[0]
                 new_node = Leaf(np.mean(labels[sample_mask]))
         else:
-            n_nonterminal[0] +=1
             split = features[:, dim] < thresh
             left_sample_mask = split & sample_mask
             right_sample_mask = ~split & sample_mask
@@ -170,7 +167,6 @@ def _build_tree(is_classification, features, labels, criterion,
     root = recursive_partition(np.ones((n_total_samples,), dtype=np.bool),
                                np.inf, 0, n_total_samples)
     print "recursive_partition called %d times" % n_rec_part_called[0]
-    print "Num leafs: %d | num non-terminal nodes: %d" % (n_leaf[0], n_nonterminal[0])
     return root
 
 

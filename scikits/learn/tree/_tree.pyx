@@ -185,9 +185,11 @@ cdef class RegressionCriterion(Criterion):
 
     cdef double sum_left
     cdef double sum_right
+    cdef int b
 
     cdef np.float64_t *labels
     cdef np.int8_t *sample_mask
+    cdef int *sorted_features_i
 
     cdef int nml, nmr, K, n_total_samples, n_samples
     
@@ -196,6 +198,8 @@ cdef class RegressionCriterion(Criterion):
         self.sum_right = 0.0
         self.nml = 0
         self.nmr = 0
+        self.b = -1
+        self.sorted_features_i = NULL
 
     cdef void init(self, np.float64_t *labels, np.int8_t *sample_mask,
                    int n_total_samples):
@@ -207,6 +211,8 @@ cdef class RegressionCriterion(Criterion):
         self.sum_right = 0.0
         self.labels = labels
         self.sample_mask = sample_mask
+        self.b = -1
+        self.sorted_features_i = NULL
 
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
@@ -234,6 +240,12 @@ cdef class RegressionCriterion(Criterion):
             self.sum_left += val
             self.nmr -= 1
             self.nml += 1
+
+        # set first idx of right branch
+        self.b = b
+
+        # store sorted features ptr for eval.
+        self.sorted_features_i = sorted_features_i
             
         return self.nml
 
@@ -253,23 +265,25 @@ cdef class MSE(RegressionCriterion):
         cdef double mean_right = 0.0
         cdef double var_left = 0.0
         cdef double var_right = 0.0
-        cdef int j
+        cdef int j, idx
         cdef double e1, e2
 
-        assert self.nml > 0
         mean_left = self.sum_left / self.nml
-        assert self.nmr > 0
         mean_right = self.sum_right / self.nmr
 
-        for j from 0 <= j < self.n_total_samples:
+        for idx from 0 <= idx < self.n_total_samples:
+            j = self.sorted_features_i[idx]
             if self.sample_mask[j] == 0:
                 continue
-            var_left += (self.labels[j] - mean_left) * (self.labels[j] - mean_left)
-            var_right += (self.labels[j] - mean_right) * (self.labels[j] - mean_right)
+            if idx < self.b:
+                var_left += (self.labels[j] - mean_left) * \
+                            (self.labels[j] - mean_left)
+            else:
+                var_right += (self.labels[j] - mean_right) * \
+                             (self.labels[j] - mean_right)
 
-        assert (self.nml + self.nmr) == self.n_samples
-        var_left /= self.n_samples
-        var_right /= self.n_samples
+        var_left /= self.nml
+        var_right /= self.nmr
 
         e1 = (<double> self.nml) / self.n_samples * var_left
         e2 = (<double> self.nmr) / self.n_samples * var_right
