@@ -174,7 +174,7 @@ sgd_err, sgd_train_time, sgd_test_time = benchmark(SGDClassifier(
 ## Train CART
 
 from scikits.learn.tree import DecisionTreeClassifier
-res = benchmark(DecisionTreeClassifier(max_depth=30, min_split=5))
+res = benchmark(DecisionTreeClassifier(max_depth=100, min_split=5))
 cart_err, cart_train_time, cart_test_time = res
 
 ######################################################################
