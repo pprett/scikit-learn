@@ -1,14 +1,14 @@
 from unittest import TestCase
 import numpy as np
-from sklearn.boosting import FunctionalGradientBoosting
+from sklearn.ensemble.boosting import GradientBoostedRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.datasets.base import load_boston
 
-class TestFunctionalGradientBoosting(TestCase):
+class TestGradientBoostedRegressor(TestCase):
     def setUp(self):
         self.task = load_boston()
         self.base_est = DecisionTreeRegressor(max_depth=2, min_split=4)
-        self.boosting = FunctionalGradientBoosting(
+        self.boosting = GradientBoostedRegressor(
                 base_estimator=DecisionTreeRegressor(
                     max_depth=2,
                     min_split=4),
@@ -19,7 +19,7 @@ class TestFunctionalGradientBoosting(TestCase):
         assert r is self.boosting
 
     def test_1_estimator_matches_base(self):
-        self.boosting = FunctionalGradientBoosting(
+        self.boosting = GradientBoostedRegressor(
                 base_estimator=DecisionTreeRegressor(
                     max_depth=2,
                     min_split=4),
@@ -36,7 +36,7 @@ class TestFunctionalGradientBoosting(TestCase):
         assert len(self.boosting.estimators_) == self.boosting.n_estimators
 
     def test_int_y_not_implemented(self):
-        self.assertRaises(NotImplementedError,
+        self.assertRaises(TypeError,
                 self.boosting.fit,
                 np.ones((4, 5)), np.arange(4).astype('int'))
 
@@ -45,6 +45,6 @@ class TestFunctionalGradientBoosting(TestCase):
         task = self.task
         mse_list = []
         for fit_iter in model.fit_iter(task['data'], task['target']):
-            mse_list.append(np.mean(fit_iter.residual ** 2))
+            mse_list.append(np.mean(fit_iter.fg.residual ** 2))
             if len(mse_list) > 1:
                 self.assert_(mse_list[-1] < mse_list[-2])
