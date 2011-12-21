@@ -254,7 +254,7 @@ class BaseGradientBoosting(BaseEstimator):
             Returns self.
         """
         X = np.asfortranarray(X, dtype=DTYPE)
-        y = np.ascontiguousarray(y)
+        y = np.ascontiguousarray(y, dtype=DTYPE)
 
         n_samples, n_features = X.shape
         if y.shape[0] != n_samples:

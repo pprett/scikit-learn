@@ -204,7 +204,7 @@ def bench_arcene(random_state=None):
     return error_rate, train_time, test_time
 
 
-regression_params = {'n_iter': 500, 'max_depth': 1,
+regression_params = {'n_iter': 100, 'max_depth': 1,
                      'min_split': 1, 'learn_rate': 0.1,
                      'loss': 'ls'}
 
@@ -213,7 +213,7 @@ regression_params = {'n_iter': 500, 'max_depth': 1,
 def bench_boston(random_state=None):
     boston = datasets.load_boston()
     X, y = shuffle(boston.data, boston.target, random_state=random_state)
-    X = X.astype(np.float32)
+    X = np.asfortranarray(X, dtype=np.float32)
     y = y.astype(np.float32)
     
     offset = int(X.shape[0] * 0.9)
@@ -235,7 +235,7 @@ def bench_boston(random_state=None):
 def bench_friedman1(random_state=None):
     X, y = datasets.make_friedman1(n_samples=1200,
                                    random_state=random_state, noise=1.0)
-    X = X.astype(np.float32)
+    X = np.asfortranarray(X, dtype=np.float32)
     y = y.astype(np.float32)
     
     X_train, y_train = X[:200], y[:200]
@@ -253,7 +253,7 @@ def bench_friedman1(random_state=None):
 @repeat()
 def bench_friedman2(random_state=None):
     X, y = datasets.make_friedman2(n_samples=1200, random_state=random_state)
-    X = X.astype(np.float32)
+    X = np.asfortranarray(X, dtype=np.float32)
     y = y.astype(np.float32)
     
     X_train, y_train = X[:200], y[:200]
@@ -271,7 +271,7 @@ def bench_friedman2(random_state=None):
 @repeat()
 def bench_friedman3(random_state=None):
     X, y = datasets.make_friedman3(n_samples=1200, random_state=random_state)
-    X = X.astype(np.float32)
+    X = np.asfortranarray(X, dtype=np.float32)
     y = y.astype(np.float32)
     
     X_train, y_train = X[:200], y[:200]

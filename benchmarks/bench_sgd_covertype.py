@@ -164,7 +164,7 @@ liblinear_err, liblinear_train_time, liblinear_test_time = liblinear_res
 
 ######################################################################
 ## Train GaussianNB model
-gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
+#gnb_err, gnb_train_time, gnb_test_time = benchmark(GaussianNB())
 
 ######################################################################
 ## Train SGD model
@@ -181,19 +181,19 @@ cart_err, cart_train_time, cart_test_time = benchmark(
     DecisionTreeClassifier(min_split=5,
                            max_depth=None))
 
-######################################################################
-## Train RandomForest model
-rf_err, rf_train_time, rf_test_time = benchmark(
-    RandomForestClassifier(n_estimators=20,
-                           min_split=5,
-                           max_depth=None))
+## ######################################################################
+## ## Train RandomForest model
+## rf_err, rf_train_time, rf_test_time = benchmark(
+##     RandomForestClassifier(n_estimators=20,
+##                            min_split=5,
+##                            max_depth=None))
 
-######################################################################
-## Train Extra-Trees model
-et_err, et_train_time, et_test_time = benchmark(
-    ExtraTreesClassifier(n_estimators=20,
-                         min_split=5,
-                         max_depth=None))
+## ######################################################################
+## ## Train Extra-Trees model
+## et_err, et_train_time, et_test_time = benchmark(
+##     ExtraTreesClassifier(n_estimators=20,
+##                          min_split=5,
+##                          max_depth=None))
 
 ######################################################################
 ## Print classification performance
@@ -214,10 +214,10 @@ print("%s %s %s %s" % ("Classifier  ", "train-time", "test-time",
 print("-" * 44)
 print_row("Liblinear", liblinear_train_time, liblinear_test_time,
           liblinear_err)
-print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
+#print_row("GaussianNB", gnb_train_time, gnb_test_time, gnb_err)
 print_row("SGD", sgd_train_time, sgd_test_time, sgd_err)
 print_row("CART", cart_train_time, cart_test_time, cart_err)
-print_row("RandomForest", rf_train_time, rf_test_time, rf_err)
-print_row("Extra-Trees", et_train_time, et_test_time, et_err)
+#print_row("RandomForest", rf_train_time, rf_test_time, rf_err)
+#print_row("Extra-Trees", et_train_time, et_test_time, et_err)
 print("")
 print("")
