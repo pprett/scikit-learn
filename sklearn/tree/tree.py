@@ -265,7 +265,7 @@ class Tree(object):
         return self.value.take(out, axis=0)
 
 
-def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
+def _build_tree(X, y, sample_weight, is_classification, criterion, max_depth, min_split,
                 min_density, max_features, random_state, n_classes, find_split,
                 sample_mask=None, X_argsorted=None):
     """Build a tree by recursively partitioning the data."""
@@ -278,7 +278,8 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
     tree = Tree(n_classes, init_capacity)
 
     # Recursively partition X
-    def recursive_partition(X, X_argsorted, y, sample_mask, depth,
+    def recursive_partition(X, X_argsorted, y, sample_weight,
+                            sample_mask, depth,
                             parent, is_left_child):
         # Count samples
         n_node_samples = sample_mask.sum()
@@ -290,7 +291,7 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
         # Split samples
         if depth < max_depth and n_node_samples >= min_split:
             feature, threshold, best_error, init_error = find_split(
-                X, y, X_argsorted, sample_mask, n_node_samples,
+                X, y, X_argsorted, sample_weight, sample_mask, n_node_samples,
                 max_features, criterion, random_state)
 
         else:
@@ -424,13 +425,15 @@ class BaseDecisionTree(BaseEstimator):
         y = np.ascontiguousarray(y, dtype=DTYPE)
 
         if sample_weight is not None:
-            sample_weight = np.asarray(sample_weight, dtype=DTYPE, order='F')
+            sample_weight = np.ascontiguousarray(sample_weight, dtype=DTYPE)
             if len(sample_weight.shape) > 1:
                 raise ValueError("Sample weights array has more"
                                  "than one dimension: %d" % len(sample_weight.shape))
             if len(y) != n_samples:
                 raise ValueError("Number of weights=%d does not match "
                                  "number of samples=%d" % (len(y), len(sample_weight)))
+        else:
+            sample_weight = np.ones(n_samples, dtype=DTYPE)
 
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
