@@ -260,6 +260,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
 
         if sample_weight is not None:
             sample_weight = np.asarray(sample_weight, dtype=DTYPE, order='F')
+            if len(sample_weight.shape) > 1:
+                raise ValueError("Sample weights array has more"
+                                 "than one dimension: %d" % len(sample_weight.shape))
             if len(y) != n_samples:
                 raise ValueError("Number of weights=%d does not match "
                                  "number of samples=%d" % (len(y), len(sample_weight)))
@@ -321,7 +324,8 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
                                 self.min_density, max_features,
                                 self.find_split_, self.random_state)
 
-        self.tree_.build(X, y, sample_mask=sample_mask,
+        self.tree_.build(X, y, sample_weight,
+                         sample_mask=sample_mask,
                          X_argsorted=X_argsorted)
 
         if self.n_outputs_ == 1:
