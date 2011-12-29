@@ -387,7 +387,7 @@ class BaseDecisionTree(BaseEstimator):
 
         self.tree_ = None
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
         """Build a decision tree from the training set (X, y).
 
         Parameters
@@ -423,13 +423,19 @@ class BaseDecisionTree(BaseEstimator):
 
         y = np.ascontiguousarray(y, dtype=DTYPE)
 
+        if sample_weight is not None:
+            sample_weight = np.asarray(sample_weight, dtype=DTYPE, order='F')
+            if len(y) != n_samples:
+                raise ValueError("Number of weights=%d does not match "
+                                 "number of samples=%d" % (len(y), len(sample_weight)))
+
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
         max_features = -1 if self.max_features is None else self.max_features
 
         if len(y) != n_samples:
             raise ValueError("Number of labels=%d does not match "
-                             "number of features=%d" % (len(y), n_samples))
+                             "number of samples=%d" % (len(y), n_samples))
         if self.min_split <= 0:
             raise ValueError("min_split must be greater than zero.")
         if max_depth <= 0:
