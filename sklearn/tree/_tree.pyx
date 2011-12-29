@@ -994,15 +994,15 @@ cdef class ClassificationCriterion(Criterion):
     label_count_stride : int
         The stride between outputs in label_count_* arrays.
 
-    label_count_left : int*
+    label_count_left : double*
         label_count_left[k * label_count_stride + c] is the number of samples
         of class c left of splitting point for output k.
 
-    label_count_right : int*
+    label_count_right : double*
         label_count_rightt[k * label_count_stride + c] is the number of samples
         of class c right of splitting point for output k.
 
-    label_count_init : int*
+    label_count_init : double*
         label_count_init[k * label_count_stride + c] is the initial number of
         samples of class c for output k. Used to reset `label_count_right` for
         each feature.
@@ -1023,9 +1023,9 @@ cdef class ClassificationCriterion(Criterion):
     cdef int n_samples
 
     cdef int label_count_stride
-    cdef int* label_count_left
-    cdef int* label_count_right
-    cdef int* label_count_init
+    cdef double* label_count_left
+    cdef double* label_count_right
+    cdef double* label_count_init
 
     cdef int n_left
     cdef int n_right
@@ -1094,7 +1094,7 @@ cdef class ClassificationCriterion(Criterion):
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
-        cdef int* label_count_init = self.label_count_init
+        cdef double* label_count_init = self.label_count_init
 
         cdef int k = 0
         cdef int c = 0
@@ -1124,9 +1124,9 @@ cdef class ClassificationCriterion(Criterion):
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
-        cdef int* label_count_init = self.label_count_init
-        cdef int* label_count_left = self.label_count_left
-        cdef int* label_count_right = self.label_count_right
+        cdef double* label_count_init = self.label_count_init
+        cdef double* label_count_left = self.label_count_left
+        cdef double* label_count_right = self.label_count_right
 
         cdef int k = 0
         cdef int c = 0
@@ -1188,7 +1188,7 @@ cdef class ClassificationCriterion(Criterion):
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
-        cdef int* label_count_init = self.label_count_init
+        cdef double* label_count_init = self.label_count_init
 
         cdef int k, c
 
@@ -1219,8 +1219,8 @@ cdef class Gini(ClassificationCriterion):
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
-        cdef int* label_count_left = self.label_count_left
-        cdef int* label_count_right = self.label_count_right
+        cdef double* label_count_left = self.label_count_left
+        cdef double* label_count_right = self.label_count_right
         cdef double n_left = <double> self.n_left
         cdef double n_right = <double> self.n_right
 
@@ -1278,8 +1278,8 @@ cdef class Entropy(ClassificationCriterion):
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
-        cdef int* label_count_left = self.label_count_left
-        cdef int* label_count_right = self.label_count_right
+        cdef double* label_count_left = self.label_count_left
+        cdef double* label_count_right = self.label_count_right
         cdef double n_left = <double> self.n_left
         cdef double n_right = <double> self.n_right
 
@@ -1380,7 +1380,6 @@ cdef class RegressionCriterion(Criterion):
         self.n_samples = 0
         self.n_left = 0
         self.n_right = 0
-<<<<<<< HEAD
 
         # Allocate
         self.mean_left = <double*> calloc(n_outputs, sizeof(double))

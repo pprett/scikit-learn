@@ -16,12 +16,14 @@ ctypedef np.int8_t BOOL_t
 
 cdef class Criterion:
     # Methods
-    cdef void init(self, DOUBLE_t* y, int y_stride, BOOL_t* sample_mask,
+    cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
+                   BOOL_t* sample_mask,
                    int n_samples, int n_total_samples)
 
     cdef void reset(self)
 
     cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+                    DOUBLE_t* sample_weight,
                     int* X_argsorted_i, BOOL_t* sample_mask)
 
     cdef double eval(self)
