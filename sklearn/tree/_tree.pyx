@@ -951,8 +951,8 @@ cdef class Tree:
 cdef class Criterion:
     """Interface for splitting criteria (regression and classification)."""
 
-    cdef void init(self, DOUBLE_t* y, int y_stride, BOOL_t*
-                   sample_mask, int n_samples, int n_total_samples):
+    cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
+            BOOL_t* sample_mask, int n_samples, int n_total_samples):
         """Initialise the criterion."""
         pass
 
@@ -961,6 +961,7 @@ cdef class Criterion:
         pass
 
     cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+                    DOUBLE_t* sample_weight,
                     int* X_argsorted_i, BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
@@ -1053,9 +1054,9 @@ cdef class ClassificationCriterion(Criterion):
         self.label_count_stride = label_count_stride
 
         # Allocate
-        self.label_count_left = <int*> calloc(n_outputs * label_count_stride, sizeof(int))
-        self.label_count_right = <int*> calloc(n_outputs * label_count_stride, sizeof(int))
-        self.label_count_init = <int*> calloc(n_outputs * label_count_stride, sizeof(int))
+        self.label_count_left = <double*> calloc(n_outputs * label_count_stride, sizeof(double))
+        self.label_count_right = <double*> calloc(n_outputs * label_count_stride, sizeof(double))
+        self.label_count_init = <double*> calloc(n_outputs * label_count_stride, sizeof(double))
 
         # Check for allocation errors
         if self.label_count_left == NULL or \
@@ -1086,7 +1087,8 @@ cdef class ClassificationCriterion(Criterion):
     def __setstate__(self, d):
         pass
 
-    cdef void init(self, DOUBLE_t* y, int y_stride, BOOL_t *sample_mask,
+    cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
+                   BOOL_t *sample_mask,
                    int n_samples, int n_total_samples):
         """Initialise the criterion."""
         cdef int n_outputs = self.n_outputs
@@ -1097,6 +1099,7 @@ cdef class ClassificationCriterion(Criterion):
         cdef int k = 0
         cdef int c = 0
         cdef int j = 0
+        cdef double w = 1.
 
         self.n_samples = n_samples
 
@@ -1107,10 +1110,12 @@ cdef class ClassificationCriterion(Criterion):
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
-
+            if sample_weight != NULL:
+                w = sample_weight[j]
+            
             for k from 0 <= k < n_outputs:
                 c = <int>y[j * y_stride + k]
-                label_count_init[k * label_count_stride + c] += 1
+                label_count_init[k * label_count_stride + c] += w
 
         self.reset()
 
@@ -1137,17 +1142,19 @@ cdef class ClassificationCriterion(Criterion):
                 label_count_right[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
 
     cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+                    DOUBLE_t* sample_weight,
                     int* X_argsorted_i, BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int n_outputs = self.n_outputs
         cdef int label_count_stride = self.label_count_stride
-        cdef int* label_count_left = self.label_count_left
-        cdef int* label_count_right = self.label_count_right
+        cdef double* label_count_left = self.label_count_left
+        cdef double* label_count_right = self.label_count_right
         cdef int n_left = self.n_left
         cdef int n_right = self.n_right
 
         cdef int idx, k, c, s
+        cdef double w = 1.
 
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
@@ -1155,14 +1162,16 @@ cdef class ClassificationCriterion(Criterion):
 
             if sample_mask[s] == 0:
                 continue
+            if sample_weight != NULL:
+                w = sample_weight[s]
 
             for k from 0 <= k < n_outputs:
                 c = <int>y[s * y_stride + k]
-                label_count_right[k * label_count_stride + c] -= 1
-                label_count_left[k * label_count_stride + c] += 1
+                label_count_right[k * label_count_stride + c] -= w
+                label_count_left[k * label_count_stride + c] += w
 
             n_left += 1
-            n_right -=1
+            n_right -= 1
 
         self.n_left = n_left
         self.n_right = n_right
@@ -1371,6 +1380,7 @@ cdef class RegressionCriterion(Criterion):
         self.n_samples = 0
         self.n_left = 0
         self.n_right = 0
+<<<<<<< HEAD
 
         # Allocate
         self.mean_left = <double*> calloc(n_outputs, sizeof(double))
@@ -1423,7 +1433,8 @@ cdef class RegressionCriterion(Criterion):
     def __setstate__(self, d):
         pass
 
-    cdef void init(self, DOUBLE_t* y, int y_stride, BOOL_t* sample_mask,
+    cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
+                   BOOL_t* sample_mask,
                    int n_samples, int n_total_samples):
         """Initialise the criterion class; assume all samples
            are in the right branch and store the mean and squared
@@ -1502,6 +1513,7 @@ cdef class RegressionCriterion(Criterion):
             var_right[k] = sq_sum_right[k] - n_samples * (mean_right[k] * mean_right[k])
 
     cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+                    DOUBLE_t* sample_weight,
                     int* X_argsorted_i, BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""

@@ -259,13 +259,15 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             criterion = REGRESSION[self.criterion](self.n_outputs_)
 
         if sample_weight is not None:
-            sample_weight = np.asarray(sample_weight, dtype=DTYPE, order='F')
+            sample_weight = np.ascontiguousarray(sample_weight, dtype=DTYPE)
             if len(sample_weight.shape) > 1:
                 raise ValueError("Sample weights array has more"
                                  "than one dimension: %d" % len(sample_weight.shape))
             if len(y) != n_samples:
                 raise ValueError("Number of weights=%d does not match "
                                  "number of samples=%d" % (len(y), len(sample_weight)))
+        else:
+            sample_weight = np.ones(n_samples, dtype=DTYPE)
 
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
