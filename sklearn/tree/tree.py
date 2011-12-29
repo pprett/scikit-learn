@@ -391,7 +391,8 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         self.tree_ = None
         self.feature_importances_ = None
 
-    def fit(self, X, y, sample_mask=None, X_argsorted=None):
+    def fit(self, X, y, sample_weight=None,
+            sample_mask=None, X_argsorted=None):
         """Build a decision tree from the training set (X, y).
 
         Parameters
@@ -426,6 +427,12 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             criterion = REGRESSION[self.criterion]()
 
         y = np.ascontiguousarray(y, dtype=DTYPE)
+
+        if sample_weight is not None:
+            sample_weight = np.asarray(sample_weight, dtype=DTYPE, order='F')
+            if len(y) != n_samples:
+                raise ValueError("Number of weights=%d does not match "
+                                 "number of samples=%d" % (len(y), len(sample_weight)))
 
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
