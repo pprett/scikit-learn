@@ -92,9 +92,9 @@ cdef class ClassificationCriterion(Criterion):
     """
     cdef int n_classes
     cdef int n_samples
-    cdef int* label_count_left
-    cdef int* label_count_right
-    cdef int* label_count_init
+    cdef double* label_count_left
+    cdef double* label_count_right
+    cdef double* label_count_init
     cdef int n_left
     cdef int n_right
 
@@ -115,9 +115,9 @@ cdef class ClassificationCriterion(Criterion):
         self.n_samples = 0
         self.n_left = 0
         self.n_right = 0
-        self.label_count_left = <int*>ndarray_label_count_left.data
-        self.label_count_right = <int*>ndarray_label_count_right.data
-        self.label_count_init = <int*>ndarray_label_count_init.data
+        self.label_count_left = <double*>ndarray_label_count_left.data
+        self.label_count_right = <double*>ndarray_label_count_right.data
+        self.label_count_init = <double*>ndarray_label_count_init.data
         self.ndarray_label_count_left = ndarray_label_count_left
         self.ndarray_label_count_right = ndarray_label_count_right
         self.ndarray_label_count_init = ndarray_label_count_init
@@ -194,8 +194,9 @@ cdef class Gini(ClassificationCriterion):
         cdef double n_right = <double> self.n_right
         cdef double H_left = n_left * n_left
         cdef double H_right = n_right * n_right
-        cdef int k, count_left, count_right
-
+        cdef double count_left, count_right
+        cdef int k
+        
         for k from 0 <= k < self.n_classes:
             count_left = self.label_count_left[k]
             if count_left > 0:
