@@ -40,7 +40,8 @@ cdef extern from "float.h":
 cdef class Criterion:
     """Interface for splitting criteria (regression and classification)"""
 
-    cdef void init(self, DTYPE_t *y, BOOL_t *sample_mask, int n_samples,
+    cdef void init(self, DTYPE_t *y, DTYPE_t *sample_weight,
+                   BOOL_t *sample_mask, int n_samples,
                    int n_total_samples):
         """Initialise the criterion class for new split point."""
         pass
@@ -49,7 +50,9 @@ cdef class Criterion:
         """Reset the criterion for a new feature index."""
         pass
 
-    cdef int update(self, int a, int b, DTYPE_t *y, int *X_argsorted_i,
+    cdef int update(self, int a, int b,
+                    DTYPE_t *y, DTYPE_t *sample_weight,
+                    int *X_argsorted_i,
                     BOOL_t *sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
@@ -119,11 +122,13 @@ cdef class ClassificationCriterion(Criterion):
         self.ndarray_label_count_right = ndarray_label_count_right
         self.ndarray_label_count_init = ndarray_label_count_init
 
-    cdef void init(self, DTYPE_t *y, BOOL_t *sample_mask, int n_samples,
+    cdef void init(self, DTYPE_t *y, DTYPE_t *sample_weight,
+                   BOOL_t *sample_mask, int n_samples,
                    int n_total_samples):
         """Initialise the criterion class."""
         cdef int c = 0
         cdef int j = 0
+        cdef double w = 0
 
         self.n_samples = n_samples
 
@@ -134,7 +139,8 @@ cdef class ClassificationCriterion(Criterion):
             if sample_mask[j] == 0:
                 continue
             c = <int>(y[j])
-            self.label_count_init[c] += 1
+            w = sample_weight[j]
+            self.label_count_init[c] += w
 
         self.reset()
 
@@ -149,19 +155,23 @@ cdef class ClassificationCriterion(Criterion):
             self.label_count_left[c] = 0
             self.label_count_right[c] = self.label_count_init[c]
 
-    cdef int update(self, int a, int b, DTYPE_t *y, int *X_argsorted_i,
+    cdef int update(self, int a, int b,
+                    DTYPE_t *y, DTYPE_t *sample_weight,
+                    int *X_argsorted_i,
                     BOOL_t *sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int c
+        cdef double w
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
             s = X_argsorted_i[idx]
             if sample_mask[s] == 0:
                 continue
             c = <int>(y[s])
-            self.label_count_right[c] -= 1
-            self.label_count_left[c] += 1
+            w = sample_weight[s]
+            self.label_count_right[c] -= w
+            self.label_count_left[c] += w
             self.n_right -= 1
             self.n_left += 1
 
@@ -302,7 +312,8 @@ cdef class RegressionCriterion(Criterion):
         self.var_left = 0.0
         self.var_right = 0.0
 
-    cdef void init(self, DTYPE_t *y, BOOL_t *sample_mask, int n_samples,
+    cdef void init(self, DTYPE_t *y, DTYPE_t *sample_weight,
+                   BOOL_t *sample_mask, int n_samples,
                    int n_total_samples):
         """Initialise the criterion class; assume all samples
            are in the right branch and store the mean and squared
@@ -345,7 +356,9 @@ cdef class RegressionCriterion(Criterion):
         self.var_right = self.sq_sum_right - \
             self.n_samples * (self.mean_right * self.mean_right)
 
-    cdef int update(self, int a, int b, DTYPE_t *y, int *X_argsorted_i,
+    cdef int update(self, int a, int b,
+                    DTYPE_t *y, DTYPE_t *sample_weight,
+                    int *X_argsorted_i,
                     BOOL_t *sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
@@ -468,6 +481,7 @@ cdef int smallest_sample_larger_than(int sample_idx, DTYPE_t *X_i,
 def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                      np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
                      np.ndarray[np.int32_t, ndim=2, mode="fortran"] X_argsorted,
+                     np.ndarray[DTYPE_t, ndim=1, mode="c"] sample_weight,
                      np.ndarray sample_mask,
                      int n_samples,
                      int max_features,
@@ -527,6 +541,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
     cdef DTYPE_t *X_i = NULL
+    cdef DTYPE_t *sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef int *X_argsorted_i = NULL
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
 
@@ -541,7 +556,8 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
 
     # Compute the initial criterion value in the node
     X_argsorted_i = <int *>X_argsorted.data
-    criterion.init(y_ptr, sample_mask_ptr, n_samples, n_total_samples)
+    criterion.init(y_ptr, sample_weight_ptr,
+                   sample_mask_ptr, n_samples, n_total_samples)
     initial_error = criterion.eval()
 
     if initial_error == 0:  # break early if the node is pure
@@ -578,7 +594,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                 break
 
             # Better split than the best so far?
-            criterion.update(a, b, y_ptr, X_argsorted_i, sample_mask_ptr)
+            criterion.update(a, b, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
             error = criterion.eval()
 
             if error < best_error:
