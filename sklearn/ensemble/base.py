@@ -63,3 +63,7 @@ class BaseEnsemble(BaseEstimator):
     def __getitem__(self, index):
         """Returns the index'th estimator in the ensemble."""
         return self.estimators_[index]
+
+    def __iter__(self):
+        """Returns iterator over estimators in the ensemble."""
+        return iter(self.estimators_)
