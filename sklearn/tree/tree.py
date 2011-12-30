@@ -312,7 +312,8 @@ def _build_tree(X, y, sample_weight, is_classification, criterion, max_depth, mi
         # Terminal node
         if feature == -1:
             # compute error at leaf
-            error = _tree._error_at_leaf(y, sample_mask, criterion,
+            error = _tree._error_at_leaf(y, sample_weight,
+                                         sample_mask, criterion,
                                          n_node_samples)
             tree.add_leaf(parent, is_left_child, value, error, n_node_samples)
 
@@ -334,12 +335,12 @@ def _build_tree(X, y, sample_weight, is_classification, criterion, max_depth, mi
                                           n_node_samples, value)
 
             # left child recursion
-            recursive_partition(X, X_argsorted, y,
+            recursive_partition(X, X_argsorted, y, sample_weight,
                                 split & sample_mask,
                                 depth + 1, node_id, True)
 
             # right child recursion
-            recursive_partition(X, X_argsorted, y,
+            recursive_partition(X, X_argsorted, y, sample_weight,
                                 ~split & sample_mask,
                                 depth + 1, node_id, False)
 
@@ -357,7 +358,8 @@ def _build_tree(X, y, sample_weight, is_classification, criterion, max_depth, mi
         X_argsorted = np.asfortranarray(
             np.argsort(X.T, axis=1).astype(np.int32).T)
 
-    recursive_partition(X, X_argsorted, y, sample_mask, 0, -1, False)
+    recursive_partition(X, X_argsorted, y, sample_weight,
+                        sample_mask, 0, -1, False)
     tree.resize(tree.node_count)
 
     return tree
