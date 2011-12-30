@@ -1,16 +1,20 @@
 import numpy as np
 from .base import BaseEnsemble
+from ..tree import DecisionTreeClassifier, DecisionTreeRegressor, \
+                   ExtraTreeClassifier, ExtraTreeRegressor
 import math
 
 
 class AdaBoost(BaseEnsemble):
 
-    def __init__(self, base_estimator,
+    def __init__(self, base_estimator=None,
                        n_estimators=10,
                        estimator_params=[],
                        beta=.5,
                        discrete_class=False,
                        two_class_threshold=0.):
+        if base_estimator is None:
+            base_estimator = DecisionTreeClassifier()
         super(AdaBoost, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators,
