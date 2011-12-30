@@ -1,10 +1,11 @@
 import numpy as np
 from .base import BaseEnsemble
+from ..base import ClassifierMixin, RegressorMixin
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 import math
 
 
-class AdaBoost(BaseEnsemble):
+class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
 
     def __init__(self, base_estimator=None,
                        n_estimators=10,
