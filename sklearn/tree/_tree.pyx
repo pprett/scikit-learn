@@ -431,14 +431,17 @@ def _apply_tree(np.ndarray[DTYPE_t, ndim=2] X,
 
 
 def _error_at_leaf(np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
+                   np.ndarray[DTYPE_t, ndim=1, mode="c"] sample_weight,
                    np.ndarray sample_mask, Criterion criterion,
                    int n_samples):
     """Compute criterion error at leaf with terminal region defined
     by `sample_mask`. """
     cdef int n_total_samples = y.shape[0]
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
+    cdef DTYPE_t *sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
-    criterion.init(y_ptr, sample_mask_ptr, n_samples, n_total_samples)
+    criterion.init(y_ptr, sample_weight_ptr,
+                   sample_mask_ptr, n_samples, n_total_samples)
     return criterion.eval()
 
 
@@ -615,6 +618,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
 def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                             np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
                             np.ndarray[np.int32_t, ndim=2, mode="fortran"] X_argsorted,
+                            np.ndarray[DTYPE_t, ndim=1, mode="c"] sample_weight,
                             np.ndarray sample_mask,
                             int n_samples,
                             int max_features,
@@ -673,6 +677,7 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef DTYPE_t t, initial_error, error
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
+    cdef DTYPE_t *sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef DTYPE_t *X_i = NULL
     cdef int *X_argsorted_i = NULL
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
@@ -688,7 +693,8 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
 
     # Compute the initial criterion value
     X_argsorted_i = <int *>X_argsorted.data
-    criterion.init(y_ptr, sample_mask_ptr, n_samples, n_total_samples)
+    criterion.init(y_ptr, sample_weight_ptr,
+                   sample_mask_ptr, n_samples, n_total_samples)
     initial_error = criterion.eval()
 
     if initial_error == 0:  # break early if the node is pure
@@ -739,7 +745,7 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
             c += 1
 
         # Better than the best so far?
-        criterion.update(0, c, y_ptr, X_argsorted_i, sample_mask_ptr)
+        criterion.update(0, c, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
         error = criterion.eval()
 
         if error < best_error:
