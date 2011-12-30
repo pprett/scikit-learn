@@ -22,34 +22,38 @@ class AdaBoost(BaseEnsemble):
         if beta <= 0:
             raise ValueError("Beta must be positive and non-zero")
 
+        self.boost_weights = []
         self.beta = beta
         self.two_class_cont = two_class_cont
         self.two_class_threshold = two_class_threshold
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X, y, sample_weight=None, **kwargs):
         """
         X: list of instance vectors
 
         y: target values/classes
 
         sample_weight: sample weights
-
-        Notes: currently only binary classification is supported
-        I am making the assumption that one class label is
-        positive and the other is negative
         """
+        X = np.atleast_2d(X)
+        y = np.atleast_1d(y)
+
+        if isinstance(self.base_estimator, ClassifierMixin):
+            self.classes_ = np.unique(y)
+            self.n_classes_ = len(self.classes_)
+            #y = np.searchsorted(self.classes_, y)
+
         if len(sample_weight) == 0:
             # initialize weights to 1/N
             sample_weight = np.ones(X.shape[0], dtype=np.float64)\
                 / X.shape[0]
         else:
             sample_weight = np.copy(sample_weight)
-        # determine number of classes
-        # remove any previous ensemble
-        self[:] = []
-        for i, boost in enumerate(xrange(boosts + 1)):
-            estimator = self.estimator(**self.params)
-            estimator.fit(X, Y, sample_weight, **params)
+
+        # boost the estimator
+        for i in xrange(self.n_estimators):
+            estimator = self._make_estimator()
+            estimator.fit(X, y, sample_weight, **kwargs)
             # TODO request that classifiers return classification
             # of training sets when fitting
             # which would make the following line unnecessary
@@ -63,17 +67,17 @@ class AdaBoost(BaseEnsemble):
             err = np.sum(sample_weight * incorrect) / np.sum(sample_weight)
             # sanity check
             if err == 0:
-                self.append((1., estimator))
+                self.boost_weights.append(1.)
                 break
             elif err >= 0.5:
                 if i == 0:
-                    self.append((1., estimator))
+                    self.boost_weights.append(1.)
                 break
             # boost weight using multi-class SAMME alg
             alpha = beta * (math.log((1 - err) / err) + \
-                            math.log(n_classes - 1))
-            self.append((alpha, estimator))
-            if i < boosts:
+                            math.log(self.n_classes_ - 1))
+            self.boost_weights.append(alpha)
+            if i < self.n_estimators - 1:
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
         return self
@@ -82,7 +86,7 @@ class AdaBoost(BaseEnsemble):
 
         prediction = np.zeros(X.shape[0], dtype=np.float64)
         norm = 0.
-        for alpha, estimator in self:
+        for alpha, estimator in zip(self.boost_weights, self):
             prediction += alpha * estimator.predict(X)
             norm += alpha
         if norm > 0:
