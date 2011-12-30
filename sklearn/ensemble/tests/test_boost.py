@@ -8,10 +8,7 @@ from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
 
 from sklearn.grid_search import GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn import datasets
 
 # toy sample
@@ -39,13 +36,7 @@ boston.target = boston.target[perm]
 def test_classification_toy():
     """Check classification on a toy dataset."""
     # Random forest
-    clf = RandomForestClassifier(n_estimators=10, random_state=1)
-    clf.fit(X, y)
-    assert_array_equal(clf.predict(T), true_result)
-    assert_equal(10, len(clf))
-
-    clf = RandomForestClassifier(n_estimators=10, max_features=1,
-                                 random_state=1)
+    clf = AdaBoostClassifier(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
     assert_equal(10, len(clf))
@@ -55,25 +46,19 @@ def test_iris():
     """Check consistency on dataset iris."""
     for c in ("gini", "entropy"):
         # Random forest
-        clf = RandomForestClassifier(n_estimators=10, criterion=c,
-                                     random_state=1)
+        params = {'criterion': c}
+        clf = AdaBoostClassifier(n_estimators=1, estimator_params=params)
         clf.fit(iris.data, iris.target)
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
                                                                          score)
 
-        clf = RandomForestClassifier(n_estimators=10, criterion=c,
-                                     max_features=2, random_state=1)
-        clf.fit(iris.data, iris.target)
-        score = clf.score(iris.data, iris.target)
-        assert score > 0.5, "Failed with criterion %s and score = %f" % (c,
-                                                                         score)
-
-
+'''
 def test_boston():
     """Check consistency on dataset boston house prices."""
     for c in ("mse",):
         # Random forest
+        """
         clf = RandomForestRegressor(n_estimators=10, criterion=c,
                                     random_state=1)
         clf.fit(boston.data, boston.target)
@@ -81,7 +66,6 @@ def test_boston():
         assert score < 3, ("Failed with max_features=None, "
                            "criterion %s and score = %f" % (c, score))
 
-        """
         clf = RandomForestRegressor(n_estimators=10, criterion=c,
                                     max_features=6, random_state=1)
         clf.fit(boston.data, boston.target)
@@ -89,12 +73,12 @@ def test_boston():
         assert score < 3, ("Failed with max_features=None, "
                            "criterion %s and score = %f" % (c, score))
         """
-
+'''
 
 def test_probability():
     """Predict probabilities."""
     # Random forest
-    clf = RandomForestClassifier(n_estimators=10, random_state=1)
+    clf = AdaBoostClassifier(n_estimators=10, random_state=1)
     clf.fit(iris.data, iris.target)
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
@@ -105,10 +89,10 @@ def test_probability():
 def test_gridsearch():
     """Check that base trees can be grid-searched."""
     # Random forest
-    forest = RandomForestClassifier()
+    boost = AdaBoostClassifier()
     parameters = {'n_estimators': (1, 2),
                   'max_depth': (1, 2)}
-    clf = GridSearchCV(forest, parameters)
+    clf = GridSearchCV(boost, parameters)
     clf.fit(iris.data, iris.target)
 
 
@@ -116,8 +100,8 @@ def test_pickle():
     """Check pickability."""
     import pickle
 
-    # Random forest
-    obj = RandomForestClassifier()
+    # Adaboost
+    obj = AdaBoostClassifier()
     obj.fit(iris.data, iris.target)
     score = obj.score(iris.data, iris.target)
     s = pickle.dumps(obj)
