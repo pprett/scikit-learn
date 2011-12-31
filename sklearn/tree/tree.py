@@ -358,9 +358,6 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
         X_argsorted = np.asfortranarray(
             np.argsort(X.T, axis=1).astype(np.int32).T)
 
-    if sample_weight is None:
-        sample_Weight = np.array([], dtype=DTYPE)
-
     recursive_partition(X, X_argsorted, y, sample_weight,
                         sample_mask, 0, -1, False)
     tree.resize(tree.node_count)
