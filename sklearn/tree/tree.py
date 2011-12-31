@@ -266,8 +266,6 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             if len(y) != n_samples:
                 raise ValueError("Number of weights=%d does not match "
                                  "number of samples=%d" % (len(y), len(sample_weight)))
-        else:
-            sample_weight = np.ones(n_samples, dtype=DTYPE)
 
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
