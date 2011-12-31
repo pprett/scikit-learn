@@ -5,6 +5,14 @@ from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 import math
 
 
+__all__ = ['BoostedClassifier']
+
+
+BOOST_METHODS = [
+    'adaboost',
+]
+
+
 class BoostedClassifier(BaseEnsemble, ClassifierMixin):
     """An boosted classifier.
 
@@ -14,11 +22,26 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
     Parameters
     ----------
-    base_estimator : object, optional (default=None)
+    base_estimator : object, optional (default=DecisionTreeClassifier)
         The base estimator from which the ensemble is built.
 
     n_estimators : integer, optional (default=10)
         The number of trees in the forest.
+
+    beta : float, optional (default=.5)
+        Scale boost weights
+
+    two_class_cont : boolean, optional (default=False)
+        Are there only two target classes and does the base estimator yield
+        continuous output between the two class labels, such as a decision tree
+        using the purity of the leaf nodes?
+
+    two_class_thresh : float, optional (default=0)
+        If two_class_cont is True, this is the theshold
+        separating the two classes
+
+    boost_method : string, optional (default='adaboost')
+        The algorithm used to boost the base estimator
 
     Notes
     -----
@@ -26,14 +49,14 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
     See also
     --------
-    AdaBoost
+    BoostedRegressor
     """
-
     def __init__(self, base_estimator=None,
                        n_estimators=10,
                        beta=.5,
                        two_class_cont=False,
-                       two_class_threshold=0.,
+                       two_class_thresh=0.,
+                       boost_method='adaboost',
                        **params):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier(**params)
@@ -48,7 +71,11 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self.boost_weights = []
         self.beta = beta
         self.two_class_cont = two_class_cont
-        self.two_class_threshold = two_class_threshold
+        self.two_class_thresh = two_class_thresh
+        boost_method = boost_method.lower()
+        if boost_method not in BOOST_METHODS:
+            raise ValueError("Boost method '%s' not implemented" % boost_method)
+        self.boost_method = boost_method
 
     def fit(self, X, y, sample_weight=None, **kwargs):
         """Build a boosted classifier from the training set (X, y).
@@ -86,6 +113,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             sample_weight = np.copy(sample_weight)
 
         # boost the estimator
+        # Currently only AdaBoost is implemented, using the SAMME modification
+        # for multi-class problems
         for i in xrange(self.n_estimators):
             estimator = self._make_estimator()
             estimator.fit(X, y, sample_weight, **kwargs)
@@ -95,8 +124,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             T = estimator.predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
-                incorrect = (((T - self.two_class_threshold) * \
-                              (y - self.two_class_threshold)) < 0).astype(np.int32)
+                incorrect = (((T - self.two_class_thresh) * \
+                              (y - self.two_class_thresh)) < 0).astype(np.int32)
             else:
                 incorrect = (T != y).astype(np.int32)
             # error fraction
