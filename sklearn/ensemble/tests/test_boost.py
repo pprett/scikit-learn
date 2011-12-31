@@ -35,7 +35,7 @@ boston.target = boston.target[perm]
 
 def test_classification_toy():
     """Check classification on a toy dataset."""
-    # Random forest
+    # Adaboost Classification
     clf = AdaBoostClassifier(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
@@ -45,9 +45,8 @@ def test_classification_toy():
 def test_iris():
     """Check consistency on dataset iris."""
     for c in ("gini", "entropy"):
-        # Random forest
-        params = {'criterion': c}
-        clf = AdaBoostClassifier(n_estimators=1, estimator_params=params)
+        # AdaBoost classification
+        clf = AdaBoostClassifier(n_estimators=1, criterion=c)
         clf.fit(iris.data, iris.target)
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
@@ -77,8 +76,8 @@ def test_boston():
 
 def test_probability():
     """Predict probabilities."""
-    # Random forest
-    clf = AdaBoostClassifier(n_estimators=10, random_state=1)
+    # AdaBoost classification
+    clf = AdaBoostClassifier(n_estimators=10)
     clf.fit(iris.data, iris.target)
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
@@ -88,10 +87,10 @@ def test_probability():
 
 def test_gridsearch():
     """Check that base trees can be grid-searched."""
-    # Random forest
+    # AdaBoost classification
     boost = AdaBoostClassifier()
     parameters = {'n_estimators': (1, 2),
-                  'max_depth': (1, 2)}
+                  'base_estimator__max_depth': (1, 2)}
     clf = GridSearchCV(boost, parameters)
     clf.fit(iris.data, iris.target)
 

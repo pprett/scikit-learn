@@ -9,16 +9,16 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
 
     def __init__(self, base_estimator=None,
                        n_estimators=10,
-                       estimator_params=[],
                        beta=.5,
                        two_class_cont=False,
-                       two_class_threshold=0.):
+                       two_class_threshold=0.,
+                       **params):
         if base_estimator is None:
-            base_estimator = DecisionTreeClassifier()
-        super(AdaBoost, self).__init__(
+            base_estimator = DecisionTreeClassifier(**params)
+
+        BaseEnsemble.__init__(self,
             base_estimator=base_estimator,
-            n_estimators=n_estimators,
-            estimator_params=estimator_params)
+            n_estimators=n_estimators)
 
         if beta <= 0:
             raise ValueError("Beta must be positive and non-zero")
@@ -42,9 +42,9 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         if isinstance(self.base_estimator, ClassifierMixin):
             self.classes_ = np.unique(y)
             self.n_classes_ = len(self.classes_)
-            #y = np.searchsorted(self.classes_, y)
+            y = np.searchsorted(self.classes_, y)
 
-        if len(sample_weight) == 0:
+        if not sample_weight:
             # initialize weights to 1/N
             sample_weight = np.ones(X.shape[0], dtype=np.float64)\
                 / X.shape[0]
@@ -61,7 +61,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             T = estimator.predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
-                incorrect = ((T * y) < 0).astype(np.int32)
+                incorrect = (((T - self.two_class_threshold) * \
+                              (y - self.two_class_threshold)) < 0).astype(np.int32)
             else:
                 incorrect = (T != y).astype(np.int32)
             # error fraction
@@ -75,7 +76,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                     self.boost_weights.append(1.)
                 break
             # boost weight using multi-class SAMME alg
-            alpha = beta * (math.log((1 - err) / err) + \
+            alpha = self.beta * (math.log((1 - err) / err) + \
                             math.log(self.n_classes_ - 1))
             self.boost_weights.append(alpha)
             if i < self.n_estimators - 1:
@@ -84,12 +85,71 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         return self
 
     def predict(self, X):
+        """Predict class for X.
 
-        prediction = np.zeros(X.shape[0], dtype=np.float64)
+        The predicted class of an input sample is computed as the majority
+        prediction of the trees in the forest.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        y : array of shape = [n_samples]
+            The predicted classes.
+        """
+        return self.classes_.take(
+            np.argmax(self.predict_proba(X), axis=1),  axis=0)
+
+    def predict_proba(self, X):
+        """Predict class probabilities for X.
+
+        The predicted class probabilities of an input sample is computed as
+        the mean predicted class probabilities of the trees in the forest.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        p : array of shape = [n_samples]
+            The class probabilities of the input samples. Classes are
+            ordered by arithmetical order.
+        """
+        X = np.atleast_2d(X)
+        p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
         norm = 0.
-        for alpha, estimator in zip(self.boost_weights, self):
-            prediction += alpha * estimator.predict(X)
+        for alpha, estimator in zip(self.boost_weights, self.estimators_):
             norm += alpha
+            if self.n_classes_ == estimator.n_classes_:
+                p += alpha * estimator.predict_proba(X)
+            else:
+                proba = alpha * estimator.predict_proba(X)
+                for j, c in enumerate(estimator.classes_):
+                    p[:, c] += proba[:, j]
         if norm > 0:
-            prediction /= norm
-        return prediction
+            p /= norm
+        return p
+
+    def predict_log_proba(self, X):
+        """Predict class log-probabilities for X.
+
+        The predicted class log-probabilities of an input sample is computed as
+        the mean predicted class log-probabilities of the trees in the forest.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        p : array of shape = [n_samples]
+            The class log-probabilities of the input samples. Classes are
+            ordered by arithmetical order.
+        """
+        return np.log(self.predict_proba(X))
