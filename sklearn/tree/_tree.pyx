@@ -164,6 +164,7 @@ cdef class ClassificationCriterion(Criterion):
            are indices in `X_argsorted_i`)."""
         cdef int c
         cdef double w = 1.
+        
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
             s = X_argsorted_i[idx]

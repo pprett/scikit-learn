@@ -266,7 +266,7 @@ class Tree(object):
         return self.value.take(out, axis=0)
 
 
-def _build_tree(X, y, sample_weight, is_classification, criterion, max_depth, min_split,
+def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
                 min_density, max_features, random_state, n_classes, find_split,
                 sample_weight=None, sample_mask=None, X_argsorted=None):
     """Build a tree by recursively partitioning the data."""
@@ -358,6 +358,9 @@ def _build_tree(X, y, sample_weight, is_classification, criterion, max_depth, mi
         X_argsorted = np.asfortranarray(
             np.argsort(X.T, axis=1).astype(np.int32).T)
 
+    if sample_weight is None:
+        sample_Weight = np.array([], dtype=DTYPE)
+
     recursive_partition(X, X_argsorted, y, sample_weight,
                         sample_mask, 0, -1, False)
     tree.resize(tree.node_count)
@@ -438,8 +441,6 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             if len(y) != n_samples:
                 raise ValueError("Number of weights=%d does not match "
                                  "number of samples=%d" % (len(y), len(sample_weight)))
-        else:
-            sample_weight = np.ones(n_samples, dtype=DTYPE)
 
         # Check parameters
         max_depth = np.inf if self.max_depth is None else self.max_depth
