@@ -442,7 +442,7 @@ def _error_at_leaf(np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
     cdef int n_total_samples = y.shape[0]
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
     cdef DTYPE_t *sample_weight_ptr = NULL
-    if sample_weight.shape[0] > 0:
+    if sample_weight is not None:
         sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
     criterion.init(y_ptr, sample_weight_ptr,
@@ -553,7 +553,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
     cdef DTYPE_t *X_i = NULL
     cdef DTYPE_t *sample_weight_ptr = NULL
-    if len(sample_weight):
+    if sample_weight is not None:
         sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef int *X_argsorted_i = NULL
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
@@ -689,7 +689,7 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
     cdef DTYPE_t *sample_weight_ptr = NULL
-    if len(sample_weight):
+    if sample_weight is not None:
         sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef DTYPE_t *X_i = NULL
     cdef int *X_argsorted_i = NULL
