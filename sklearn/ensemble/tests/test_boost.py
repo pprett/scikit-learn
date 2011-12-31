@@ -8,7 +8,7 @@ from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
 
 from sklearn.grid_search import GridSearchCV
-from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import BoostedClassifier
 from sklearn import datasets
 
 # toy sample
@@ -36,7 +36,7 @@ boston.target = boston.target[perm]
 def test_classification_toy():
     """Check classification on a toy dataset."""
     # Adaboost Classification
-    clf = AdaBoostClassifier(n_estimators=10)
+    clf = BoostedClassifier(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
     assert_equal(10, len(clf))
@@ -46,7 +46,7 @@ def test_iris():
     """Check consistency on dataset iris."""
     for c in ("gini", "entropy"):
         # AdaBoost classification
-        clf = AdaBoostClassifier(n_estimators=1, criterion=c)
+        clf = BoostedClassifier(n_estimators=1, criterion=c)
         clf.fit(iris.data, iris.target)
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
@@ -77,7 +77,7 @@ def test_boston():
 def test_probability():
     """Predict probabilities."""
     # AdaBoost classification
-    clf = AdaBoostClassifier(n_estimators=10)
+    clf = BoostedClassifier(n_estimators=10)
     clf.fit(iris.data, iris.target)
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
@@ -88,7 +88,7 @@ def test_probability():
 def test_gridsearch():
     """Check that base trees can be grid-searched."""
     # AdaBoost classification
-    boost = AdaBoostClassifier()
+    boost = BoostedClassifier()
     parameters = {'n_estimators': (1, 2),
                   'base_estimator__max_depth': (1, 2)}
     clf = GridSearchCV(boost, parameters)
@@ -100,7 +100,7 @@ def test_pickle():
     import pickle
 
     # Adaboost
-    obj = AdaBoostClassifier()
+    obj = BoostedClassifier()
     obj.fit(iris.data, iris.target)
     score = obj.score(iris.data, iris.target)
     s = pickle.dumps(obj)

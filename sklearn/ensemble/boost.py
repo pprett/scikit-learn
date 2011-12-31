@@ -5,13 +5,58 @@ from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 import math
 
 
-class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
+__all__ = ['BoostedClassifier']
 
+
+BOOST_METHODS = [
+    'adaboost',
+]
+
+
+class BoostedClassifier(BaseEnsemble, ClassifierMixin):
+    """An boosted classifier.
+
+    A random forest is a meta estimator that fits a number of classifical
+    decision trees on various sub-samples of the dataset and use averaging
+    to improve the predictive accuracy and control over-fitting.
+
+    Parameters
+    ----------
+    base_estimator : object, optional (default=DecisionTreeClassifier)
+        The base estimator from which the ensemble is built.
+
+    n_estimators : integer, optional (default=10)
+        The number of trees in the forest.
+
+    beta : float, optional (default=.5)
+        Scale boost weights
+
+    two_class_cont : boolean, optional (default=False)
+        Are there only two target classes and does the base estimator yield
+        continuous output between the two class labels, such as a decision tree
+        using the purity of the leaf nodes?
+
+    two_class_thresh : float, optional (default=0)
+        If two_class_cont is True, this is the theshold
+        separating the two classes
+
+    boost_method : string, optional (default='adaboost')
+        The algorithm used to boost the base estimator
+
+    Notes
+    -----
+    .. [1] L. Breiman, "Random Forests", Machine Learning, 45(1), 5-32, 2001.
+
+    See also
+    --------
+    BoostedRegressor
+    """
     def __init__(self, base_estimator=None,
                        n_estimators=10,
                        beta=.5,
                        two_class_cont=False,
-                       two_class_threshold=0.,
+                       two_class_thresh=0.,
+                       boost_method='adaboost',
                        **params):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier(**params)
@@ -26,15 +71,31 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         self.boost_weights = []
         self.beta = beta
         self.two_class_cont = two_class_cont
-        self.two_class_threshold = two_class_threshold
+        self.two_class_thresh = two_class_thresh
+        boost_method = boost_method.lower()
+        if boost_method not in BOOST_METHODS:
+            raise ValueError("Boost method '%s' not implemented" % boost_method)
+        self.boost_method = boost_method
 
     def fit(self, X, y, sample_weight=None, **kwargs):
-        """
-        X: list of instance vectors
+        """Build a boosted classifier from the training set (X, y).
 
-        y: target values/classes
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The training input samples.
 
-        sample_weight: sample weights
+        y : array-like, shape = [n_samples]
+            The target values (integers that correspond to classes in
+            classification, real numbers in regression).
+
+        sample_weight: array-like, shape = [n_samples], optional
+            Sample weights
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
@@ -52,6 +113,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             sample_weight = np.copy(sample_weight)
 
         # boost the estimator
+        # Currently only AdaBoost is implemented, using the SAMME modification
+        # for multi-class problems
         for i in xrange(self.n_estimators):
             estimator = self._make_estimator()
             estimator.fit(X, y, sample_weight, **kwargs)
@@ -61,8 +124,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             T = estimator.predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
-                incorrect = (((T - self.two_class_threshold) * \
-                              (y - self.two_class_threshold)) < 0).astype(np.int32)
+                incorrect = (((T - self.two_class_thresh) * \
+                              (y - self.two_class_thresh)) < 0).astype(np.int32)
             else:
                 incorrect = (T != y).astype(np.int32)
             # error fraction
@@ -107,7 +170,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
-        the mean predicted class probabilities of the trees in the forest.
+        the weighted mean predicted class probabilities
+        of the trees in the forest.
 
         Parameters
         ----------
@@ -139,7 +203,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         """Predict class log-probabilities for X.
 
         The predicted class log-probabilities of an input sample is computed as
-        the mean predicted class log-probabilities of the trees in the forest.
+        the weighted mean predicted class log-probabilities
+        of the trees in the forest.
 
         Parameters
         ----------
