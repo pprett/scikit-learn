@@ -128,7 +128,7 @@ cdef class ClassificationCriterion(Criterion):
         """Initialise the criterion class."""
         cdef int c = 0
         cdef int j = 0
-        cdef double w = 0
+        cdef double w = 1.
 
         self.n_samples = n_samples
 
@@ -139,7 +139,8 @@ cdef class ClassificationCriterion(Criterion):
             if sample_mask[j] == 0:
                 continue
             c = <int>(y[j])
-            w = sample_weight[j]
+            if sample_weight != NULL:
+                w = sample_weight[j]
             self.label_count_init[c] += w
 
         self.reset()
@@ -162,14 +163,16 @@ cdef class ClassificationCriterion(Criterion):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int c
-        cdef double w
+        cdef double w = 1.
+        
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
             s = X_argsorted_i[idx]
             if sample_mask[s] == 0:
                 continue
             c = <int>(y[s])
-            w = sample_weight[s]
+            if sample_weight != NULL:
+                w = sample_weight[s]
             self.label_count_right[c] -= w
             self.label_count_left[c] += w
             self.n_right -= 1
@@ -438,7 +441,9 @@ def _error_at_leaf(np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
     by `sample_mask`. """
     cdef int n_total_samples = y.shape[0]
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
-    cdef DTYPE_t *sample_weight_ptr = <DTYPE_t *>sample_weight.data
+    cdef DTYPE_t *sample_weight_ptr = NULL
+    if sample_weight.shape[0] > 0:
+        sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
     criterion.init(y_ptr, sample_weight_ptr,
                    sample_mask_ptr, n_samples, n_total_samples)
@@ -545,7 +550,9 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
     cdef DTYPE_t *X_i = NULL
-    cdef DTYPE_t *sample_weight_ptr = <DTYPE_t *>sample_weight.data
+    cdef DTYPE_t *sample_weight_ptr = NULL
+    if len(sample_weight):
+        sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef int *X_argsorted_i = NULL
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
 
@@ -677,7 +684,9 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef DTYPE_t t, initial_error, error
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
-    cdef DTYPE_t *sample_weight_ptr = <DTYPE_t *>sample_weight.data
+    cdef DTYPE_t *sample_weight_ptr = NULL
+    if len(sample_weight):
+        sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef DTYPE_t *X_i = NULL
     cdef int *X_argsorted_i = NULL
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
