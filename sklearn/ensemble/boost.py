@@ -76,7 +76,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                     self.boost_weights.append(1.)
                 break
             # boost weight using multi-class SAMME alg
-            alpha = beta * (math.log((1 - err) / err) + \
+            alpha = self.beta * (math.log((1 - err) / err) + \
                             math.log(self.n_classes_ - 1))
             self.boost_weights.append(alpha)
             if i < self.n_estimators - 1:
