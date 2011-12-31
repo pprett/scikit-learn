@@ -14,6 +14,9 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
     Parameters
     ----------
+    base_estimator : object, optional (default=None)
+        The base estimator from which the ensemble is built.
+
     n_estimators : integer, optional (default=10)
         The number of trees in the forest.
 
