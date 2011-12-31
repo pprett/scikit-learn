@@ -88,9 +88,9 @@ def test_probability():
 def test_gridsearch():
     """Check that base trees can be grid-searched."""
     # AdaBoost classification
-    boost = AdaBoostClassifier(max_depth=None)
+    boost = AdaBoostClassifier()
     parameters = {'n_estimators': (1, 2),
-                  'max_depth': (1, 2)}
+                  'base_estimator__max_depth': (1, 2)}
     clf = GridSearchCV(boost, parameters)
     clf.fit(iris.data, iris.target)
 
