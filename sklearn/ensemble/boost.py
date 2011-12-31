@@ -5,7 +5,26 @@ from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 import math
 
 
-class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
+class BoostedClassifier(BaseEnsemble, ClassifierMixin):
+    """An boosted classifier.
+
+    A random forest is a meta estimator that fits a number of classifical
+    decision trees on various sub-samples of the dataset and use averaging
+    to improve the predictive accuracy and control over-fitting.
+
+    Parameters
+    ----------
+    n_estimators : integer, optional (default=10)
+        The number of trees in the forest.
+
+    Notes
+    -----
+    .. [1] L. Breiman, "Random Forests", Machine Learning, 45(1), 5-32, 2001.
+
+    See also
+    --------
+    AdaBoost
+    """
 
     def __init__(self, base_estimator=None,
                        n_estimators=10,
@@ -29,12 +48,24 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         self.two_class_threshold = two_class_threshold
 
     def fit(self, X, y, sample_weight=None, **kwargs):
-        """
-        X: list of instance vectors
+        """Build a boosted classifier from the training set (X, y).
 
-        y: target values/classes
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The training input samples.
 
-        sample_weight: sample weights
+        y : array-like, shape = [n_samples]
+            The target values (integers that correspond to classes in
+            classification, real numbers in regression).
+
+        sample_weight: array-like, shape = [n_samples], optional
+            Sample weights
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
@@ -107,7 +138,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
-        the mean predicted class probabilities of the trees in the forest.
+        the weighted mean predicted class probabilities
+        of the trees in the forest.
 
         Parameters
         ----------
@@ -139,7 +171,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         """Predict class log-probabilities for X.
 
         The predicted class log-probabilities of an input sample is computed as
-        the mean predicted class log-probabilities of the trees in the forest.
+        the weighted mean predicted class log-probabilities
+        of the trees in the forest.
 
         Parameters
         ----------
