@@ -25,13 +25,6 @@ perm = np.random.permutation(iris.target.size)
 iris.data = iris.data[perm]
 iris.target = iris.target[perm]
 
-# also load the boston dataset
-# and randomly permute it
-boston = datasets.load_boston()
-perm = np.random.permutation(boston.target.size)
-boston.data = boston.data[perm]
-boston.target = boston.target[perm]
-
 
 def test_classification_toy():
     """Check classification on a toy dataset."""
@@ -39,7 +32,6 @@ def test_classification_toy():
     clf = BoostedClassifier(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
-    assert_equal(10, len(clf))
 
 
 def test_iris():
