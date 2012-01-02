@@ -1,3 +1,14 @@
+"""Boosted classifiers
+
+The module structure is the following:
+
+- The ``BoostedClassifier`` class implements a ``fit`` method
+  capable of boosting any classifier
+"""
+
+# Authors: Noel Dawe
+# License: BSD 3
+
 import numpy as np
 from .base import BaseEnsemble
 from ..base import ClassifierMixin
@@ -16,7 +27,7 @@ BOOST_METHODS = [
 
 
 class BoostedClassifier(BaseEnsemble, ClassifierMixin):
-    """An boosted classifier.
+    """A boosted classifier.
 
     A boosted classifier is a meta estimator that begins by fitting a
     classifier on a dataset and then fits additional copies of the classifer
@@ -77,7 +88,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         if beta <= 0:
             raise ValueError("Beta must be positive and non-zero")
 
-        self.boost_weights = []
+        self.boost_weights_ = list()
         self.beta = beta
         self.two_class_cont = two_class_cont
         self.two_class_thresh = two_class_thresh
@@ -113,10 +124,9 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
 
-        if isinstance(self.base_estimator, ClassifierMixin):
-            self.classes_ = np.unique(y)
-            self.n_classes_ = len(self.classes_)
-            y = np.searchsorted(self.classes_, y)
+        self.classes_ = np.unique(y)
+        self.n_classes_ = len(self.classes_)
+        y = np.searchsorted(self.classes_, y)
 
         if not sample_weight:
             # initialize weights to 1/N
@@ -145,30 +155,32 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             err = np.sum(sample_weight * incorrect) / np.sum(sample_weight)
             # sanity check
             if err == 0:
-                self.boost_weights.append(1.)
+                self.boost_weights_.append(1.)
                 break
             elif err >= 0.5:
                 if i == 0:
-                    self.boost_weights.append(1.)
+                    self.boost_weights_.append(1.)
                 break
             # boost weight using multi-class SAMME alg
             alpha = self.beta * (math.log((1 - err) / err) + \
                             math.log(self.n_classes_ - 1))
-            self.boost_weights.append(alpha)
+            self.boost_weights_.append(alpha)
             if i < self.n_estimators - 1:
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
                 # normalize
-                sample_weight /= sum(sample_weight) / X.shape[0]
+                sample_weight *= X.shape[0] / np.sum(sample_weight)
 
         # Boosting may break early so set n_estimators to actual value
         self.n_estimators = len(self.estimators_)
 
         # Sum the importances
         if self.compute_importances:
+            norm = sum(self.boost_weights_)
             self.feature_importances_ = \
-                sum(clf.feature_importances_ for clf in self.estimators_) \
-                / self.n_estimators
+                sum(weight * clf.feature_importances_ for \
+                  weight, clf in zip(self.boost_weights_, self.estimators_)) \
+                / norm
 
         return self
 
@@ -212,7 +224,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
         norm = 0.
-        for alpha, estimator in zip(self.boost_weights, self.estimators_):
+        for alpha, estimator in zip(self.boost_weights_, self.estimators_):
             norm += alpha
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
