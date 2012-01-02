@@ -88,7 +88,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         if beta <= 0:
             raise ValueError("Beta must be positive and non-zero")
 
-        self.boost_weights = []
+        self.boost_weights_ = list()
         self.beta = beta
         self.two_class_cont = two_class_cont
         self.two_class_thresh = two_class_thresh
@@ -156,16 +156,16 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             err = np.sum(sample_weight * incorrect) / np.sum(sample_weight)
             # sanity check
             if err == 0:
-                self.boost_weights.append(1.)
+                self.boost_weights_.append(1.)
                 break
             elif err >= 0.5:
                 if i == 0:
-                    self.boost_weights.append(1.)
+                    self.boost_weights_.append(1.)
                 break
             # boost weight using multi-class SAMME alg
             alpha = self.beta * (math.log((1 - err) / err) + \
                             math.log(self.n_classes_ - 1))
-            self.boost_weights.append(alpha)
+            self.boost_weights_.append(alpha)
             if i < self.n_estimators - 1:
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
@@ -176,10 +176,12 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self.n_estimators = len(self.estimators_)
 
         # Sum the importances
+        norm = sum(self.boost_weights_)
         if self.compute_importances:
             self.feature_importances_ = \
-                sum(clf.feature_importances_ for clf in self.estimators_) \
-                / self.n_estimators
+                sum(weight * clf.feature_importances_ for \
+                  weight, clf in zip(self.boost_weights_, self.estimators_)) \
+                / norm
 
         return self
 
@@ -223,7 +225,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
         norm = 0.
-        for alpha, estimator in zip(self.boost_weights, self.estimators_):
+        for alpha, estimator in zip(self.boost_weights_, self.estimators_):
             norm += alpha
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
