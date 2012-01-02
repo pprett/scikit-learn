@@ -12,22 +12,18 @@ print __doc__
 
 import numpy as np
 
-from sklearn.datasets import make_classification
+from sklearn.datasets import make_blobs
 from sklearn.ensemble import BoostedClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 # Build a classification task
-X, y = make_classification(n_samples=1000,
-                           n_features=10,
-                           n_informative=8,
-                           n_redundant=0,
-                           n_repeated=0,
-                           n_classes=5,
-                           random_state=0,
-                           shuffle=False)
+X, y = make_blobs(n_samples=100000,
+                  n_features=2,
+                  cluster_std=10,
+                  centers=3)
 
-X_test, X_train = X[:500], X[500:]
-y_test, y_train = y[:500], y[500:]
+X_test, X_train = X[:50000], X[50000:]
+y_test, y_train = y[:50000], y[50000:]
 
 test_errors = []
 train_errors = []

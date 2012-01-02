@@ -128,7 +128,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self.n_classes_ = len(self.classes_)
         y = np.searchsorted(self.classes_, y)
 
-        if not sample_weight:
+        if sample_weight is None:
             # initialize weights to 1/N
             sample_weight = np.ones(X.shape[0], dtype=np.float64)\
                 / X.shape[0]
@@ -144,24 +144,20 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             # TODO request that classifiers return classification
             # of training sets when fitting
             # which would make the following line unnecessary
-            T = estimator.predict(X)
+            p = estimator.predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
-                incorrect = (((T - self.two_class_thresh) * \
+                incorrect = (((p - self.two_class_thresh) * \
                               (y - self.two_class_thresh)) < 0).astype(np.int32)
             else:
-                incorrect = (T != y).astype(np.int32)
+                incorrect = (p != y).astype(np.int32)
             # error fraction
             err = np.sum(sample_weight * incorrect) / np.sum(sample_weight)
-            # sanity check
+            # if classification is perfect then stop
             if err == 0:
                 self.boost_weights_.append(1.)
                 break
-            elif err >= 0.5:
-                if i == 0:
-                    self.boost_weights_.append(1.)
-                break
-            # boost weight using multi-class SAMME alg
+            # boost weight using multi-class AdaBoost SAMME alg
             alpha = self.beta * (math.log((1 - err) / err) + \
                             math.log(self.n_classes_ - 1))
             self.boost_weights_.append(alpha)
