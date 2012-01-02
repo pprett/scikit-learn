@@ -223,9 +223,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         """
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
-        norm = 0.
+        norm = sum(self.boost_weights_)
         for alpha, estimator in zip(self.boost_weights_, self.estimators_):
-            norm += alpha
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
             else:
