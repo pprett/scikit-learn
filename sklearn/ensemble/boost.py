@@ -124,10 +124,9 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
 
-        if isinstance(self.base_estimator, ClassifierMixin):
-            self.classes_ = np.unique(y)
-            self.n_classes_ = len(self.classes_)
-            y = np.searchsorted(self.classes_, y)
+        self.classes_ = np.unique(y)
+        self.n_classes_ = len(self.classes_)
+        y = np.searchsorted(self.classes_, y)
 
         if not sample_weight:
             # initialize weights to 1/N
@@ -170,14 +169,14 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
                 # normalize
-                sample_weight /= sum(sample_weight) / X.shape[0]
+                sample_weight *= X.shape[0] / np.sum(sample_weight)
 
         # Boosting may break early so set n_estimators to actual value
         self.n_estimators = len(self.estimators_)
 
         # Sum the importances
-        norm = sum(self.boost_weights_)
         if self.compute_importances:
+            norm = sum(self.boost_weights_)
             self.feature_importances_ = \
                 sum(weight * clf.feature_importances_ for \
                   weight, clf in zip(self.boost_weights_, self.estimators_)) \
