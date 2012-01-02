@@ -46,7 +46,7 @@ for boost in bdt.fit_generator(X_train, y_train):
 # Plot the feature importances of the trees and of the forest
 import pylab as pl
 pl.figure()
-pl.plot(xrange(1, 10), test_errors, "b", label='test error')
-pl.plot(xrange(1, 10), train_errors, "r", label='train error')
+pl.plot(xrange(1, len(test_errors)+1), test_errors, "b", label='test error')
+pl.plot(xrange(1, len(train_errors)+1), train_errors, "r", label='train error')
 pl.legend()
 pl.show()
