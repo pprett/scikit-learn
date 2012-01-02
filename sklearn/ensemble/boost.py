@@ -60,9 +60,11 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
     Notes
     -----
-    .. [1] Yoav Freund, Robert E. Schapire. "A Decision-Theoretic Generalization
-           of on-Line Learning and an Application to Boosting", 1995
-    .. [2] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie. "Multi-class AdaBoost" 2009
+    .. [1] Yoav Freund, Robert E. Schapire. "A Decision-Theoretic
+           Generalization of on-Line Learning and an Application
+           to Boosting", 1995
+    .. [2] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie.
+           "Multi-class AdaBoost" 2009
 
     See also
     --------
@@ -94,7 +96,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self.two_class_thresh = two_class_thresh
         boost_method = boost_method.lower()
         if boost_method not in BOOST_METHODS:
-            raise ValueError("Boost method '%s' not implemented" % boost_method)
+            raise ValueError("Boost method '%s' not implemented" % \
+                             boost_method)
         self.boost_method = boost_method
         self.compute_importances = compute_importances
         self.feature_importances_ = None
@@ -130,7 +133,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         if sample_weight is None:
             # initialize weights to 1/N
-            sample_weight = np.ones(X.shape[0], dtype=np.float64)\
+            sample_weight = np.ones(X.shape[0], dtype=np.float64) \
                 / X.shape[0]
         else:
             sample_weight = np.copy(sample_weight)
@@ -148,22 +151,23 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             # instances incorrectly classified
             if self.two_class_cont:
                 incorrect = (((p - self.two_class_thresh) * \
-                              (y - self.two_class_thresh)) < 0).astype(np.int32)
+                              (y - self.two_class_thresh)) \
+                             < 0).astype(np.int32)
             else:
                 incorrect = (p != y).astype(np.int32)
             # error fraction
             err = (sample_weight * incorrect).sum() / sample_weight.sum()
             # if classification is perfect then stop
-            if err == 0:
+            if err <= 0:
                 self.boost_weights_.append(1.)
                 break
             # sanity check
-            if err > 1. - 1. / self.n_classes_:
-                self.boost_weights_.append(1.)
+            if err >= 1. - (1. / self.n_classes_):
+                self.estimators_.pop(-1)
                 break
             # boost weight using multi-class AdaBoost SAMME alg
-            alpha = self.beta * (math.log((1 - err) / err) + \
-                            math.log(self.n_classes_ - 1))
+            alpha = self.beta * (math.log((1. - err) / err) + \
+                            math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
             if i < self.n_estimators - 1:
                 correct = incorrect ^ 1
