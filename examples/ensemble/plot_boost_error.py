@@ -30,7 +30,7 @@ train_errors = []
 
 for n_estimators in xrange(1, 10):
     # Build a boosted decision tree
-    boost = BoostedClassifier(DecisionTreeClassifier(),
+    boost = BoostedClassifier(DecisionTreeClassifier(min_split=100),
                               n_estimators=n_estimators)
 
     boost.fit(X_train, y_train)

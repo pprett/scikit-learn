@@ -152,9 +152,13 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             else:
                 incorrect = (p != y).astype(np.int32)
             # error fraction
-            err = np.sum(sample_weight * incorrect) / np.sum(sample_weight)
+            err = (sample_weight * incorrect).sum() / sample_weight.sum()
             # if classification is perfect then stop
             if err == 0:
+                self.boost_weights_.append(1.)
+                break
+            # sanity check
+            if err > 1. - 1. / self.n_classes_:
                 self.boost_weights_.append(1.)
                 break
             # boost weight using multi-class AdaBoost SAMME alg
@@ -165,7 +169,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
                 # normalize
-                sample_weight *= X.shape[0] / np.sum(sample_weight)
+                sample_weight *= X.shape[0] / sample_weight.sum()
 
         # Boosting may break early so set n_estimators to actual value
         self.n_estimators = len(self.estimators_)
@@ -219,9 +223,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         """
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
-        norm = 0.
+        norm = sum(self.boost_weights_)
         for alpha, estimator in zip(self.boost_weights_, self.estimators_):
-            norm += alpha
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
             else:
