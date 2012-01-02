@@ -124,6 +124,30 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self : object
             Returns self.
         """
+        for boost in self.fit_generator(X, y, sample_weight=sample_weight, **kwargs):
+            pass
+        return self
+
+    def fit_generator(self, X, y, sample_weight=None, **kwargs):
+        """Build a boosted classifier from the training set (X, y).
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The training input samples.
+
+        y : array-like, shape = [n_samples]
+            The target values (integers that correspond to classes in
+            classification, real numbers in regression).
+
+        sample_weight: array-like, shape = [n_samples], optional
+            Sample weights
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
 
@@ -141,7 +165,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         # boost the estimator
         # Currently only AdaBoost is implemented, using the SAMME modification
         # for multi-class problems
-        for i in xrange(self.n_estimators):
+        while len(self) < self.n_estimators:
             estimator = self._make_estimator()
             estimator.fit(X, y, sample_weight=sample_weight, **kwargs)
             # TODO request that classifiers return classification
@@ -169,7 +193,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             alpha = self.beta * (math.log((1. - err) / err) + \
                             math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
-            if i < self.n_estimators - 1:
+            if len(self) < self.n_estimators:
+                yield self
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
                 # normalize
@@ -185,8 +210,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 sum(weight * clf.feature_importances_ for \
                   weight, clf in zip(self.boost_weights_, self.estimators_)) \
                 / norm
-
-        return self
+        yield self
 
     def predict(self, X):
         """Predict class for X.

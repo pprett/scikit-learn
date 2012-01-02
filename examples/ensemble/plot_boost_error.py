@@ -18,7 +18,7 @@ from sklearn.tree import DecisionTreeClassifier
 
 # Build a classification task
 X, y = make_blobs(n_samples=100000,
-                  n_features=2,
+                  n_features=10,
                   cluster_std=10,
                   centers=3)
 
@@ -28,12 +28,12 @@ y_test, y_train = y[:50000], y[50000:]
 test_errors = []
 train_errors = []
 
-for n_estimators in xrange(1, 10):
-    # Build a boosted decision tree
-    boost = BoostedClassifier(DecisionTreeClassifier(min_split=100),
-                              n_estimators=n_estimators)
 
-    boost.fit(X_train, y_train)
+bdt = BoostedClassifier(DecisionTreeClassifier(min_split=100),
+                        n_estimators=10)
+
+for boost in bdt.fit_generator(X_train, y_train):
+
     print boost.n_estimators, len(boost.estimators_)
 
     y_test_predict = boost.predict(X_test)
@@ -46,7 +46,7 @@ for n_estimators in xrange(1, 10):
 # Plot the feature importances of the trees and of the forest
 import pylab as pl
 pl.figure()
-pl.plot(xrange(1, 10), test_errors, "b", label='test error')
-pl.plot(xrange(1, 10), train_errors, "r", label='train error')
+pl.plot(xrange(1, len(test_errors)+1), test_errors, "b", label='test error')
+pl.plot(xrange(1, len(train_errors)+1), train_errors, "r", label='train error')
 pl.legend()
 pl.show()
