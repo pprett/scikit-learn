@@ -22,32 +22,35 @@ X, y = make_classification(n_samples=1000,
                            n_informative=8,
                            n_redundant=0,
                            n_repeated=0,
-                           n_classes=2,
+                           n_classes=5,
                            random_state=0,
                            shuffle=False)
 
-# Build a boosted decision tree
-boost = BoostedClassifier(DecisionTreeClassifier(),
-                          compute_importances=True,
-                          n_estimators=100)
+X_test, X_train = X[:500], X[500:]
+y_test, y_train = y[:500], y[500:]
 
-boost.fit(X, y)
-importances = boost.feature_importances_
-indices = np.argsort(importances)[::-1]
+test_errors = []
+train_errors = []
 
-# Print the feature ranking
-print "Feature ranking:"
+for n_estimators in xrange(1, 10):
+    # Build a boosted decision tree
+    boost = BoostedClassifier(DecisionTreeClassifier(),
+                              n_estimators=n_estimators)
 
-for f in xrange(10):
-    print "%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]])
+    boost.fit(X_train, y_train)
+    print boost.n_estimators, len(boost.estimators_)
+
+    y_test_predict = boost.predict(X_test)
+    y_train_predict = boost.predict(X_train)
+
+    test_errors.append(sum(y_test_predict != y_test) / float(len(y_test)))
+    train_errors.append(sum(y_train_predict != y_train) / float(len(y_train)))
+
 
 # Plot the feature importances of the trees and of the forest
 import pylab as pl
 pl.figure()
-pl.title("Feature importances")
-
-for tree in boost.estimators_:
-    pl.plot(xrange(10), tree.feature_importances_[indices], "r")
-
-pl.plot(xrange(10), importances[indices], "b")
+pl.plot(xrange(1, 10), test_errors, "b", label='test error')
+pl.plot(xrange(1, 10), train_errors, "r", label='train error')
+pl.legend()
 pl.show()
