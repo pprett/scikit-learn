@@ -91,6 +91,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             raise ValueError("Beta must be positive and non-zero")
 
         self.boost_weights_ = list()
+        self.errs_ = list()
         self.beta = beta
         self.two_class_cont = two_class_cont
         self.two_class_thresh = two_class_thresh
@@ -184,6 +185,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             # if classification is perfect then stop
             if err <= 0:
                 self.boost_weights_.append(1.)
+                self.errs_.append(err)
                 yield self
                 break
             # sanity check
@@ -194,6 +196,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             alpha = self.beta * (math.log((1. - err) / err) + \
                                  math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
+            self.errs_.append(err)
             yield self
             if len(self) < self.n_estimators:
                 sample_weight *= np.exp(alpha * incorrect)
