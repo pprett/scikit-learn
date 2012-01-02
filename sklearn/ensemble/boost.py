@@ -1,3 +1,14 @@
+"""Boosted classifiers
+
+The module structure is the following:
+
+- The ``BoostedClassifier`` class implements a ``fit`` method
+  capable of boosting any classifier
+"""
+
+# Authors: Noel Dawe
+# License: BSD 3
+
 import numpy as np
 from .base import BaseEnsemble
 from ..base import ClassifierMixin
@@ -16,7 +27,7 @@ BOOST_METHODS = [
 
 
 class BoostedClassifier(BaseEnsemble, ClassifierMixin):
-    """An boosted classifier.
+    """A boosted classifier.
 
     A boosted classifier is a meta estimator that begins by fitting a
     classifier on a dataset and then fits additional copies of the classifer
