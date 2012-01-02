@@ -1,7 +1,7 @@
 import numpy as np
 from .base import BaseEnsemble
-from ..base import ClassifierMixin, RegressorMixin
-from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
+from ..base import ClassifierMixin
+from ..tree import DecisionTreeClassifier
 import math
 
 
