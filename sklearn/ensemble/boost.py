@@ -10,15 +10,19 @@ __all__ = ['BoostedClassifier']
 
 BOOST_METHODS = [
     'adaboost',
+    #'majority',
+    #'brownboost',
 ]
 
 
 class BoostedClassifier(BaseEnsemble, ClassifierMixin):
     """An boosted classifier.
 
-    A random forest is a meta estimator that fits a number of classifical
-    decision trees on various sub-samples of the dataset and use averaging
-    to improve the predictive accuracy and control over-fitting.
+    A boosted classifier is a meta estimator that begins by fitting a
+    classifier on a dataset and then fits additional copies of the classifer
+    on the same dataset where the weights of correctly and incorrectly
+    classified instances are adjusted such that subsequent classifiers
+    focus more on difficult cases.
 
     Parameters
     ----------
@@ -45,11 +49,13 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
     Notes
     -----
-    .. [1] L. Breiman, "Random Forests", Machine Learning, 45(1), 5-32, 2001.
+    .. [1] Yoav Freund, Robert E. Schapire. "A Decision-Theoretic Generalization
+           of on-Line Learning and an Application to Boosting", 1995
+    .. [2] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie. "Multi-class AdaBoost" 2009
 
     See also
     --------
-    BoostedRegressor
+    DecisionTreeClassifier
     """
     def __init__(self, base_estimator=None,
                        n_estimators=10,
@@ -60,6 +66,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                        **params):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier(**params)
+        elif not isinstance(base_estimator, ClassifierMixin):
+            raise TypeError("estimator must be a subclass of ClassifierMixin")
 
         BaseEnsemble.__init__(self,
             base_estimator=base_estimator,
@@ -150,8 +158,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
     def predict(self, X):
         """Predict class for X.
 
-        The predicted class of an input sample is computed as the majority
-        prediction of the trees in the forest.
+        The predicted class of an input sample is computed as the weighted
+        mean prediction of the classifiers in the ensemble.
 
         Parameters
         ----------
@@ -171,7 +179,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         The predicted class probabilities of an input sample is computed as
         the weighted mean predicted class probabilities
-        of the trees in the forest.
+        of the classifiers in the ensemble.
 
         Parameters
         ----------
@@ -204,7 +212,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         The predicted class log-probabilities of an input sample is computed as
         the weighted mean predicted class log-probabilities
-        of the trees in the forest.
+        of the classifiers in the ensemble.
 
         Parameters
         ----------

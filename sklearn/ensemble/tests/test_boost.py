@@ -1,5 +1,5 @@
 """
-Testing for the forest module (sklearn.ensemble.forest).
+Testing for the boost module (sklearn.ensemble.boost).
 """
 
 import numpy as np
@@ -25,13 +25,6 @@ perm = np.random.permutation(iris.target.size)
 iris.data = iris.data[perm]
 iris.target = iris.target[perm]
 
-# also load the boston dataset
-# and randomly permute it
-boston = datasets.load_boston()
-perm = np.random.permutation(boston.target.size)
-boston.data = boston.data[perm]
-boston.target = boston.target[perm]
-
 
 def test_classification_toy():
     """Check classification on a toy dataset."""
@@ -39,7 +32,6 @@ def test_classification_toy():
     clf = BoostedClassifier(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
-    assert_equal(10, len(clf))
 
 
 def test_iris():
@@ -51,28 +43,6 @@ def test_iris():
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
                                                                          score)
-
-'''
-def test_boston():
-    """Check consistency on dataset boston house prices."""
-    for c in ("mse",):
-        # Random forest
-        """
-        clf = RandomForestRegressor(n_estimators=10, criterion=c,
-                                    random_state=1)
-        clf.fit(boston.data, boston.target)
-        score = clf.score(boston.data, boston.target)
-        assert score < 3, ("Failed with max_features=None, "
-                           "criterion %s and score = %f" % (c, score))
-
-        clf = RandomForestRegressor(n_estimators=10, criterion=c,
-                                    max_features=6, random_state=1)
-        clf.fit(boston.data, boston.target)
-        score = clf.score(boston.data, boston.target)
-        assert score < 3, ("Failed with max_features=None, "
-                           "criterion %s and score = %f" % (c, score))
-        """
-'''
 
 def test_probability():
     """Predict probabilities."""
@@ -109,18 +79,6 @@ def test_pickle():
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(iris.data, iris.target)
     assert score == score2
-
-    """
-    obj = RandomForestRegressor()
-    obj.fit(boston.data, boston.target)
-    score = obj.score(boston.data, boston.target)
-    s = pickle.dumps(obj)
-
-    obj2 = pickle.loads(s)
-    assert_equal(type(obj2), obj.__class__)
-    score2 = obj2.score(boston.data, boston.target)
-    assert score == score2
-    """
 
 
 if __name__ == "__main__":
