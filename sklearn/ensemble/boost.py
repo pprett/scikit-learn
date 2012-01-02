@@ -184,6 +184,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             # if classification is perfect then stop
             if err <= 0:
                 self.boost_weights_.append(1.)
+                yield self
                 break
             # sanity check
             if err >= 1. - (1. / self.n_classes_):
@@ -191,12 +192,11 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 break
             # boost weight using multi-class AdaBoost SAMME alg
             alpha = self.beta * (math.log((1. - err) / err) + \
-                            math.log(self.n_classes_ - 1.))
+                                 math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
+            yield self
             if len(self) < self.n_estimators:
-                yield self
-                correct = incorrect ^ 1
-                sample_weight *= np.exp(alpha * (incorrect - correct))
+                sample_weight *= np.exp(alpha * incorrect)
                 # normalize
                 sample_weight *= X.shape[0] / sample_weight.sum()
 
@@ -210,7 +210,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 sum(weight * clf.feature_importances_ for \
                   weight, clf in zip(self.boost_weights_, self.estimators_)) \
                 / norm
-        yield self
 
     def predict(self, X):
         """Predict class for X.
