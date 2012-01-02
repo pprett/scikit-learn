@@ -20,7 +20,9 @@ import scipy.stats
 
 # Build multivariate normal distribution
 n_features = 10
-n_samples = 10000
+n_samples = 13000
+n_split = 3000
+
 cov = np.diag(np.ones(n_features))
 mean = np.zeros(n_features)
 X = np.random.multivariate_normal(mean, cov, n_samples)
@@ -46,8 +48,8 @@ perm = np.random.permutation(n_samples)
 y = y[perm]
 X = X[perm]
 
-X_train, X_test = X[:1000], X[1000:]
-y_train, y_test = y[:1000], y[1000:]
+X_train, X_test = X[:n_split], X[n_split:]
+y_train, y_test = y[:n_split], y[n_split:]
 
 test_errors = []
 train_errors = []
