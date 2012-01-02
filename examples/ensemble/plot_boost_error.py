@@ -55,7 +55,7 @@ test_errors = []
 train_errors = []
 
 bdt = BoostedClassifier(DecisionTreeClassifier(min_split=10),
-                        n_estimators=100)
+                        n_estimators=20)
 
 for boost in bdt.fit_generator(X_train, y_train):
 
@@ -65,10 +65,27 @@ for boost in bdt.fit_generator(X_train, y_train):
     test_errors.append(sum(y_test_predict != y_test) / float(len(y_test)))
     train_errors.append(sum(y_train_predict != y_train) / float(len(y_train)))
 
+n_trees = xrange(1, bdt.n_estimators + 1)
+
 # Plot the feature importances of the trees and of the forest
 import pylab as pl
 pl.figure()
-pl.plot(xrange(1, len(test_errors)+1), test_errors, "b", label='test error')
-pl.plot(xrange(1, len(train_errors)+1), train_errors, "r", label='train error')
+
+pl.subplot(1, 3, 1)
+pl.plot(n_trees, test_errors, "b", label='testing sample')
+pl.plot(n_trees, train_errors, "r", label='training sample')
 pl.legend()
+pl.ylabel('Error')
+pl.xlabel('Number of Trees')
+
+pl.subplot(1, 3, 2)
+pl.plot(n_trees, bdt.boost_weights_, "b")
+pl.ylabel('Boost Weight')
+pl.xlabel('Number of Trees')
+
+pl.subplot(1, 3, 3)
+pl.plot(n_trees, bdt.errs_, "b")
+pl.ylabel('Error')
+pl.xlabel('Tree')
+
 pl.show()
