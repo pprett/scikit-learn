@@ -1,5 +1,5 @@
 """
-Testing for the forest module (sklearn.ensemble.forest).
+Testing for the boost module (sklearn.ensemble.boost).
 """
 
 import numpy as np
@@ -52,28 +52,6 @@ def test_iris():
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
                                                                          score)
 
-'''
-def test_boston():
-    """Check consistency on dataset boston house prices."""
-    for c in ("mse",):
-        # Random forest
-        """
-        clf = RandomForestRegressor(n_estimators=10, criterion=c,
-                                    random_state=1)
-        clf.fit(boston.data, boston.target)
-        score = clf.score(boston.data, boston.target)
-        assert score < 3, ("Failed with max_features=None, "
-                           "criterion %s and score = %f" % (c, score))
-
-        clf = RandomForestRegressor(n_estimators=10, criterion=c,
-                                    max_features=6, random_state=1)
-        clf.fit(boston.data, boston.target)
-        score = clf.score(boston.data, boston.target)
-        assert score < 3, ("Failed with max_features=None, "
-                           "criterion %s and score = %f" % (c, score))
-        """
-'''
-
 def test_probability():
     """Predict probabilities."""
     # AdaBoost classification
@@ -109,18 +87,6 @@ def test_pickle():
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(iris.data, iris.target)
     assert score == score2
-
-    """
-    obj = RandomForestRegressor()
-    obj.fit(boston.data, boston.target)
-    score = obj.score(boston.data, boston.target)
-    s = pickle.dumps(obj)
-
-    obj2 = pickle.loads(s)
-    assert_equal(type(obj2), obj.__class__)
-    score2 = obj2.score(boston.data, boston.target)
-    assert score == score2
-    """
 
 
 if __name__ == "__main__":
