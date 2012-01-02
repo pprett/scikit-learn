@@ -63,6 +63,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                        two_class_cont=False,
                        two_class_thresh=0.,
                        boost_method='adaboost',
+                       compute_importances=False,
                        **params):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier(**params)
@@ -84,6 +85,10 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         if boost_method not in BOOST_METHODS:
             raise ValueError("Boost method '%s' not implemented" % boost_method)
         self.boost_method = boost_method
+        self.compute_importances = compute_importances
+        self.feature_importances_ = None
+        if compute_importances:
+            self.base_estimator.compute_importances = True
 
     def fit(self, X, y, sample_weight=None, **kwargs):
         """Build a boosted classifier from the training set (X, y).
@@ -125,7 +130,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         # for multi-class problems
         for i in xrange(self.n_estimators):
             estimator = self._make_estimator()
-            estimator.fit(X, y, sample_weight, **kwargs)
+            estimator.fit(X, y, sample_weight=sample_weight, **kwargs)
             # TODO request that classifiers return classification
             # of training sets when fitting
             # which would make the following line unnecessary
@@ -153,6 +158,18 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             if i < self.n_estimators - 1:
                 correct = incorrect ^ 1
                 sample_weight *= np.exp(alpha * (incorrect - correct))
+                # normalize
+                sample_weight /= sum(sample_weight) / X.shape[0]
+
+        # Boosting may break early so set n_estimators to actual value
+        self.n_estimators = len(self.estimators_)
+
+        # Sum the importances
+        if self.compute_importances:
+            self.feature_importances_ = \
+                sum(clf.feature_importances_ for clf in self.estimators_) \
+                / self.n_estimators
+
         return self
 
     def predict(self, X):
