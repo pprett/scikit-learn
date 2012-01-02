@@ -60,6 +60,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                        **params):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier(**params)
+        elif not isinstance(base_estimator, ClassifierMixin):
+            raise TypeError("estimator must be a subclass of ClassifierMixin")
 
         BaseEnsemble.__init__(self,
             base_estimator=base_estimator,
