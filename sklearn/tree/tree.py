@@ -289,6 +289,9 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
             raise ValueError("Attempting to find a split "
                              "with an empty sample_mask")
 
+        if sample_weight is not None:
+            assert sample_weight.shape[0] == y.shape[0]
+
         # Split samples
         if depth < max_depth and n_node_samples >= min_split:
             feature, threshold, best_error, init_error = find_split(
@@ -325,6 +328,8 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
                 X_argsorted = np.asfortranarray(
                     np.argsort(X.T, axis=1).astype(np.int32).T)
                 y = current_y
+                if sample_weight is not None:
+                    sample_weight = sample_weight[sample_mask]
                 sample_mask = np.ones((X.shape[0],), dtype=np.bool)
 
             # Split and and recurse
