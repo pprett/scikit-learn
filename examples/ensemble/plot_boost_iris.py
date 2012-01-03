@@ -7,7 +7,7 @@ Plot the decision surfaces of boosted decision trees trained on pairs of
 features of the iris dataset.
 
 This plot compares the decision surfaces learned by a decision tree classifier
-(first column), by a boosted decision tree classifier (second column).-
+(first column), by a boosted decision tree classifier (second column).
 
 In the first row, the classifiers are built using the sepal width and the sepal
 length features only, on the second row using the petal length and sepal length
@@ -91,6 +91,6 @@ for pair in ([0, 1], [0, 2], [2, 3]):
 
         plot_idx += 1
 
-pl.suptitle("Decision surfaces of a decision tree, of a random forest, and of "
-            "an extra-trees classifier")
+pl.suptitle("Decision surfaces of a decision tree and of "
+            "a boosted decision tree.")
 pl.show()

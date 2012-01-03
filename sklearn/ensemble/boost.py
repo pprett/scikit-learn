@@ -31,7 +31,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
     A boosted classifier is a meta estimator that begins by fitting a
     classifier on a dataset and then fits additional copies of the classifer
-    on the same dataset where the weights of correctly and incorrectly
+    on the same dataset where the weights of incorrectly
     classified instances are adjusted such that subsequent classifiers
     focus more on difficult cases.
 
@@ -44,7 +44,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         The number of trees in the forest.
 
     beta : float, optional (default=.5)
-        Scale boost weights
+        Scale boost weights. A low/high value corresponds to
+        a slow/fast learning rate.
 
     two_class_cont : boolean, optional (default=False)
         Are there only two target classes and does the base estimator yield
