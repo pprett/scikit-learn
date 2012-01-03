@@ -3,10 +3,9 @@
 Testing and Training Error with Boosting
 ========================================
 
-This examples shows the use of forests of trees to evaluate the importance of
-features on an artifical classification task. The red plots are the feature
-importances of each individual tree, and the blue plot is the feature importance
-of the whole forest.
+This examples shows the use of boosting to improve prediction accuracy.
+The error on the test and training sets after each boost is plotted on
+the left. The boost weights and error of each tree are also shown.
 """
 print __doc__
 
