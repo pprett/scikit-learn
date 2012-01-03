@@ -19,13 +19,6 @@ import math
 __all__ = ['BoostedClassifier']
 
 
-BOOST_METHODS = [
-    'adaboost',
-    #'majority',
-    #'brownboost',
-]
-
-
 class BoostedClassifier(BaseEnsemble, ClassifierMixin):
     """A boosted classifier.
 
@@ -56,9 +49,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         If two_class_cont is True, this is the theshold
         separating the two classes
 
-    boost_method : string, optional (default='adaboost')
-        The algorithm used to boost the base estimator
-
     Notes
     -----
     .. [1] Yoav Freund, Robert E. Schapire. "A Decision-Theoretic
@@ -76,7 +66,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                        beta=.5,
                        two_class_cont=False,
                        two_class_thresh=0.,
-                       boost_method='adaboost',
                        compute_importances=False,
                        **params):
         if base_estimator is None:
@@ -96,11 +85,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self.beta = beta
         self.two_class_cont = two_class_cont
         self.two_class_thresh = two_class_thresh
-        boost_method = boost_method.lower()
-        if boost_method not in BOOST_METHODS:
-            raise ValueError("Boost method '%s' not implemented" % \
-                             boost_method)
-        self.boost_method = boost_method
         self.compute_importances = compute_importances
         self.feature_importances_ = None
         if compute_importances:
