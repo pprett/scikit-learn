@@ -509,6 +509,9 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     X_argsorted : ndarray, shape (n_samples, n_features)
         Argsort of cols of `X`. `X_argsorted[0,j]` gives the example
         index of the smallest value of feature `j`.
+    
+    sample_weight : ndarray, shape (n_total_samples,), dtype=float
+        A weight for each sample.
 
     sample_mask : ndarray, shape (n_samples,), dtype=np.bool
         A mask for the samples to be considered. Only samples `j` for which
@@ -644,6 +647,9 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     X_argsorted : ndarray, shape (n_samples, n_features)
         Argsort of cols of `X`. `X_argsorted[0,j]` gives the example
         index of the smallest value of feature `j`.
+    
+    sample_weight : ndarray, shape (n_total_samples,), dtype=float
+        A weight for each sample.
 
     sample_mask : ndarray, shape (n_samples,), dtype=np.bool
         A mask for the samples to be considered. Only samples `j` for which
