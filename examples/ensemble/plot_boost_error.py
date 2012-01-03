@@ -17,20 +17,25 @@ from sklearn.tree import DecisionTreeClassifier
 
 import scipy.stats
 
-# Build multivariate normal distribution
+
 n_features = 10
 n_samples = 13000
 n_split = 3000
 
+# Build multivariate normal distribution
 cov = np.diag(np.ones(n_features))
 mean = np.zeros(n_features)
 X = np.random.multivariate_normal(mean, cov, n_samples)
 
-# sort by distance from origin
+# Sort by distance from origin
 X = np.array(sorted(list(X), key=lambda x: sum([x_i**2 for x_i in x])))
 
-
-# label by quantile
+# Label by quantile.
+# The decision boundaries separating successive classes
+# are nested concentric ten-dimensional spheres [1].
+#
+# [1] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie.
+#     "Multi-class AdaBoost" 2009
 y = []
 for i, x in enumerate(X):
     if i < n_samples / 3.:
@@ -54,12 +59,14 @@ test_errors = []
 train_errors = []
 
 bdt = BoostedClassifier(DecisionTreeClassifier(min_split=10),
-                        n_estimators=20)
+                        n_estimators=50)
 
-for boost in bdt.fit_generator(X_train, y_train):
+for i, boost in enumerate(bdt.fit_generator(X_train, y_train)):
 
     y_test_predict = boost.predict(X_test)
     y_train_predict = boost.predict(X_train)
+    print "boost %d: weight: %.3f error: %.3f" % \
+          (i, boost.boost_weights_[-1], boost.errs_[-1])
 
     test_errors.append(sum(y_test_predict != y_test) / float(len(y_test)))
     train_errors.append(sum(y_train_predict != y_train) / float(len(y_train)))
