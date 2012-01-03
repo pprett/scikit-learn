@@ -69,11 +69,11 @@ n_trees = xrange(1, bdt.n_estimators + 1)
 
 # Plot the feature importances of the trees and of the forest
 import pylab as pl
-pl.figure()
+pl.figure(figsize=(15, 5))
 
 pl.subplot(1, 3, 1)
-pl.plot(n_trees, test_errors, "b", label='testing sample')
-pl.plot(n_trees, train_errors, "r", label='training sample')
+pl.plot(n_trees, test_errors, "b", label='test')
+pl.plot(n_trees, train_errors, "r", label='train')
 pl.legend()
 pl.ylabel('Error')
 pl.xlabel('Number of Trees')
