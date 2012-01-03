@@ -154,11 +154,12 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         # for multi-class problems
         while len(self) < self.n_estimators:
             estimator = self._make_estimator()
-            estimator.fit(X, y, sample_weight=sample_weight, **kwargs)
-            # TODO request that classifiers return classification
-            # of training sets when fitting
-            # which would make the following line unnecessary
-            p = estimator.predict(X)
+            if hasattr(estimator, 'fit_predict'):
+                # optim for estimators that are able to save redundant computations
+                # when calling fit + predict on the same input X
+                p = estimator.fit_predict(X, y, sample_weight=sample_weight, **kwargs)
+            else:
+                p = estimator.fit(X, y, sample_weight=sample_weight, **kwargs).predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
                 incorrect = (((p - self.two_class_thresh) *
