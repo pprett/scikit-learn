@@ -110,12 +110,13 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         self : object
             Returns self.
         """
-        for boost in self.fit_generator(X, y, sample_weight=sample_weight, **kwargs):
+        for boost in self.fit_generator(X, y, sample_weight=sample_weight,
+                                        **kwargs):
             pass
         return self
 
     def fit_generator(self, X, y, sample_weight=None, **kwargs):
-        """Build a boosted classifier from the training set (X, y).
+        """A generator which yields self after each boost.
 
         Parameters
         ----------
@@ -131,8 +132,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         Returns
         -------
-        self : object
-            Returns self.
+        self : iterator
+            Yields self after each boost iteration.
         """
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
