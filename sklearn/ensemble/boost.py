@@ -161,8 +161,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             p = estimator.predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
-                incorrect = (((p - self.two_class_thresh) * \
-                              (y - self.two_class_thresh)) \
+                incorrect = (((p - self.two_class_thresh) *
+                              (y - self.two_class_thresh))
                              < 0).astype(np.int32)
             else:
                 incorrect = (p != y).astype(np.int32)
@@ -179,7 +179,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 self.estimators_.pop(-1)
                 break
             # boost weight using multi-class AdaBoost SAMME alg
-            alpha = self.beta * (math.log((1. - err) / err) + \
+            alpha = self.beta * (math.log((1. - err) / err) +
                                  math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
             self.errs_.append(err)
@@ -196,7 +196,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         if self.compute_importances:
             norm = sum(self.boost_weights_)
             self.feature_importances_ = \
-                sum(weight * clf.feature_importances_ for \
+                sum(weight * clf.feature_importances_ for
                   weight, clf in zip(self.boost_weights_, self.estimators_)) \
                 / norm
 
