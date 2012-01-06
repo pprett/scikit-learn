@@ -59,9 +59,6 @@ cdef class Criterion:
         """Evaluate the criteria (aka the split error)."""
         pass
 
-    cpdef value(self, np.ndarray out):
-        pass
-
 
 cdef class ClassificationCriterion(Criterion):
     """Abstract criterion for classification.
