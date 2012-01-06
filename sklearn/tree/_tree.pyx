@@ -235,10 +235,9 @@ cdef class Entropy(ClassificationCriterion):
         return e1 + e2
 
 
-cdef class MSE(Criterion):
-    """Mean squared error impurity criterion.
-
-    MSE = var_left + var_right    
+cdef class RegressionCriterion(Criterion):
+    """Abstract criterion for regression. Computes variance of the
+       target values left and right of the split point.
 
     Computation is linear in `n_samples` by using ::
 
@@ -378,8 +377,18 @@ cdef class MSE(Criterion):
         return self.n_left
 
     cdef double eval(self):
-        return self.var_left + self.var_right
+        pass
 
+
+cdef class MSE(RegressionCriterion):
+    """Mean squared error impurity criterion.
+
+    MSE = var_left + var_right
+    """
+
+    cdef double eval(self):
+        assert (self.n_left + self.n_right) == self.n_samples
+        return self.var_left + self.var_right
 
 ################################################################################
 # Tree functions
