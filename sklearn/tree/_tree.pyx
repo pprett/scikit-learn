@@ -488,8 +488,6 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
 
     max_features : int
         The number of features to consider when looking for the best split.
-        If max_features < 0, all features are considered, otherwise max_features
-        are chosen at random.
 
     criterion : Criterion
         The criterion function to be minimized.
@@ -543,7 +541,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     best_error = np.inf ##initial_error
 
     # Features to consider
-    if max_features < 0 or max_features == n_features:
+    if max_features == n_features:
         features = np.arange(n_features)
     else:
         features = random_state.permutation(n_features)[:max_features]
@@ -620,8 +618,6 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
 
     max_features : int
         The number of features to consider when looking for the best split.
-        If max_features < 0, all features are considered, otherwise max_features
-        are chosen at random.
 
     criterion : Criterion
         The criterion function to be minimized.
@@ -675,7 +671,7 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     best_error = initial_error
 
     # Features to consider
-    if max_features < 0 or max_features == n_features:
+    if max_features == n_features:
         features = np.arange(n_features)
     else:
         features = random_state.permutation(n_features)[:max_features]
