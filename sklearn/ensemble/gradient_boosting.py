@@ -422,7 +422,7 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
     def predict(self, X):
         X = np.atleast_2d(X)
         X = X.astype(DTYPE)
-        if not self.estimators_:
+        if len(self.estimators_) == 0:
             raise ValueError("Estimator not fitted, " \
                              "call `fit` before `predict`.")
         f = self._predict(X)

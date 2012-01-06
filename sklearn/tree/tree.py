@@ -314,7 +314,7 @@ def _build_tree(X, y, criterion, max_depth, min_split,
                              "with an empty sample_mask")
 
         # Split samples
-        if depth < max_depth and n_node_samples > min_split:
+        if depth < max_depth and n_node_samples >= min_split:
             feature, threshold, best_error, initial_error = find_split(
                 X, y, X_argsorted, sample_mask, n_node_samples,
                 max_features, criterion, random_state)

@@ -45,7 +45,7 @@ print("MSE: %.4f" % mse)
 # compute test set deviance
 y_pred = clf.init.predict(X_test)
 test_deviance = np.zeros((params['n_iter'],), dtype=np.float64)
-for i, tree in enumerate(clf.trees):
+for i, tree in enumerate(clf.estimators_):
     y_pred += clf.learn_rate * tree.predict(X_test).ravel()
     test_deviance[i] = clf.loss_(y_test, y_pred)
 
@@ -62,7 +62,7 @@ pl.ylabel('Deviance')
 
 ################################################################################
 # Plot feature importances
-importance = clf.feature_importances
+importance = clf.feature_importances_
 sorted_idx = np.argsort(importance)
 pos = np.arange(sorted_idx.shape[0]) + .5
 pl.subplot(1, 2, 2)

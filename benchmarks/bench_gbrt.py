@@ -287,14 +287,16 @@ def bench_friedman3(random_state=None):
 
 
 gbrt_results = {
-    ## "Example 10.2": bench_random_gaussian(),
-    ## "Spam": bench_spam(),
-    ## "Madelon": bench_madelon(),
-    ## "Arcene": bench_arcene(),
+    "Example 10.2": bench_random_gaussian(),
+    "Spam": bench_spam(),
+    "Madelon": bench_madelon(),
+    "Arcene": bench_arcene(),
    "Boston": bench_boston(), 
    "Friedman#1": bench_friedman1(),
    "Friedman#2": bench_friedman2(),
    "Friedman#3": bench_friedman3(),
     }
 
-print gbrt_results
+
+from pprint import pprint
+pprint(gbrt_results)
