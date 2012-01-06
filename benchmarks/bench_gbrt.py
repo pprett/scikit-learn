@@ -161,11 +161,11 @@ def bench_spam(random_state=None):
     test_time = time() - t0
     ## for i in range(10) + [99, 199]:
     ##     print i+1, clf.train_deviance[i]
-    ## variable_importance = clf.variable_importance
-    ## sorted_idx = np.argsort(variable_importance)[-20:]
+    ## feature_importances = clf.feature_importances_
+    ## sorted_idx = np.argsort(feature_importances)[-20:]
     ## pos = np.arange(sorted_idx.shape[0]) + .5
 
-    ## pl.barh(pos, variable_importance[sorted_idx], align='center')
+    ## pl.barh(pos, feature_importances[sorted_idx], align='center')
     ## pl.yticks(pos, feature_names[sorted_idx])
     ## pl.ylabel('Relative influence')
     ## pl.show()

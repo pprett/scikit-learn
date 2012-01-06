@@ -35,7 +35,7 @@ def test_classification_toy():
 
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
-    assert_equal(100, len(clf.trees))
+    assert_equal(100, len(clf.estimators_))
 
     deviance_decrease = (clf.train_deviance[:-1] - clf.train_deviance[1:])
     assert np.any(deviance_decrease >= 0.0), \
@@ -64,9 +64,9 @@ def test_parameter_checks():
 
     assert_raises(ValueError, GradientBoostingClassifier, init={})
 
-    # test fit before variable importance
+    # test fit before feature importances
     assert_raises(ValueError,
-                  lambda :GradientBoostingClassifier().variable_importance)
+                  lambda :GradientBoostingClassifier().feature_importances_)
 
     # test value error on multi-class
     assert_raises(ValueError,
@@ -152,16 +152,16 @@ def test_regression_synthetic():
     assert mse < 0.015, "Failed on Friedman3 with mse = %.4f" % mse
 
 
-def test_variable_importance():
+def test_feature_importances():
     clf = GradientBoostingRegressor(n_iter=100, max_depth=4,
                                     min_split=1, random_state=1)
     clf.fit(boston.data, boston.target)
-    variable_importance = clf.variable_importance
+    importances = clf.feature_importances_
 
     # true feature importance ranking
     true_ranking = np.array([3, 9, 8, 10, 2, 1, 4, 11, 12, 7, 6, 5, 0])
 
-    assert_array_equal(true_ranking, variable_importance.argsort())
+    assert_array_equal(true_ranking, importances.argsort())
 
 
 def test_probability():

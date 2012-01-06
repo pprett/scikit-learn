@@ -18,6 +18,7 @@ from ..base import RegressorMixin
 from ..utils import check_random_state
 
 from ..tree.tree import _build_tree
+from ..tree.tree import compute_feature_importances
 from ..tree.tree import Tree
 from ..tree._tree import _find_best_split
 from ..tree._tree import MSE
@@ -26,20 +27,6 @@ from ..tree._tree import DTYPE
 
 # ignore overflows due to exp(-pred) in BinomailDeviance
 np.seterr(invalid='raise', under='raise', divide='raise', over='ignore')
-
-
-def update_variable_importance(tree, variable_importance):
-    """Computes the variable importance of each feature according to `tree`
-    and adds them to `variable_importance`. """
-    for node_id in xrange(tree.children.shape[0]):
-        if tree.children[node_id, 0] == tree.children[node_id, 1] == Tree.LEAF:
-            continue
-        else:
-            feature = tree.feature[node_id]
-            error_improvement = (tree.initial_error[node_id] -
-                                 tree.best_error[node_id]) \
-                                / tree.initial_error[node_id]
-            variable_importance[feature] += error_improvement ** 2.0
 
 
 class MedianPredictor(object):
@@ -198,7 +185,7 @@ LOSS_FUNCTIONS = {'ls': LeastSquaresError,
 
 class BaseGradientBoosting(BaseEstimator):
 
-    trees = []
+    estimators_ = []
 
     def __init__(self, loss, learn_rate, n_iter, min_split, max_depth, init,
                  subsample, random_state):
@@ -280,7 +267,7 @@ class BaseGradientBoosting(BaseEstimator):
         # init predictions
         y_pred = self.init.predict(X)
 
-        self.trees = []
+        self.estimators_ = []
 
         self.train_deviance = np.zeros((self.n_iter,), dtype=np.float64)
         self.oob_deviance = np.zeros((self.n_iter), dtype=np.float64)
@@ -305,7 +292,7 @@ class BaseGradientBoosting(BaseEstimator):
                                          self.learn_rate)
 
             # add tree to ensemble
-            self.trees.append(tree)
+            self.estimators_.append(tree)
 
             # update out-of-bag predictions and deviance
             if self.subsample < 1.0:
@@ -329,25 +316,24 @@ class BaseGradientBoosting(BaseEstimator):
         """
         if old_pred is not None:
             return old_pred + self.learn_rate * \
-                   self.trees[-1].predict(X).ravel()
+                   self.estimators_[-1].predict(X).ravel()
         else:
             y = self.init.predict(X)
-            for tree in self.trees:
+            for tree in self.estimators_:
                 y += self.learn_rate * tree.predict(X).ravel()
             return y
 
     @property
-    def variable_importance(self):
-        if not self.trees or len(self.trees) == 0:
+    def feature_importances_(self):
+        if not self.estimators_ or len(self.estimators_) == 0:
             raise ValueError("Estimator not fitted, " \
-                             "call `fit` before `variable_importance`.")
-        variable_importance = np.zeros((self.n_features,), dtype=np.float64)
-        for tree in self.trees:
-            update_variable_importance(tree, variable_importance)
-        variable_importance /= len(self.trees)
-        variable_importance = 100.0 * (variable_importance /
-                                       variable_importance.max())
-        return variable_importance
+                             "call `fit` before `feature_importances_`.")
+        importances = sum(compute_feature_importances(tree, self.n_features)
+                          for tree in self.estimators_)
+        importances /= len(self.estimators_)
+        # FIXME different from forest importances
+        importances = 100.0 * (importances / importances.max())
+        return importances
 
 
 class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
@@ -436,7 +422,7 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
     def predict(self, X):
         X = np.atleast_2d(X)
         X = X.astype(DTYPE)
-        if len(self.trees) == 0:
+        if not self.estimators_:
             raise ValueError("Estimator not fitted, " \
                              "call `fit` before `predict`.")
         f = self._predict(X)
@@ -445,7 +431,7 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
     def predict_proba(self, X):
         X = np.atleast_2d(X)
         X = X.astype(DTYPE)
-        if len(self.trees) == 0:
+        if len(self.estimators_) == 0:
             raise ValueError("Estimator not fitted, " \
                              "call `fit` before `predict_proba`.")
         f = self._predict(X)
@@ -538,7 +524,7 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
     def predict(self, X):
         X = np.atleast_2d(X)
         X = X.astype(DTYPE)
-        if len(self.trees) == 0:
+        if len(self.estimators_) == 0:
             raise ValueError("Estimator not fitted, " \
                              "call `fit` before `predict`.")
         y = self._predict(X)

@@ -146,7 +146,7 @@ def compute_feature_importances(tree, n_features):
         else:
             importances[tree.feature[node]] += (
                 tree.n_samples[node] *
-                (tree.init_error[node] -
+                (tree.initial_error[node] -
                  tree.best_error[node]))
 
     importances /= np.sum(importances)
