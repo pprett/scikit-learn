@@ -24,6 +24,11 @@ from ..tree._tree import _find_best_split
 from ..tree._tree import MSE
 from ..tree._tree import DTYPE
 
+from .boosting import LossFunction
+from .boosting import LeastSquaresError
+from .boosting import LeastAbsoluteError
+from .boosting import BinomialDeviance
+
 
 # ignore overflows due to exp(-pred) in BinomailDeviance
 np.seterr(invalid='raise', under='raise', divide='raise', over='ignore')
@@ -76,20 +81,7 @@ class ClassPriorPredictor(object):
         y.fill(self.prior)
         return y
 
-
-class LossFunction(object):
-    """Abstract base class for various loss functions."""
-
-    def init_estimator(self, X, y):
-        pass
-
-    def __call__(self, y, pred):
-        pass
-
-    def negative_gradient(self, y, pred):
-        """Compute the negative gradient."""
-        pass
-
+class TreeLossMixin(object):
     def update_terminal_regions(self, tree, X, y, residual, y_pred,
                                 learn_rate=1.0):
         """Update the terminal regions (=leaves) of the given tree and
@@ -112,31 +104,13 @@ class LossFunction(object):
         pass
 
 
-class LeastSquaresError(LossFunction):
+class TreeLeastSquaresError(LeastSquaresError, TreeLossMixin):
     """Loss function for least squares (LS) estimation.
     Terminal regions need not to be updated for least squares. """
 
-    def init_estimator(self):
-        return MeanPredictor()
 
-    def __call__(self, y, pred):
-        return np.mean((y - pred) ** 2.0)
-
-    def negative_gradient(self, y, pred):
-        return y - pred
-
-
-class LeastAbsoluteError(LossFunction):
+class TreeLeastAbsoluteError(LeastAbsoluteError, TreeLossMixin):
     """Loss function for least absolute deviation (LAD) regression. """
-
-    def init_estimator(self):
-        return MedianPredictor()
-
-    def __call__(self, y, pred):
-        return np.abs(y - pred).mean()
-
-    def negative_gradient(self, y, pred):
-        return np.sign(y - pred)
 
     def _update_terminal_region(self, tree, leaf, terminal_region, X, y,
                                 residual, pred):
@@ -145,23 +119,8 @@ class LeastAbsoluteError(LossFunction):
                                         pred.take(terminal_region, axis=0))
 
 
-class BinomialDeviance(LossFunction):
+class TreeBinomialDeviance(BinomialDeviance, TreeLossMixin):
     """Binomial deviance loss function for binary classification."""
-
-    def init_estimator(self):
-        return ClassPriorPredictor()
-
-    def __call__(self, y, pred):
-        """Compute the deviance (= negative log-likelihood). """
-        ## return -2.0 * np.sum(y * pred -
-        ##                      np.log(1.0 + np.exp(pred))) / y.shape[0]
-
-        # logaddexp(0, v) == log(1.0 + exp(v))
-        return -2.0 * np.sum(y * pred -
-                             np.logaddexp(0.0, pred)) / y.shape[0]
-
-    def negative_gradient(self, y, pred):
-        return y - 1.0 / (1.0 + np.exp(-pred))
 
     def _update_terminal_region(self, tree, leaf, terminal_region, X, y,
                                 residual, pred):
@@ -178,9 +137,9 @@ class BinomialDeviance(LossFunction):
             tree.value[leaf, 0] = numerator / denominator
 
 
-LOSS_FUNCTIONS = {'ls': LeastSquaresError,
-                  'lad': LeastAbsoluteError,
-                  'deviance': BinomialDeviance}
+LOSS_FUNCTIONS = {'ls': TreeLeastSquaresError,
+                  'lad': TreeLeastAbsoluteError,
+                  'deviance': TreeBinomialDeviance}
 
 
 class BaseGradientBoosting(BaseEstimator):
