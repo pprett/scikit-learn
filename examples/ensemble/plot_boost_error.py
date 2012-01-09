@@ -25,10 +25,11 @@ n_split = 3000
 # Build multivariate normal distribution
 cov = np.diag(np.ones(n_features))
 mean = np.zeros(n_features)
-X = np.random.multivariate_normal(mean, cov, n_samples)
+X = list(np.random.multivariate_normal(mean, cov, n_samples))
 
 # Sort by distance from origin
-X = np.array(sorted(list(X), key=lambda x: sum([x_i**2 for x_i in x])))
+X.sort(key=lambda x: sum([x_i**2 for x_i in x]))
+X = np.array(X)
 
 # Label by quantile.
 # The decision boundaries separating successive classes
