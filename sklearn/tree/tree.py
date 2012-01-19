@@ -172,6 +172,9 @@ class Tree(object):
 
     n_samples : np.ndarray of np.int32
         The number of samples at each node.
+
+    weighted_n_samples : np.ndarray of np.float64
+        The weighted number of samples at each node.
     """
 
     LEAF = -1
@@ -192,6 +195,7 @@ class Tree(object):
         self.best_error = np.empty((capacity,), dtype=np.float32)
         self.init_error = np.empty((capacity,), dtype=np.float32)
         self.n_samples = np.empty((capacity,), dtype=np.int32)
+        self.weighted_n_samples = np.empty((capacity,), dtype=np.float64)
 
     def resize(self, capacity=None):
         """Resize tree arrays to `capacity`, if `None` double capacity. """
@@ -208,13 +212,15 @@ class Tree(object):
         self.best_error.resize((capacity,), refcheck=False)
         self.init_error.resize((capacity,), refcheck=False)
         self.n_samples.resize((capacity,), refcheck=False)
+        self.weighted_n_samples.resize((capacity,), refcheck=False)
 
         # if capacity smaller than node_count, adjust the counter
         if capacity < self.node_count:
             self.node_count = capacity
 
     def add_split_node(self, parent, is_left_child, feature, threshold,
-                       best_error, init_error, n_samples, value):
+                       best_error, init_error,
+                       n_samples, weighted_n_samples, value):
         """Add a splitting node to the tree. The new node registers itself as
         the child of its parent. """
         node_id = self.node_count
@@ -227,6 +233,7 @@ class Tree(object):
         self.init_error[node_id] = init_error
         self.best_error[node_id] = best_error
         self.n_samples[node_id] = n_samples
+        self.weighted_n_samples[node_id] = weighted_n_samples
         self.value[node_id] = value
 
         # set as left or right child of parent
@@ -239,7 +246,8 @@ class Tree(object):
         self.node_count += 1
         return node_id
 
-    def add_leaf(self, parent, is_left_child, value, error, n_samples):
+    def add_leaf(self, parent, is_left_child, value, error,
+                 n_samples, weighted_n_samples):
         """Add a leaf to the tree. The new node registers itself as the
         child of its parent. """
         node_id = self.node_count
@@ -248,6 +256,7 @@ class Tree(object):
 
         self.value[node_id] = value
         self.n_samples[node_id] = n_samples
+        self.weighted_n_samples[node_id] = weighted_n_samples
         self.init_error[node_id] = error
         self.best_error[node_id] = error
 
@@ -284,13 +293,15 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
                             parent, is_left_child):
         # Count samples
         n_node_samples = sample_mask.sum()
+        weighted_n_node_samples = n_node_samples
+
+        if sample_weight is not None:
+            assert sample_weight.shape[0] == y.shape[0]
+            weighted_n_node_samples = (sample_mask * sample_weight).sum()
 
         if n_node_samples == 0:
             raise ValueError("Attempting to find a split "
                              "with an empty sample_mask")
-
-        if sample_weight is not None:
-            assert sample_weight.shape[0] == y.shape[0]
 
         # Split samples
         if depth < max_depth and n_node_samples >= min_split:
@@ -318,7 +329,8 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
             error = _tree._error_at_leaf(y, sample_weight,
                                          sample_mask, criterion,
                                          n_node_samples)
-            tree.add_leaf(parent, is_left_child, value, error, n_node_samples)
+            tree.add_leaf(parent, is_left_child, value, error,
+                          n_node_samples, weighted_n_node_samples)
 
         # Internal node
         else:
@@ -337,7 +349,9 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
 
             node_id = tree.add_split_node(parent, is_left_child, feature,
                                           threshold, best_error, init_error,
-                                          n_node_samples, value)
+                                          n_node_samples,
+                                          weighted_n_node_samples,
+                                          value)
 
             # left child recursion
             recursive_partition(X, X_argsorted, y, sample_weight,
@@ -507,7 +521,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
 
                 else:
                     importances[self.tree_.feature[node]] += (
-                        self.tree_.n_samples[node] *
+                        self.tree_.weighted_n_samples[node] *
                             (self.tree_.init_error[node] -
                              self.tree_.best_error[node]))
 

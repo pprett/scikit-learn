@@ -73,7 +73,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         elif not isinstance(base_estimator, ClassifierMixin):
             raise TypeError("estimator must be a subclass of ClassifierMixin")
 
-        BaseEnsemble.__init__(self,
+
+        super(BoostedClassifier, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators)
 
