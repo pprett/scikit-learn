@@ -205,6 +205,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             to share the data structure and to avoid re-computation in
             tree ensembles. For maximum efficiency use dtype np.int32.
 
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
+
         Returns
         -------
         self : object

@@ -67,7 +67,7 @@ class IterGrid(object):
                 yield params
 
 
-def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
+def fit_grid_point(X, y, sample_weight, base_clf, clf_params, train, test, loss_func,
                    score_func, verbose, **fit_params):
     """Run fit on one set of parameters
 
@@ -332,7 +332,7 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
         if hasattr(self.best_estimator_, 'predict_proba'):
             self.predict_proba = self.best_estimator_.predict_proba
 
-    def fit(self, X, y=None, **params):
+    def fit(self, X, y=None, sample_weight=None, **params):
         """Run fit with all sets of parameters
 
         Returns the best classifier
@@ -348,6 +348,8 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
             Target vector relative to X for classification;
             None for unsupervised learning.
 
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
         """
         return self._fit(X, y)
 
@@ -388,8 +390,9 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
         out = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                 pre_dispatch=pre_dispatch)(
             delayed(fit_grid_point)(
-                X, y, base_clf, clf_params, train, test, self.loss_func,
-                self.score_func, self.verbose, **self.fit_params)
+                X, y, sample_weight, base_clf, clf_params, train, test,
+                self.loss_func, self.score_func, self.verbose,
+                **self.fit_params)
                     for clf_params in grid for train, test in cv)
 
         # Out is a list of triplet: score, estimator, n_test_samples
