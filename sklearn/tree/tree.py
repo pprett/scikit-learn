@@ -293,11 +293,14 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
                             parent, is_left_child):
         # Count samples
         n_node_samples = sample_mask.sum()
-        weighted_n_node_samples = n_node_samples
 
         if sample_weight is not None:
             assert sample_weight.shape[0] == y.shape[0]
-            weighted_n_node_samples = (sample_mask * sample_weight).sum()
+            current_sample_weight = sample_weight[sample_mask]
+            weighted_n_node_samples = current_sample_weight.sum()
+        else:
+            current_sample_weight = None
+            weighted_n_node_samples = n_node_samples
 
         if n_node_samples == 0:
             raise ValueError("Attempting to find a split "
@@ -318,7 +321,12 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
         if is_classification:
             value = np.zeros((n_classes,))
             t = current_y.max() + 1
-            value[:t] = np.bincount(current_y.astype(np.int))
+            value[:t] = np.bincount(current_y.astype(np.int),
+                                    weights=current_sample_weight)
+
+        elif current_sample_weight is not None:
+            value = np.asarray((current_y * current_sample_weight).sum() /
+                               weighted_n_node_samples)
 
         else:
             value = np.asarray(np.mean(current_y))
@@ -341,7 +349,7 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
                     np.argsort(X.T, axis=1).astype(np.int32).T)
                 y = current_y
                 if sample_weight is not None:
-                    sample_weight = sample_weight[sample_mask]
+                    sample_weight = current_sample_weight
                 sample_mask = np.ones((X.shape[0],), dtype=np.bool)
 
             # Split and and recurse
