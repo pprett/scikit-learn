@@ -103,7 +103,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             The target values (integers that correspond to classes in
             classification, real numbers in regression).
 
-        sample_weight: array-like, shape = [n_samples], optional
+        sample_weight : array-like, shape = [n_samples], optional
             Sample weights
 
         Returns

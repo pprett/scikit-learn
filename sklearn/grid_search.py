@@ -61,7 +61,7 @@ class IterGrid(object):
                 yield params
 
 
-def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
+def fit_grid_point(X, y, sample_weight, base_clf, clf_params, train, test, loss_func,
                    score_func, verbose, **fit_params):
     """Run fit on one set of parameters
 
@@ -98,9 +98,19 @@ def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
     else:
         y_test = None
         y_train = None
+    if sample_weight is not None:
+        sample_weight_test = sample_weight[test]
+        sample_weight_train = sample_weight[train]
+    else:
+        sample_weight_test = None
+        sample_weight_train = None
 
-    clf.fit(X_train, y_train, **fit_params)
+    if sample_weight is not None:
+        clf.fit(X_train, y_train, sample_weight=sample_weight_train, **fit_params)
+    else:
+        clf.fit(X_train, y_train, **fit_params)
 
+    # TODO: include sample_weight_test below
     if loss_func is not None:
         y_pred = clf.predict(X_test)
         this_score = -loss_func(y_test, y_pred)
@@ -108,7 +118,11 @@ def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
         y_pred = clf.predict(X_test)
         this_score = score_func(y_test, y_pred)
     else:
-        this_score = clf.score(X_test, y_test)
+        if sample_weight_test is not None:
+            this_score = clf.score(X_test, y_test,
+                                   sample_weight=sample_weight_test)
+        else:
+            this_score = clf.score(X_test, y_test)
 
     if y is not None:
         if hasattr(y, 'shape'):
@@ -276,7 +290,7 @@ class GridSearchCV(BaseEstimator):
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
 
-    def fit(self, X, y=None, **params):
+    def fit(self, X, y=None, sample_weight=None, **params):
         """Run fit with all sets of parameters
 
         Returns the best classifier
@@ -292,6 +306,8 @@ class GridSearchCV(BaseEstimator):
             Target vector relative to X for classification;
             None for unsupervised learning.
 
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
         """
         self._set_params(**params)
         estimator = self.estimator
@@ -316,8 +332,9 @@ class GridSearchCV(BaseEstimator):
         out = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                 pre_dispatch=pre_dispatch)(
             delayed(fit_grid_point)(
-                X, y, base_clf, clf_params, train, test, self.loss_func,
-                self.score_func, self.verbose, **self.fit_params)
+                X, y, sample_weight, base_clf, clf_params, train, test,
+                self.loss_func, self.score_func, self.verbose,
+                **self.fit_params)
                     for clf_params in grid for train, test in cv)
 
         # Out is a list of triplet: score, estimator, n_test_samples

@@ -426,6 +426,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             The target values (integers that correspond to classes in
             classification, real numbers in regression).
 
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
+
         Returns
         -------
         self : object
