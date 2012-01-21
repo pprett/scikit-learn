@@ -40,14 +40,15 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         Scale boost weights. A low/high value corresponds to
         a slow/fast learning rate.
 
-    two_class_cont : boolean, optional (default=False)
-        Are there only two target classes and does the base estimator yield
-        continuous output between the two class labels, such as a decision tree
-        using the purity of the leaf nodes?
+    use_proba : boolean, optional (default=False)
+        Use class probabilities to determine incorrectly classified instances.
 
-    two_class_thresh : float, optional (default=0)
-        If two_class_cont is True, this is the theshold
-        separating the two classes
+    proba_thresh : float, optional (default=1/n_classes)
+        If use_proba is True, this is the theshold probability of the true class
+        below which instances are counted as incorrectly classified.
+    
+    fit_params : dict, optional
+        parameters to pass to the fit method of the base estimator
 
     Notes
     -----
@@ -64,34 +65,35 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
     def __init__(self, base_estimator=None,
                        n_estimators=10,
                        beta=.5,
-                       two_class_cont=False,
-                       two_class_thresh=0.,
+                       use_proba=False,
+                       proba_thresh=None,
                        compute_importances=False,
-                       **params):
+                       fit_params=None,
+                       ):
         if base_estimator is None:
-            base_estimator = DecisionTreeClassifier(**params)
+            base_estimator = DecisionTreeClassifier()
         elif not isinstance(base_estimator, ClassifierMixin):
             raise TypeError("estimator must be a subclass of ClassifierMixin")
-
 
         super(BoostedClassifier, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators)
 
         if beta <= 0:
-            raise ValueError("Beta must be positive and non-zero")
+            raise ValueError("beta must be positive and non-zero")
 
         self.boost_weights_ = list()
         self.errs_ = list()
         self.beta = beta
-        self.two_class_cont = two_class_cont
-        self.two_class_thresh = two_class_thresh
+        self.use_proba = use_proba
+        self.proba_thresh = proba_thresh
+        self.fit_params = fit_params if fit_params is not None else {}
         self.compute_importances = compute_importances
         self.feature_importances_ = None
         if compute_importances:
             self.base_estimator.compute_importances = True
 
-    def fit(self, X, y, sample_weight=None, **kwargs):
+    def fit(self, X, y, sample_weight=None, **params):
         """Build a boosted classifier from the training set (X, y).
 
         Parameters
@@ -105,37 +107,13 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         sample_weight : array-like, shape = [n_samples], optional
             Sample weights
-
+        
         Returns
         -------
         self : object
             Returns self.
         """
-        for boost in self.fit_generator(X, y, sample_weight=sample_weight,
-                                        **kwargs):
-            pass
-        return self
-
-    def fit_generator(self, X, y, sample_weight=None, **kwargs):
-        """A generator which yields self after each boost.
-
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The training input samples.
-
-        y : array-like, shape = [n_samples]
-            The target values (integers that correspond to classes in
-            classification, real numbers in regression).
-
-        sample_weight: array-like, shape = [n_samples], optional
-            Sample weights
-
-        Returns
-        -------
-        self : iterator
-            Yields self after each boost iteration.
-        """
+        self._set_params(**params)
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
 
@@ -158,9 +136,9 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             if hasattr(estimator, 'fit_predict'):
                 # optim for estimators that are able to save redundant computations
                 # when calling fit + predict on the same input X
-                p = estimator.fit_predict(X, y, sample_weight=sample_weight, **kwargs)
+                p = estimator.fit_predict(X, y, sample_weight=sample_weight, **self.fit_params)
             else:
-                p = estimator.fit(X, y, sample_weight=sample_weight, **kwargs).predict(X)
+                p = estimator.fit(X, y, sample_weight=sample_weight, **self.fit_params).predict(X)
             # instances incorrectly classified
             if self.two_class_cont:
                 incorrect = (((p - self.two_class_thresh) *
@@ -174,7 +152,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             if err <= 0:
                 self.boost_weights_.append(1.)
                 self.errs_.append(err)
-                yield self
                 break
             # sanity check
             if err >= 1. - (1. / self.n_classes_):
@@ -185,7 +162,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                                  math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
             self.errs_.append(err)
-            yield self
             if len(self) < self.n_estimators:
                 sample_weight *= np.exp(alpha * incorrect)
                 # normalize
@@ -201,6 +177,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 sum(weight * clf.feature_importances_ for
                   weight, clf in zip(self.boost_weights_, self.estimators_)) \
                 / norm
+        return self
 
     def predict(self, X):
         """Predict class for X.
