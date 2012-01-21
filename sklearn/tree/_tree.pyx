@@ -952,7 +952,8 @@ cdef class Criterion:
     """Interface for splitting criteria (regression and classification)."""
 
     cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
-            BOOL_t* sample_mask, int n_samples, int n_total_samples):
+            BOOL_t* sample_mask,
+            int n_samples, double weighted_n_samples, int n_total_samples):
         """Initialise the criterion."""
         pass
 
@@ -990,6 +991,9 @@ cdef class ClassificationCriterion(Criterion):
 
     n_samples : int
         The number of samples.
+    
+    weighted_n_samples : double
+        The weighted number of samples.
 
     label_count_stride : int
         The stride between outputs in label_count_* arrays.
@@ -1013,6 +1017,12 @@ cdef class ClassificationCriterion(Criterion):
     n_right : int
         The number of samples right of splitting point.
 
+    weighted_n_left : double
+        The weighted number of samples left of splitting point.
+
+    weighted_n_right : double
+        The weighted number of samples right of splitting point.
+    
     References
     ----------
 
@@ -1021,14 +1031,17 @@ cdef class ClassificationCriterion(Criterion):
     cdef int n_outputs
     cdef int* n_classes
     cdef int n_samples
+    cdef double weighted_n_samples
 
     cdef int label_count_stride
     cdef double* label_count_left
     cdef double* label_count_right
     cdef double* label_count_init
-
+    
     cdef int n_left
     cdef int n_right
+    cdef double weighted_n_left
+    cdef double weighted_n_right
 
     def __cinit__(self, int n_outputs, object n_classes):
         """Constructor."""
@@ -1036,8 +1049,11 @@ cdef class ClassificationCriterion(Criterion):
 
         self.n_outputs = n_outputs
         self.n_samples = 0
+        self.weighted_n_samples = 0.0
         self.n_left = 0
         self.n_right = 0
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = 0.0
 
         self.n_classes = <int*> malloc(n_outputs * sizeof(int))
         if self.n_classes == NULL:
@@ -1087,9 +1103,12 @@ cdef class ClassificationCriterion(Criterion):
     def __setstate__(self, d):
         pass
 
-    cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
+    cdef void init(self, DOUBLE_t* y, int y_stride,
+                   DOUBLE_t* sample_weight,
                    BOOL_t *sample_mask,
-                   int n_samples, int n_total_samples):
+                   int n_samples,
+                   double weighted_n_samples,
+                   int n_total_samples):
         """Initialise the criterion."""
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
@@ -1099,9 +1118,10 @@ cdef class ClassificationCriterion(Criterion):
         cdef int k = 0
         cdef int c = 0
         cdef int j = 0
-        cdef double w = 1.
+        cdef double w = 1.0
 
         self.n_samples = n_samples
+        self.weighted_n_samples = weighted_n_samples
 
         for k from 0 <= k < n_outputs:
             for c from 0 <= c < n_classes[k]:
@@ -1132,6 +1152,8 @@ cdef class ClassificationCriterion(Criterion):
         cdef int c = 0
         self.n_left = 0
         self.n_right = self.n_samples
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = self.weighted_n_samples
 
         for k from 0 <= k < n_outputs:
             for c from 0 <= c < n_classes[k]:
@@ -1172,9 +1194,13 @@ cdef class ClassificationCriterion(Criterion):
 
             n_left += 1
             n_right -= 1
+            weighted_n_left += w
+            weighted_n_right -= w
 
         self.n_left = n_left
         self.n_right = n_right
+        self.weighted_n_left = weighted_n_left
+        self.weighted_n_right = weighted_n_right
 
         return n_left
 
@@ -1215,14 +1241,14 @@ cdef class Gini(ClassificationCriterion):
 
     cdef double eval(self):
         """Returns Gini index of left branch + Gini index of right branch."""
-        cdef int n_samples = self.n_samples
+        cdef int n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
         cdef double* label_count_left = self.label_count_left
         cdef double* label_count_right = self.label_count_right
-        cdef double n_left = <double> self.n_left
-        cdef double n_right = <double> self.n_right
+        cdef double n_left = <double> self.weighted_n_left
+        cdef double n_right = <double> self.weighted_n_right
 
         cdef double total = 0.0
         cdef double H_left
@@ -1274,14 +1300,14 @@ cdef class Entropy(ClassificationCriterion):
 
     cdef double eval(self):
         """Returns Entropy of left branch + Entropy index of right branch. """
-        cdef int n_samples = self.n_samples
+        cdef int n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
         cdef double* label_count_left = self.label_count_left
         cdef double* label_count_right = self.label_count_right
-        cdef double n_left = <double> self.n_left
-        cdef double n_right = <double> self.n_right
+        cdef double n_left = <double> self.weighted_n_left
+        cdef double n_right = <double> self.weighted_n_right
 
         cdef double total = 0.0
         cdef double H_left
@@ -1324,6 +1350,9 @@ cdef class RegressionCriterion(Criterion):
 
     n_samples : int
         The number of samples
+    
+    weighted_n_samples : double
+        The weighted number of samples.
 
     mean_left : double*
         mean_left[k] is the mean target value of the samples left of the split
@@ -1350,14 +1379,21 @@ cdef class RegressionCriterion(Criterion):
         output k.
 
     n_left : int
-        number of samples left of split point.
+        The number of samples left of split point.
 
     n_right : int
-        number of samples right of split point.
+        The number of samples right of split point.
+
+    weighted_n_left : double
+        The weighted number of samples left of splitting point.
+
+    weighted_n_right : double
+        The weighted number of samples right of splitting point.
     """
 
     cdef int n_outputs
     cdef int n_samples
+    cdef double weighted_n_samples
 
     cdef double* mean_left
     cdef double* mean_right
@@ -1370,6 +1406,8 @@ cdef class RegressionCriterion(Criterion):
 
     cdef int n_right
     cdef int n_left
+    cdef double weighted_n_right
+    cdef double weighted_n_left
 
     def __cinit__(self, int n_outputs):
         """Constructor."""
@@ -1378,8 +1416,11 @@ cdef class RegressionCriterion(Criterion):
         self.n_outputs = n_outputs
 
         self.n_samples = 0
+        self.weighted_n_samples = 0.0
         self.n_left = 0
         self.n_right = 0
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = 0.0
 
         # Allocate
         self.mean_left = <double*> calloc(n_outputs, sizeof(double))
@@ -1432,9 +1473,12 @@ cdef class RegressionCriterion(Criterion):
     def __setstate__(self, d):
         pass
 
-    cdef void init(self, DOUBLE_t* y, int y_stride, DOUBLE_t* sample_weight,
+    cdef void init(self, DOUBLE_t* y, int y_stride,
+                   DOUBLE_t* sample_weight,
                    BOOL_t* sample_mask,
-                   int n_samples, int n_total_samples):
+                   int n_samples,
+                   double weighted_n_samples,
+                   int n_total_samples):
         """Initialise the criterion class; assume all samples
            are in the right branch and store the mean and squared
            sum in `self.mean_init` and `self.sq_sum_init`. """
@@ -1461,21 +1505,25 @@ cdef class RegressionCriterion(Criterion):
             var_right[k] = 0.0
 
         self.n_samples = n_samples
-
+        self.weighted_n_samples = weighted_n_samples
+        
+        cdef double w = 1.0
         cdef int j = 0
         cdef DOUBLE_t y_jk = 0.0
 
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
+            if sample_weight != NULL:
+                w = sample_weight[j]
 
             for k from 0 <= k < n_outputs:
                 y_jk = y[j * y_stride + k]
-                sq_sum_init[k] += y_jk * y_jk
-                mean_init[k] += y_jk
+                sq_sum_init[k] += y_jk * y_jk * w * w
+                mean_init[k] += y_jk * w
 
         for k from 0 <= k < n_outputs:
-            mean_init[k] /= n_samples
+            mean_init[k] /= weighted_n_samples
 
         self.reset()
 
@@ -1502,6 +1550,8 @@ cdef class RegressionCriterion(Criterion):
 
         self.n_right = self.n_samples
         self.n_left = 0
+        self.weighted_n_left = self.weighted_n_samples
+        self.weighted_n_right = 0.0
 
         for k from 0 <= k < n_outputs:
             mean_right[k] = mean_init[k]
@@ -1523,11 +1573,12 @@ cdef class RegressionCriterion(Criterion):
         cdef double* var_left = self.var_left
         cdef double* var_right = self.var_right
 
-        cdef int n_samples = self.n_samples
+        cdef int n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
-        cdef int n_left = self.n_left
-        cdef int n_right = self.n_right
+        cdef int n_left = self.weighted_n_left
+        cdef int n_right = self.weighted_n_right
 
+        cdef double w = 1.0
         cdef double y_idx = 0.0
         cdef int idx, j, k
 
@@ -1537,9 +1588,11 @@ cdef class RegressionCriterion(Criterion):
 
             if sample_mask[j] == 0:
                 continue
+            if sample_weight != NULL:
+                w = sample_weight[j]
 
             for k from 0 <= k < n_outputs:
-                y_idx = y[j * y_stride + k]
+                y_idx = y[j * y_stride + k] * w
                 sq_sum_left[k] += (y_idx * y_idx)
                 sq_sum_right[k] -= (y_idx * y_idx)
 
@@ -1550,6 +1603,10 @@ cdef class RegressionCriterion(Criterion):
             self.n_left = n_left
             n_right -= 1
             self.n_right = n_right
+            weighted_n_left += w
+            self.weighted_n_left = weighted_n_left
+            weighted_n_right -= w
+            self.weighted_n_right = weight_n_right
 
             for k from 0 <= k < n_outputs:
                 var_left[k] = sq_sum_left[k] - n_left * (mean_left[k] * mean_left[k])
