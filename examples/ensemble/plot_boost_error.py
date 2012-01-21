@@ -64,25 +64,25 @@ bdt = BoostedClassifier(DecisionTreeClassifier(min_split=600),
 
 bdt.fit(X_train, y_train, verbose=True)
 
-"""
-for i in xrange(len(bdt)): 
-    y_test_predict = bdt.predict(X_test, size=i + 1)
-    y_train_predict = bdt.predict(X_train, size=i + 1)
-    test_errors.append(sum(y_test_predict != y_test) / float(len(y_test)))
-    train_errors.append(sum(y_train_predict != y_train) / float(len(y_train)))
-"""
+from itertools import izip
+
+for y_test_predict, y_train_predict in izip(bdt.iter_predict(X_test),
+                                            bdt.iter_predict(X_train)):
+    test_errors.append((y_test_predict != y_test).sum() / float(y_test.shape[0]))
+    train_errors.append((y_train_predict != y_train).sum() / float(y_train.shape[0]))
+
 n_trees = xrange(1, len(bdt) + 1)
 
 import pylab as pl
 pl.figure(figsize=(15, 5))
-"""
+
 pl.subplot(1, 3, 1)
 pl.plot(n_trees, test_errors, "b", label='test')
 pl.plot(n_trees, train_errors, "r", label='train')
 pl.legend()
 pl.ylabel('Error')
 pl.xlabel('Number of Trees')
-"""
+
 pl.subplot(1, 3, 2)
 pl.plot(n_trees, bdt.errs_, "b")
 pl.ylabel('Error')
@@ -94,7 +94,7 @@ pl.subplot(1, 3, 3)
 pl.plot(n_trees, bdt.boost_weights_, "b")
 pl.ylabel('Boost Weight')
 pl.xlabel('Number of Trees')
-pl.ylim((0, 1))
+pl.ylim((0, .8))
 pl.xlim((-20, len(bdt) + 20))
 
 

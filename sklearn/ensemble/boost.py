@@ -195,6 +195,27 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         """
         return self.classes_.take(
             np.argmax(self.predict_proba(X), axis=1),  axis=0)
+    
+    def iter_predict(self, X):
+        """Predict class for X.
+
+        The predicted class of an input sample is computed as the weighted
+        mean prediction of the classifiers in the ensemble.
+        Temporary method to determine error on testing set after each boost.
+        See examples/ensemble/plot_boost_error.py
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        y : array of shape = [n_samples]
+            The predicted classes.
+        """
+        for proba in self.iter_predict_proba(X):
+            yield self.classes_.take(np.argmax(proba, axis=1),  axis=0)
 
     def predict_proba(self, X):
         """Predict class probabilities for X.
@@ -228,6 +249,40 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         if norm > 0:
             p /= norm
         return p
+    
+    def iter_predict_proba(self, X):
+        """Predict class probabilities for X.
+
+        The predicted class probabilities of an input sample is computed as
+        the weighted mean predicted class probabilities
+        of the classifiers in the ensemble.
+        Temporary method to determine error on testing set after each boost.
+        See examples/ensemble/plot_boost_error.py
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+        
+        Returns
+        -------
+        p : array of shape = [n_samples]
+            The class probabilities of the input samples. Classes are
+            ordered by arithmetical order.
+        """
+        X = np.atleast_2d(X)
+        p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
+        
+        norm = 0.
+        for alpha, estimator in zip(self.boost_weights_, self.estimators_):
+            if self.n_classes_ == estimator.n_classes_:
+                p += alpha * estimator.predict_proba(X)
+            else:
+                proba = alpha * estimator.predict_proba(X)
+                for j, c in enumerate(estimator.classes_):
+                    p[:, c] += proba[:, j]
+            norm += alpha
+            yield p / norm if norm > 0 else p
 
     def predict_log_proba(self, X):
         """Predict class log-probabilities for X.
