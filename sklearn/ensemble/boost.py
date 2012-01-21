@@ -144,6 +144,9 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             if err <= 0:
                 self.boost_weights_.append(1.)
                 self.errs_.append(err)
+                if verbose:
+                    print "boost %d: weight: %.3f error: %.3f" % \
+                        (boost, 1., err)
                 break
             # sanity check
             if err >= 1. - (1. / self.n_classes_):
@@ -174,7 +177,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 / norm
         return self
 
-    def predict(self, X, size=None):
+    def predict(self, X):
         """Predict class for X.
 
         The predicted class of an input sample is computed as the weighted
@@ -185,19 +188,15 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
-        size : int, optional
-            If greater than zero, only use the first 'size'
-            classifiers in the boost
-
         Returns
         -------
         y : array of shape = [n_samples]
             The predicted classes.
         """
         return self.classes_.take(
-            np.argmax(self.predict_proba(X, size=size), axis=1),  axis=0)
+            np.argmax(self.predict_proba(X), axis=1),  axis=0)
 
-    def predict_proba(self, X, size=None):
+    def predict_proba(self, X):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
@@ -209,10 +208,6 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
         
-        size : int, optional
-            If greater than zero, only use the first 'size'
-            classifiers in the boost
-
         Returns
         -------
         p : array of shape = [n_samples]
@@ -222,15 +217,8 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
         
-        if size is not None and size > 0:
-            weights_ = self.boost_weights_[:size]
-            estimators_ = self.estimators_[:size]
-        else:
-            weights_ = self.boost_weights_
-            estimators_ = self.estimators_
-        
-        norm = sum(weights_)
-        for alpha, estimator in zip(weights_, estimators_):
+        norm = sum(self.boost_weights_)
+        for alpha, estimator in zip(self.boost_weights_, self.estimators_):
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
             else:
@@ -241,7 +229,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
             p /= norm
         return p
 
-    def predict_log_proba(self, X, size=None):
+    def predict_log_proba(self, X):
         """Predict class log-probabilities for X.
 
         The predicted class log-probabilities of an input sample is computed as
@@ -253,14 +241,10 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
         
-        size : int, optional
-            If greater than zero, only use the first 'size'
-            classifiers in the boost
-
         Returns
         -------
         p : array of shape = [n_samples]
             The class log-probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        return np.log(self.predict_proba(X, size=size))
+        return np.log(self.predict_proba(X))
