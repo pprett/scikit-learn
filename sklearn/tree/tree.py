@@ -309,7 +309,8 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
         # Split samples
         if depth < max_depth and n_node_samples >= min_split:
             feature, threshold, best_error, init_error = find_split(
-                X, y, X_argsorted, sample_weight, sample_mask, n_node_samples,
+                X, y, X_argsorted, sample_weight, sample_mask,
+                n_node_samples, weighted_n_node_samples,
                 max_features, criterion, random_state)
 
         else:
@@ -336,7 +337,8 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
             # compute error at leaf
             error = _tree._error_at_leaf(y, sample_weight,
                                          sample_mask, criterion,
-                                         n_node_samples)
+                                         n_node_samples,
+                                         weighted_n_node_samples)
             tree.add_leaf(parent, is_left_child, value, error,
                           n_node_samples, weighted_n_node_samples)
 
