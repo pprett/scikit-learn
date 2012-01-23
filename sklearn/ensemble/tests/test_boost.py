@@ -9,6 +9,7 @@ from numpy.testing import assert_equal
 
 from sklearn.grid_search import GridSearchCV
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn import datasets
 
 # toy sample
@@ -38,7 +39,8 @@ def test_iris():
     """Check consistency on dataset iris."""
     for c in ("gini", "entropy"):
         # AdaBoost classification
-        clf = AdaBoostClassifier(n_estimators=1, criterion=c)
+        clf = AdaBoostClassifier(DecisionTreeClassifier(criterion=c),
+                                 n_estimators=1)
         clf.fit(iris.data, iris.target)
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
