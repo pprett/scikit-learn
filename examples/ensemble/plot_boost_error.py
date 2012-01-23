@@ -9,8 +9,6 @@ the left. The boost weights and error of each tree are also shown.
 """
 print __doc__
 
-import numpy as np
-
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.datasets.samples_generator import make_gaussian_quantiles
