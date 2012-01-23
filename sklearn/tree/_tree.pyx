@@ -103,9 +103,9 @@ cdef class ClassificationCriterion(Criterion):
     cdef int n_classes
     cdef int n_samples
     cdef double weighted_n_samples
-    cdef double* label_count_left
-    cdef double* label_count_right
-    cdef double* label_count_init
+    cdef DTYPE_t* label_count_left
+    cdef DTYPE_t* label_count_right
+    cdef DTYPE_t* label_count_init
     cdef int n_left
     cdef int n_right
     cdef double weighted_n_left
@@ -131,9 +131,9 @@ cdef class ClassificationCriterion(Criterion):
         self.n_right = 0
         self.weighted_n_left = 0.0
         self.weighted_n_right = 0.0
-        self.label_count_left = <double*>ndarray_label_count_left.data
-        self.label_count_right = <double*>ndarray_label_count_right.data
-        self.label_count_init = <double*>ndarray_label_count_init.data
+        self.label_count_left = <DTYPE_t *>ndarray_label_count_left.data
+        self.label_count_right = <DTYPE_t *>ndarray_label_count_right.data
+        self.label_count_init = <DTYPE_t *>ndarray_label_count_init.data
         self.ndarray_label_count_left = ndarray_label_count_left
         self.ndarray_label_count_right = ndarray_label_count_right
         self.ndarray_label_count_init = ndarray_label_count_init
