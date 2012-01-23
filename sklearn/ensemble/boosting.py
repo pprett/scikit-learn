@@ -16,13 +16,13 @@ from ..tree import DecisionTreeClassifier
 import math
 
 
-__all__ = ['BoostedClassifier']
+__all__ = ['AdaBoostClassifier']
 
 
-class BoostedClassifier(BaseEnsemble, ClassifierMixin):
-    """A boosted classifier.
+class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
+    """An AdaBoosted classifier.
 
-    A boosted classifier is a meta estimator that begins by fitting a
+    An AdaBoosted classifier is a meta estimator that begins by fitting a
     classifier on a dataset and then fits additional copies of the classifer
     on the same dataset where the weights of incorrectly
     classified instances are adjusted such that subsequent classifiers
@@ -66,13 +66,13 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         elif not isinstance(base_estimator, ClassifierMixin):
             raise TypeError("estimator must be a subclass of ClassifierMixin")
 
-        super(BoostedClassifier, self).__init__(
+        super(AdaBoostClassifier, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators)
 
         if beta <= 0:
             raise ValueError("beta must be positive and non-zero")
-        
+
         self.boost_weights_ = list()
         self.errs_ = list()
         self.beta = beta
@@ -96,7 +96,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         sample_weight : array-like, shape = [n_samples], optional
             Sample weights
-        
+
         Returns
         -------
         self : object
@@ -108,7 +108,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
 
         self.classes_ = np.unique(y)
         self.n_classes_ = len(self.classes_)
-         
+
         y = np.searchsorted(self.classes_, y)
 
         if sample_weight is None:
@@ -117,12 +117,12 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
                 / X.shape[0]
         else:
             sample_weight = np.copy(sample_weight)
-        
+
         # clear any previous fit results
         self.estimators_ = list()
         self.boost_weights_ = list()
-        self.errs_ = list()    
-        
+        self.errs_ = list()
+
         # boost the estimator using AdaBoost with the SAMME modification
         # for multi-class problems
         for boost in xrange(self.n_estimators):
@@ -195,7 +195,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         """
         return self.classes_.take(
             np.argmax(self.predict_proba(X), axis=1),  axis=0)
-    
+
     def iter_predict(self, X):
         """Predict class for X.
 
@@ -228,7 +228,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         ----------
         X : array-like of shape = [n_samples, n_features]
             The input samples.
-        
+
         Returns
         -------
         p : array of shape = [n_samples]
@@ -237,7 +237,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         """
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
-        
+
         norm = sum(self.boost_weights_)
         for alpha, estimator in zip(self.boost_weights_, self.estimators_):
             if self.n_classes_ == estimator.n_classes_:
@@ -249,7 +249,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         if norm > 0:
             p /= norm
         return p
-    
+
     def iter_predict_proba(self, X):
         """Predict class probabilities for X.
 
@@ -263,7 +263,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         ----------
         X : array-like of shape = [n_samples, n_features]
             The input samples.
-        
+
         Returns
         -------
         p : array of shape = [n_samples]
@@ -272,7 +272,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         """
         X = np.atleast_2d(X)
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
-        
+
         norm = 0.
         for alpha, estimator in zip(self.boost_weights_, self.estimators_):
             if self.n_classes_ == estimator.n_classes_:
@@ -295,7 +295,7 @@ class BoostedClassifier(BaseEnsemble, ClassifierMixin):
         ----------
         X : array-like of shape = [n_samples, n_features]
             The input samples.
-        
+
         Returns
         -------
         p : array of shape = [n_samples]

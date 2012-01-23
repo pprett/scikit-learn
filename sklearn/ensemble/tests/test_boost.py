@@ -8,7 +8,7 @@ from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
 
 from sklearn.grid_search import GridSearchCV
-from sklearn.ensemble import BoostedClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn import datasets
 
 # toy sample
@@ -29,7 +29,7 @@ iris.target = iris.target[perm]
 def test_classification_toy():
     """Check classification on a toy dataset."""
     # Adaboost Classification
-    clf = BoostedClassifier(n_estimators=10)
+    clf = AdaBoostClassifier(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
 
@@ -38,7 +38,7 @@ def test_iris():
     """Check consistency on dataset iris."""
     for c in ("gini", "entropy"):
         # AdaBoost classification
-        clf = BoostedClassifier(n_estimators=1, criterion=c)
+        clf = AdaBoostClassifier(n_estimators=1, criterion=c)
         clf.fit(iris.data, iris.target)
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
@@ -47,7 +47,7 @@ def test_iris():
 def test_probability():
     """Predict probabilities."""
     # AdaBoost classification
-    clf = BoostedClassifier(n_estimators=10)
+    clf = AdaBoostClassifier(n_estimators=10)
     clf.fit(iris.data, iris.target)
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
@@ -58,7 +58,7 @@ def test_probability():
 def test_gridsearch():
     """Check that base trees can be grid-searched."""
     # AdaBoost classification
-    boost = BoostedClassifier()
+    boost = AdaBoostClassifier()
     parameters = {'n_estimators': (1, 2),
                   'base_estimator__max_depth': (1, 2)}
     clf = GridSearchCV(boost, parameters)
@@ -70,7 +70,7 @@ def test_pickle():
     import pickle
 
     # Adaboost
-    obj = BoostedClassifier()
+    obj = AdaBoostClassifier()
     obj.fit(iris.data, iris.target)
     score = obj.score(iris.data, iris.target)
     s = pickle.dumps(obj)
