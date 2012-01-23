@@ -58,7 +58,7 @@ pl.xlim((-20, len(bdt) + 20))
 pl.subplot(1, 3, 3)
 pl.plot(n_trees, bdt.boost_weights_, "b")
 pl.ylabel('Boost Weight')
-pl.xlabel('Number of Trees')
+pl.xlabel('Tree')
 pl.ylim((0, .8))
 pl.xlim((-20, len(bdt) + 20))
 
