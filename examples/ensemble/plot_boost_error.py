@@ -9,49 +9,14 @@ the left. The boost weights and error of each tree are also shown.
 """
 print __doc__
 
-import numpy as np
-
-from sklearn.datasets import make_blobs
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets.samples_generator import make_gaussian_quantiles
 
-import scipy.stats
+X, y = make_gaussian_quantiles(n_samples=13000, n_features=10,
+                               n_classes=3)
 
-
-n_features = 10
-n_samples = 13000
 n_split = 3000
-
-# Build multivariate normal distribution
-cov = np.diag(np.ones(n_features))
-mean = np.zeros(n_features)
-X = list(np.random.multivariate_normal(mean, cov, n_samples))
-
-# Sort by distance from origin
-X.sort(key=lambda x: sum([x_i**2 for x_i in x]))
-X = np.array(X)
-
-# Label by quantile.
-# The decision boundaries separating successive classes
-# are nested concentric ten-dimensional spheres [1].
-#
-# [1] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie.
-#     "Multi-class AdaBoost" 2009
-y = []
-for i, x in enumerate(X):
-    if i < n_samples / 3.:
-        y.append(1)
-    elif i < 2 * n_samples / 3.:
-        y.append(2)
-    else:
-        y.append(3)
-
-y = np.array(y)
-
-# random permutation
-perm = np.random.permutation(n_samples)
-y = y[perm]
-X = X[perm]
 
 X_train, X_test = X[:n_split], X[n_split:]
 y_train, y_test = y[:n_split], y[n_split:]
