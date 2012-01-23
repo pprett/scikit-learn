@@ -12,7 +12,7 @@ print __doc__
 import numpy as np
 
 from sklearn.datasets import make_blobs
-from sklearn.ensemble import BoostedClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 
 import scipy.stats
@@ -59,8 +59,8 @@ y_train, y_test = y[:n_split], y[n_split:]
 test_errors = []
 train_errors = []
 
-bdt = BoostedClassifier(DecisionTreeClassifier(min_leaf=100),
-                        n_estimators=200)
+bdt = AdaBoostClassifier(DecisionTreeClassifier(min_leaf=100),
+                         n_estimators=200)
 
 bdt.fit(X_train, y_train, verbose=True)
 
