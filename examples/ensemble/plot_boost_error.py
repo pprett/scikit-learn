@@ -59,7 +59,7 @@ y_train, y_test = y[:n_split], y[n_split:]
 test_errors = []
 train_errors = []
 
-bdt = BoostedClassifier(DecisionTreeClassifier(min_split=600),
+bdt = BoostedClassifier(DecisionTreeClassifier(min_leaf=100),
                         n_estimators=600)
 
 bdt.fit(X_train, y_train, verbose=True)
