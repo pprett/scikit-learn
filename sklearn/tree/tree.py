@@ -7,7 +7,8 @@ randomized trees. Single and multi-output problems are both handled.
 # Copyright (C) 2008-2011, Luis Pedro Coelho <luis@luispedro.org>
 # License: MIT. See COPYING.MIT file in the milk distribution
 
-# Authors: Brian Holt, Peter Prettenhofer, Satrajit Ghosh, Gilles Louppe
+# Authors: Brian Holt, Peter Prettenhofer, Satrajit Ghosh, Gilles Louppe,
+#          Noel Dawe
 # License: BSD3
 
 from __future__ import division

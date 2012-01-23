@@ -140,7 +140,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             incorrect = (p != y).astype(np.int32)
             # error fraction
             err = (sample_weight * incorrect).sum() / sample_weight.sum()
-            # if classification is perfect then stop
+            # stop if classification is perfect
             if err <= 0:
                 self.boost_weights_.append(1.)
                 self.errs_.append(err)
@@ -148,7 +148,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                     print "boost %d: weight: %.3f error: %.3f" % \
                         (boost, 1., err)
                 break
-            # sanity check
+            # stop if the error is at least as bad as random guessing
             if err >= 1. - (1. / self.n_classes_):
                 self.estimators_.pop(-1)
                 break
@@ -164,9 +164,6 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                 sample_weight *= np.exp(alpha * incorrect)
                 # normalize
                 sample_weight *= X.shape[0] / sample_weight.sum()
-
-        # boosting may terminate early so set n_estimators to actual value
-        self.n_estimators = len(self.estimators_)
 
         # sum the importances
         if self.compute_importances:
@@ -201,8 +198,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
 
         The predicted class of an input sample is computed as the weighted
         mean prediction of the classifiers in the ensemble.
-        Temporary method to determine error on testing set after each boost.
-        See examples/ensemble/plot_boost_error.py
+        This method allows monitoring (i.e. determine error on testing set)
+        after each boost. See examples/ensemble/plot_boost_error.py
 
         Parameters
         ----------
@@ -256,8 +253,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         The predicted class probabilities of an input sample is computed as
         the weighted mean predicted class probabilities
         of the classifiers in the ensemble.
-        Temporary method to determine error on testing set after each boost.
-        See examples/ensemble/plot_boost_error.py
+        This method allows monitoring (i.e. determine error on testing set)
+        after each boost. See examples/ensemble/plot_boost_error.py
 
         Parameters
         ----------
