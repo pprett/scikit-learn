@@ -60,7 +60,7 @@ test_errors = []
 train_errors = []
 
 bdt = BoostedClassifier(DecisionTreeClassifier(min_leaf=100),
-                        n_estimators=600)
+                        n_estimators=200)
 
 bdt.fit(X_train, y_train, verbose=True)
 
