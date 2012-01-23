@@ -101,7 +101,8 @@ def export_graphviz(decision_tree, out_file=None, feature_names=None):
                       tree.value[node_id])
 
     def recurse(tree, node_id):
-        assert node_id != -1
+        if node_id == 1:
+            raise ValueError("Invalid node_id -1")
         left_child, right_child = tree.children[node_id, :]
         node_data = {
             "current": node_id,
@@ -599,7 +600,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         The minimum number of samples required to split an internal node.
 
     min_density : float, optional (default=0.1)
-        This parameter trades runtime against memory requirement. It
+        This parameter controls a trade-off in an optimization heuristic. It
         controls the minimum density of the `sample_mask` (i.e. the
         fraction of samples in the mask). If the density falls below this
         threshold the mask is recomputed and the input data is packed
@@ -659,10 +660,6 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
 
     .. [4] L. Breiman, and A. Cutler, "Random Forests",
            http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
-
-    See also
-    --------
-    DecisionTreeRegressor
 
     Examples
     --------
@@ -759,7 +756,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         The minimum number of samples required to split an internal node.
 
     min_density : float, optional (default=0.1)
-        This parameter trades runtime against memory requirement. It
+        This parameter controls a trade-off in an optimization heuristic. It
         controls the minimum density of the `sample_mask` (i.e. the
         fraction of samples in the mask). If the density falls below this
         threshold the mask is recomputed and the input data is packed
@@ -801,6 +798,10 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
 
             I(f) = \sum_{nodes A for which f is used} n_samples(A) * \Delta err
 
+    See also
+    --------
+    DecisionTreeClassifier
+
     Notes
     -----
     **References**:
@@ -815,10 +816,6 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
 
     .. [4] L. Breiman, and A. Cutler, "Random Forests",
            http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
-
-    See also
-    --------
-    DecisionTreeClassifier
 
     Examples
     --------
