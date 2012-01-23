@@ -145,7 +145,7 @@ cdef class ClassificationCriterion(Criterion):
         """Initialise the criterion class."""
         cdef int c = 0
         cdef int j = 0
-        cdef double w = 1.0
+        cdef DTYPE_t w = 1.0
 
         self.n_samples = n_samples
         self.weighted_n_samples = weighted_n_samples
@@ -183,7 +183,7 @@ cdef class ClassificationCriterion(Criterion):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int c
-        cdef double w = 1.0
+        cdef DTYPE_t w = 1.0
         
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
@@ -367,7 +367,7 @@ cdef class RegressionCriterion(Criterion):
         self.n_samples = n_samples
         self.weighted_n_samples = weighted_n_samples
         
-        cdef double w = 1.0
+        cdef DTYPE_t w = 1.0
         cdef int j = 0
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
@@ -406,7 +406,7 @@ cdef class RegressionCriterion(Criterion):
                     BOOL_t *sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
-        cdef double w = 1.0
+        cdef DTYPE_t w = 1.0
         cdef double y_idx = 0.0
         cdef int idx, j
         # post condition: all samples from [0:b) are on the left side
