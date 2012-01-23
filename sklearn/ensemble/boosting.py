@@ -113,7 +113,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
 
         if sample_weight is None:
             # initialize weights to 1/N
-            sample_weight = np.ones(X.shape[0], dtype=np.float64) \
+            sample_weight = np.ones(X.shape[0], dtype=np.float32) \
                 / X.shape[0]
         else:
             sample_weight = np.copy(sample_weight)
