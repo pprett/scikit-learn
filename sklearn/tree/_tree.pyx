@@ -538,6 +538,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                      np.ndarray sample_mask,
                      int n_samples,
                      double weighted_n_samples,
+                     int min_leaf,
                      int max_features,
                      Criterion criterion,
                      object random_state):
@@ -569,6 +570,9 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     weighted_n_samples : double
         The weighted number of samples in the current sample_mask
 
+    min_leaf : int
+        The minimum number of samples required to be at a leaf node.
+
     max_features : int
         The number of features to consider when looking for the best split.
 
@@ -597,6 +601,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef int n_total_samples = X.shape[0]
     cdef int n_features = X.shape[1]
     cdef int i, a, b, best_i = -1
+    cdef int n_left = 0
     cdef DTYPE_t t, initial_error, error
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
@@ -657,7 +662,13 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                 break
 
             # Better split than the best so far?
-            criterion.update(a, b, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
+            n_left = criterion.update(a, b, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
+            
+            # Only consider splits that respect min_leaf
+            if n_left < min_leaf or (n_samples - n_left) < min_leaf:
+                a = b
+                continue
+            
             error = criterion.eval()
 
             if error < best_error:
@@ -681,6 +692,7 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                             np.ndarray sample_mask,
                             int n_samples,
                             double weighted_n_samples,
+                            int min_leaf,
                             int max_features,
                             Criterion criterion,
                             object random_state):
@@ -711,6 +723,9 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     
     weighted_n_samples : double
         The weighted number of samples in the current sample_mask
+    
+    min_leaf : int
+        The minimum number of samples required to be at a leaf node.
 
     max_features : int
         The number of features to consider when looking for the best split.
@@ -816,6 +831,8 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
         # Better than the best so far?
         criterion.update(0, c, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
         error = criterion.eval()
+        
+        # TODO only consider splits that respect min_leaf
 
         if error < best_error:
             best_i = i
