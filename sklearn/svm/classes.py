@@ -6,10 +6,13 @@ from .base import BaseLibLinear, DenseBaseLibSVM
 class LinearSVC(BaseLibLinear, ClassifierMixin, CoefSelectTransformerMixin):
     """Linear Support Vector Classification.
 
-    Similar to SVC with parameter kernel='linear', but uses internally
-    liblinear rather than libsvm, so it has more flexibility in the
-    choice of penalties and loss functions and should be faster for
-    huge datasets.
+    Similar to SVC with parameter kernel='linear', but implemented in terms of
+    liblinear rather than libsvm, so it has more flexibility in the choice of
+    penalties and loss functions and should scale better.
+
+    This class supports both dense and sparse input. Use C-ordered arrays or
+    CSR matrices containing 64-bit floats for optimal performance; any other
+    input format will be converted (and copied).
 
     Parameters
     ----------
@@ -63,7 +66,7 @@ class LinearSVC(BaseLibLinear, ClassifierMixin, CoefSelectTransformerMixin):
         Weights asigned to the features (coefficients in the primal
         problem). This is only available in the case of linear kernel.
 
-        `coef_` is readonly property derived from `raw_coef_` that
+        `coef_` is readonly property derived from `raw_coef_` that \
         follows the internal memory layout of liblinear.
 
     `intercept_` : array, shape = [1] if n_classes == 2 else [n_classes]
@@ -76,13 +79,13 @@ class LinearSVC(BaseLibLinear, ClassifierMixin, CoefSelectTransformerMixin):
     to have slightly different results for the same input data. If
     that happens, try with a smaller tol parameter.
 
+    **References:**
+    `LIBLINEAR: A Library for Large Linear Classification
+    <http://www.csie.ntu.edu.tw/~cjlin/liblinear/>`__
+
     See also
     --------
     SVC
-
-    LIBLINEAR -- A Library for Large Linear Classification
-    http://www.csie.ntu.edu.tw/~cjlin/liblinear/
-
     """
 
     # all the implementation is provided by the mixins
@@ -603,7 +606,7 @@ class OneClassSVM(DenseBaseLibSVM):
             Returns self.
 
         Notes
-        ------
+        -----
         If X is not a C-ordered contiguous array, it is copied.
 
         """

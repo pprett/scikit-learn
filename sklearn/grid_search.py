@@ -61,7 +61,7 @@ class IterGrid(object):
                 yield params
 
 
-def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
+def fit_grid_point(X, y, sample_weight, base_clf, clf_params, train, test, loss_func,
                    score_func, verbose, **fit_params):
     """Run fit on one set of parameters
 
@@ -98,9 +98,19 @@ def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
     else:
         y_test = None
         y_train = None
+    if sample_weight is not None:
+        sample_weight_test = sample_weight[test]
+        sample_weight_train = sample_weight[train]
+    else:
+        sample_weight_test = None
+        sample_weight_train = None
 
-    clf.fit(X_train, y_train, **fit_params)
+    if sample_weight is not None:
+        clf.fit(X_train, y_train, sample_weight=sample_weight_train, **fit_params)
+    else:
+        clf.fit(X_train, y_train, **fit_params)
 
+    # TODO: include sample_weight_test below
     if loss_func is not None:
         y_pred = clf.predict(X_test)
         this_score = -loss_func(y_test, y_pred)
@@ -108,7 +118,11 @@ def fit_grid_point(X, y, base_clf, clf_params, train, test, loss_func,
         y_pred = clf.predict(X_test)
         this_score = score_func(y_test, y_pred)
     else:
-        this_score = clf.score(X_test, y_test)
+        if sample_weight_test is not None:
+            this_score = clf.score(X_test, y_test,
+                                   sample_weight=sample_weight_test)
+        else:
+            this_score = clf.score(X_test, y_test)
 
     if y is not None:
         if hasattr(y, 'shape'):
@@ -253,13 +267,15 @@ class GridSearchCV(BaseEstimator):
                  fit_params=None, n_jobs=1, iid=True, refit=True, cv=None,
                  verbose=0, pre_dispatch='2*n_jobs',
                 ):
-        assert hasattr(estimator, 'fit') and (hasattr(estimator, 'predict')
-                        or hasattr(estimator, 'score')), (
-            "estimator should a be an estimator implementing 'fit' and "
-            "'predict' or 'score' methods, %s (type %s) was passed" %
-                    (estimator, type(estimator)))
+        if not hasattr(estimator, 'fit') or \
+           not (hasattr(estimator, 'predict') or hasattr(estimator, 'score')):
+            raise TypeError("estimator should a be an estimator implementing"
+                            " 'fit' and 'predict' or 'score' methods,"
+                            " %s (type %s) was passed" %
+                            (estimator, type(estimator)))
         if loss_func is None and score_func is None:
-            assert hasattr(estimator, 'score'), ValueError(
+            if not hasattr(estimator, 'score'):
+                raise TypeError(
                     "If no loss_func is specified, the estimator passed "
                     "should have a 'score' method. The estimator %s "
                     "does not." % estimator)
@@ -276,7 +292,7 @@ class GridSearchCV(BaseEstimator):
         self.verbose = verbose
         self.pre_dispatch = pre_dispatch
 
-    def fit(self, X, y=None, **params):
+    def fit(self, X, y=None, sample_weight=None, **params):
         """Run fit with all sets of parameters
 
         Returns the best classifier
@@ -292,6 +308,8 @@ class GridSearchCV(BaseEstimator):
             Target vector relative to X for classification;
             None for unsupervised learning.
 
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
         """
         self._set_params(**params)
         estimator = self.estimator
@@ -316,8 +334,9 @@ class GridSearchCV(BaseEstimator):
         out = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                 pre_dispatch=pre_dispatch)(
             delayed(fit_grid_point)(
-                X, y, base_clf, clf_params, train, test, self.loss_func,
-                self.score_func, self.verbose, **self.fit_params)
+                X, y, sample_weight, base_clf, clf_params, train, test,
+                self.loss_func, self.score_func, self.verbose,
+                **self.fit_params)
                     for clf_params in grid for train, test in cv)
 
         # Out is a list of triplet: score, estimator, n_test_samples
@@ -345,15 +364,11 @@ class GridSearchCV(BaseEstimator):
 
         # Note: we do not use max(out) to make ties deterministic even if
         # comparison on estimator instances is not deterministic
-        best_score = None
+        best_score = -np.inf
         for score, estimator in scores:
-            if best_score is None:
+            if score > best_score:
                 best_score = score
                 best_estimator = estimator
-            else:
-                if score > best_score:
-                    best_score = score
-                    best_estimator = estimator
 
         if best_score is None:
             raise ValueError('Best score could not be found')
@@ -370,8 +385,6 @@ class GridSearchCV(BaseEstimator):
             self.predict = best_estimator.predict
         if hasattr(best_estimator, 'predict_proba'):
             self.predict_proba = best_estimator.predict_proba
-        if hasattr(best_estimator, 'score'):
-            self.score_ = best_estimator.score
 
         # Store the computed scores
         # XXX: the name is too specific, it shouldn't have
@@ -383,22 +396,25 @@ class GridSearchCV(BaseEstimator):
         return self
 
     def score(self, X, y=None):
-        # This method is overridden during the fit if the best estimator
-        # found has a score function.
+        if hasattr(self.best_estimator_, 'score'):
+             return self.best_estimator_.score(X, y)
+        if self.score_func is None:
+            raise ValueError("No score function explicitly defined, "
+                             "and the estimator doesn't provide one %s"
+                             % self.best_estimator_)
         y_predicted = self.predict(X)
         return self.score_func(y, y_predicted)
 
     @property
     @deprecated('GridSearchCV.best_estimator is deprecated'
                 ' and will be removed in version 0.12.'
-                ' Please use GridSearchCV.best_estimator_ instead.')
+                ' Please use ``GridSearchCV.best_estimator_`` instead.')
     def best_estimator(self):
         return self.best_estimator_
 
     @property
     @deprecated('GridSearchCV.best_score is deprecated'
                 ' and will be removed in version 0.12.'
-                ' Please use GridSearchCV.best_score_ instead.')
+                ' Please use ``GridSearchCV.best_score_`` instead.')
     def best_score(self):
         return self.best_score_
-

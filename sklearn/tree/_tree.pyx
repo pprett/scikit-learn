@@ -41,7 +41,8 @@ cdef class Criterion:
     """Interface for splitting criteria (regression and classification)"""
 
     cdef void init(self, DTYPE_t *y, DTYPE_t *sample_weight,
-                   BOOL_t *sample_mask, int n_samples,
+                   BOOL_t *sample_mask,
+                   int n_samples, double weighted_n_samples,
                    int n_total_samples):
         """Initialise the criterion class for new split point."""
         pass
@@ -73,15 +74,18 @@ cdef class ClassificationCriterion(Criterion):
 
     n_samples : int
         The number of samples.
+    
+    weighted_n_samples : double
+        The weighted number of samples.
 
-    label_count_left : int*
-        The label counts for samples left of splitting point.
+    label_count_left : double*
+        The weighted label counts for samples left of splitting point.
 
-    label_count_right : int*
-        The label counts for samples right of splitting point.
+    label_count_right : double*
+        The weighted label counts for samples right of splitting point.
 
-    label_count_init : int*
-        The initial label counts for samples right of splitting point.
+    label_count_init : double*
+        The initial weighted label counts for samples right of splitting point.
         Used to reset `label_count_right` for each feature.
 
     n_left : int
@@ -89,14 +93,23 @@ cdef class ClassificationCriterion(Criterion):
 
     n_right : int
         The number of samples right of splitting point.
+    
+    weighted_n_left : double
+        The weighted number of samples left of splitting point.
+
+    weighted_n_right : double
+        The weighted number of samples right of splitting point.
     """
     cdef int n_classes
     cdef int n_samples
+    cdef double weighted_n_samples
     cdef double* label_count_left
     cdef double* label_count_right
     cdef double* label_count_init
     cdef int n_left
     cdef int n_right
+    cdef double weighted_n_left
+    cdef double weighted_n_right
 
     # need to store ref to arrays to prevent GC
     cdef ndarray_label_count_left
@@ -104,17 +117,20 @@ cdef class ClassificationCriterion(Criterion):
     cdef ndarray_label_count_init
 
     def __init__(self, int n_classes):
-        cdef np.ndarray[np.int32_t, ndim=1] ndarray_label_count_left \
-            = np.zeros((n_classes,), dtype=np.int32, order='C')
-        cdef np.ndarray[np.int32_t, ndim=1] ndarray_label_count_right \
-            = np.zeros((n_classes,), dtype=np.int32, order='C')
-        cdef np.ndarray[np.int32_t, ndim=1] ndarray_label_count_init \
-            = np.zeros((n_classes,), dtype=np.int32, order='C')
+        cdef np.ndarray[DTYPE_t, ndim=1] ndarray_label_count_left \
+            = np.zeros((n_classes,), dtype=DTYPE, order='C')
+        cdef np.ndarray[DTYPE_t, ndim=1] ndarray_label_count_right \
+            = np.zeros((n_classes,), dtype=DTYPE, order='C')
+        cdef np.ndarray[DTYPE_t, ndim=1] ndarray_label_count_init \
+            = np.zeros((n_classes,), dtype=DTYPE, order='C')
 
         self.n_classes = n_classes
         self.n_samples = 0
+        self.weighted_n_samples = 0.0
         self.n_left = 0
         self.n_right = 0
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = 0.0
         self.label_count_left = <double*>ndarray_label_count_left.data
         self.label_count_right = <double*>ndarray_label_count_right.data
         self.label_count_init = <double*>ndarray_label_count_init.data
@@ -123,14 +139,16 @@ cdef class ClassificationCriterion(Criterion):
         self.ndarray_label_count_init = ndarray_label_count_init
 
     cdef void init(self, DTYPE_t *y, DTYPE_t *sample_weight,
-                   BOOL_t *sample_mask, int n_samples,
+                   BOOL_t *sample_mask,
+                   int n_samples, double weighted_n_samples,
                    int n_total_samples):
         """Initialise the criterion class."""
         cdef int c = 0
         cdef int j = 0
-        cdef double w = 1.
+        cdef double w = 1.0
 
         self.n_samples = n_samples
+        self.weighted_n_samples = weighted_n_samples
 
         for c from 0 <= c < self.n_classes:
             self.label_count_init[c] = 0
@@ -151,9 +169,11 @@ cdef class ClassificationCriterion(Criterion):
         cdef int c = 0
         self.n_left = 0
         self.n_right = self.n_samples
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = self.weighted_n_samples
 
         for c from 0 <= c < self.n_classes:
-            self.label_count_left[c] = 0
+            self.label_count_left[c] = 0.0
             self.label_count_right[c] = self.label_count_init[c]
 
     cdef int update(self, int a, int b,
@@ -163,7 +183,7 @@ cdef class ClassificationCriterion(Criterion):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int c
-        cdef double w = 1.
+        cdef double w = 1.0
         
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
@@ -177,6 +197,8 @@ cdef class ClassificationCriterion(Criterion):
             self.label_count_left[c] += w
             self.n_right -= 1
             self.n_left += 1
+            self.weighted_n_right -= w
+            self.weighted_n_left += w
 
         return self.n_left
 
@@ -193,10 +215,8 @@ cdef class Gini(ClassificationCriterion):
 
     cdef double eval(self):
         """Returns Gini index of left branch + Gini index of right branch. """
-        cdef double n_left = <double> self.n_left
-        cdef double n_right = <double> self.n_right
-        cdef double H_left = n_left * n_left
-        cdef double H_right = n_right * n_right
+        cdef double H_left = self.weighted_n_left * self.weighted_n_left
+        cdef double H_right = self.weighted_n_right * self.weighted_n_right
         cdef double count_left, count_right
         cdef int k
         
@@ -208,17 +228,17 @@ cdef class Gini(ClassificationCriterion):
             if count_right > 0:
                 H_right -= (count_right * count_right)
 
-        if n_left == 0:
+        if self.weighted_n_left == 0:
             H_left = 0
         else:
-            H_left /= n_left
+            H_left /= self.weighted_n_left
 
-        if n_right == 0:
+        if self.weighted_n_right == 0:
             H_right = 0
         else:
-            H_right /= n_right
+            H_right /= self.weighted_n_right
 
-        return (H_left + H_right) / self.n_samples
+        return (H_left + H_right) / self.weighted_n_samples
 
 
 cdef class Entropy(ClassificationCriterion):
@@ -233,19 +253,17 @@ cdef class Entropy(ClassificationCriterion):
         cdef double H_right = 0.0
         cdef int k
         cdef double e1, e2
-        cdef double n_left = <double> self.n_left
-        cdef double n_right = <double> self.n_right
 
         for k from 0 <= k < self.n_classes:
             if self.label_count_left[k] > 0:
-                H_left -= ((self.label_count_left[k] / n_left)
-                           * log(self.label_count_left[k] / n_left))
+                H_left -= ((self.label_count_left[k] / self.weighted_n_left)
+                           * log(self.label_count_left[k] / self.weighted_n_left))
             if self.label_count_right[k] > 0:
-                H_right -= ((self.label_count_right[k] / n_right)
-                            * log(self.label_count_right[k] / n_right))
+                H_right -= ((self.label_count_right[k] / self.weighted_n_right)
+                            * log(self.label_count_right[k] / self.weighted_n_right))
 
-        e1 = (n_left / self.n_samples) * H_left
-        e2 = (n_right / self.n_samples) * H_right
+        e1 = (self.weighted_n_left / self.weighted_n_samples) * H_left
+        e2 = (self.weighted_n_right / self.weighted_n_samples) * H_right
         return e1 + e2
 
 
@@ -262,35 +280,47 @@ cdef class RegressionCriterion(Criterion):
     ----------
     n_samples : int
         The number of samples
+    
+    weighted_n_samples : double
+        The weighted number of samples.
 
     mean_left : double
-        The mean target value of the samples left of the split point.
+        The weighted mean target value of the samples left of the split point.
 
     mean_right : double
-        The mean target value of the samples right of the split.
+        The weighted mean target value of the samples right of the split.
 
     sq_sum_left : double
-        The sum of squared target values left of the split point.
+        The weighted sum of squared target values left of the split point.
 
     sq_sum_right : double
-        The sum of squared target values right of the split point.
+        The weighted sum of squared target values right of the split point.
 
     var_left : double
-        The variance of the target values left of the split point.
+        The weighted variance of the target values left of the split point.
 
     var_right : double
-        The variance of the target values left of the split point.
+        The weighted variance of the target values left of the split point.
 
     n_left : int
-        number of samples left of split point.
+        The number of samples left of split point.
 
     n_right : int
-        number of samples right of split point.
+        The number of samples right of split point.
+
+    weighted_n_left : double
+        The weighted number of samples left of splitting point.
+
+    weighted_n_right : double
+        The weighted number of samples right of splitting point.
     """
 
     cdef int n_samples
+    cdef double weighted_n_samples
     cdef int n_right
     cdef int n_left
+    cdef double weighted_n_right
+    cdef double weighted_n_left
 
     cdef double mean_left
     cdef double mean_right
@@ -305,8 +335,11 @@ cdef class RegressionCriterion(Criterion):
 
     def __init__(self):
         self.n_samples = 0
+        self.weighted_n_samples = 0.0
         self.n_left = 0
         self.n_right = 0
+        self.weighted_n_left = 0.0
+        self.weighted_n_right = 0.0
         self.mean_left = 0.0
         self.mean_right = 0.0
         self.mean_init = 0.0
@@ -317,7 +350,8 @@ cdef class RegressionCriterion(Criterion):
         self.var_right = 0.0
 
     cdef void init(self, DTYPE_t *y, DTYPE_t *sample_weight,
-                   BOOL_t *sample_mask, int n_samples,
+                   BOOL_t *sample_mask,
+                   int n_samples, double weighted_n_samples,
                    int n_total_samples):
         """Initialise the criterion class; assume all samples
            are in the right branch and store the mean and squared
@@ -331,15 +365,19 @@ cdef class RegressionCriterion(Criterion):
         self.var_left = 0.0
         self.var_right = 0.0
         self.n_samples = n_samples
-
+        self.weighted_n_samples = weighted_n_samples
+        
+        cdef double w = 1.0
         cdef int j = 0
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
-            self.sq_sum_init += (y[j] * y[j])
-            self.mean_init += y[j]
+            if sample_weight != NULL:
+                w = sample_weight[j]
+            self.sq_sum_init += (y[j] * y[j] * w * w)
+            self.mean_init += y[j] * w
 
-        self.mean_init = self.mean_init / self.n_samples
+        self.mean_init = self.mean_init / self.weighted_n_samples
 
         self.reset()
 
@@ -352,6 +390,8 @@ cdef class RegressionCriterion(Criterion):
         """
         self.n_right = self.n_samples
         self.n_left = 0
+        self.weighted_n_left = self.weighted_n_samples
+        self.weighted_n_right = 0.0
         self.mean_right = self.mean_init
         self.mean_left = 0.0
         self.sq_sum_right = self.sq_sum_init
@@ -366,6 +406,7 @@ cdef class RegressionCriterion(Criterion):
                     BOOL_t *sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
+        cdef double w = 1.0
         cdef double y_idx = 0.0
         cdef int idx, j
         # post condition: all samples from [0:b) are on the left side
@@ -373,23 +414,27 @@ cdef class RegressionCriterion(Criterion):
             j = X_argsorted_i[idx]
             if sample_mask[j] == 0:
                 continue
-            y_idx = y[j]
+            if sample_weight != NULL:
+                w = sample_weight[j]
+            y_idx = w * y[j]
             self.sq_sum_left = self.sq_sum_left + (y_idx * y_idx)
             self.sq_sum_right = self.sq_sum_right - (y_idx * y_idx)
 
-            self.mean_left = (self.n_left * self.mean_left + y_idx) / \
-                <double>(self.n_left + 1)
-            self.mean_right = ((self.n_samples - self.n_left) * \
+            self.mean_left = (self.weighted_n_left * self.mean_left + y_idx) / \
+                <double>(self.weighted_n_left + w)
+            self.mean_right = ((self.weighted_n_samples - self.weighted_n_left) * \
                 self.mean_right - y_idx) / \
-                <double>(self.n_samples - self.n_left - 1)
+                <double>(self.weighted_n_samples - self.weighted_n_left - w)
 
             self.n_right -= 1
             self.n_left += 1
+            self.weighted_n_right -= w
+            self.weighted_n_left += w
 
             self.var_left = self.sq_sum_left - \
-                self.n_left * (self.mean_left * self.mean_left)
+                self.weighted_n_left * (self.mean_left * self.mean_left)
             self.var_right = self.sq_sum_right - \
-                self.n_right * (self.mean_right * self.mean_right)
+                self.weighted_n_right * (self.mean_right * self.mean_right)
 
         return self.n_left
 
@@ -436,7 +481,7 @@ def _apply_tree(np.ndarray[DTYPE_t, ndim=2] X,
 def _error_at_leaf(np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
                    np.ndarray[DTYPE_t, ndim=1, mode="c"] sample_weight,
                    np.ndarray sample_mask, Criterion criterion,
-                   int n_samples):
+                   int n_samples, double weighted_n_samples):
     """Compute criterion error at leaf with terminal region defined
     by `sample_mask`. """
     cdef int n_total_samples = y.shape[0]
@@ -446,10 +491,9 @@ def _error_at_leaf(np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
         sample_weight_ptr = <DTYPE_t *>sample_weight.data
     cdef BOOL_t *sample_mask_ptr = <BOOL_t *>sample_mask.data
     criterion.init(y_ptr, sample_weight_ptr,
-                   sample_mask_ptr, n_samples, n_total_samples)
+                   sample_mask_ptr,
+                   n_samples, weighted_n_samples, n_total_samples)
     return criterion.eval()
-
-
 
 
 cdef int smallest_sample_larger_than(int sample_idx, DTYPE_t *X_i,
@@ -493,6 +537,8 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                      np.ndarray[DTYPE_t, ndim=1, mode="c"] sample_weight,
                      np.ndarray sample_mask,
                      int n_samples,
+                     double weighted_n_samples,
+                     int min_leaf,
                      int max_features,
                      Criterion criterion,
                      object random_state):
@@ -520,6 +566,12 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     n_samples : int
         The number of samples in the current sample_mask
         (i.e. `sample_mask.sum()`).
+        
+    weighted_n_samples : double
+        The weighted number of samples in the current sample_mask
+
+    min_leaf : int
+        The minimum number of samples required to be at a leaf node.
 
     max_features : int
         The number of features to consider when looking for the best split.
@@ -549,6 +601,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     cdef int n_total_samples = X.shape[0]
     cdef int n_features = X.shape[1]
     cdef int i, a, b, best_i = -1
+    cdef int n_left = 0
     cdef DTYPE_t t, initial_error, error
     cdef DTYPE_t best_error = np.inf, best_t = np.inf
     cdef DTYPE_t *y_ptr = <DTYPE_t *>y.data
@@ -571,7 +624,8 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     # Compute the initial criterion value in the node
     X_argsorted_i = <int *>X_argsorted.data
     criterion.init(y_ptr, sample_weight_ptr,
-                   sample_mask_ptr, n_samples, n_total_samples)
+                   sample_mask_ptr,
+                   n_samples, weighted_n_samples, n_total_samples)
     initial_error = criterion.eval()
 
     if initial_error == 0:  # break early if the node is pure
@@ -608,7 +662,13 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                 break
 
             # Better split than the best so far?
-            criterion.update(a, b, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
+            n_left = criterion.update(a, b, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
+            
+            # Only consider splits that respect min_leaf
+            if n_left < min_leaf or (n_samples - n_left) < min_leaf:
+                a = b
+                continue
+            
             error = criterion.eval()
 
             if error < best_error:
@@ -631,6 +691,8 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                             np.ndarray[DTYPE_t, ndim=1, mode="c"] sample_weight,
                             np.ndarray sample_mask,
                             int n_samples,
+                            double weighted_n_samples,
+                            int min_leaf,
                             int max_features,
                             Criterion criterion,
                             object random_state):
@@ -658,6 +720,12 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     n_samples : int
         The number of samples in the current sample_mask
         (i.e. `sample_mask.sum()`).
+    
+    weighted_n_samples : double
+        The weighted number of samples in the current sample_mask
+    
+    min_leaf : int
+        The minimum number of samples required to be at a leaf node.
 
     max_features : int
         The number of features to consider when looking for the best split.
@@ -709,7 +777,8 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     # Compute the initial criterion value
     X_argsorted_i = <int *>X_argsorted.data
     criterion.init(y_ptr, sample_weight_ptr,
-                   sample_mask_ptr, n_samples, n_total_samples)
+                   sample_mask_ptr, n_samples, weighted_n_samples,
+                   n_total_samples)
     initial_error = criterion.eval()
 
     if initial_error == 0:  # break early if the node is pure
@@ -762,6 +831,8 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
         # Better than the best so far?
         criterion.update(0, c, y_ptr, sample_weight_ptr, X_argsorted_i, sample_mask_ptr)
         error = criterion.eval()
+        
+        # TODO only consider splits that respect min_leaf
 
         if error < best_error:
             best_i = i

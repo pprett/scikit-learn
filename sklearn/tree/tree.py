@@ -101,7 +101,8 @@ def export_graphviz(decision_tree, out_file=None, feature_names=None):
                       tree.value[node_id])
 
     def recurse(tree, node_id):
-        assert node_id != -1
+        if node_id == 1:
+            raise ValueError("Invalid node_id -1")
         left_child, right_child = tree.children[node_id, :]
         node_data = {
             "current": node_id,
@@ -172,6 +173,9 @@ class Tree(object):
 
     n_samples : np.ndarray of np.int32
         The number of samples at each node.
+
+    weighted_n_samples : np.ndarray of np.float64
+        The weighted number of samples at each node.
     """
 
     LEAF = -1
@@ -192,6 +196,7 @@ class Tree(object):
         self.best_error = np.empty((capacity,), dtype=np.float32)
         self.init_error = np.empty((capacity,), dtype=np.float32)
         self.n_samples = np.empty((capacity,), dtype=np.int32)
+        self.weighted_n_samples = np.empty((capacity,), dtype=np.float64)
 
     def resize(self, capacity=None):
         """Resize tree arrays to `capacity`, if `None` double capacity. """
@@ -208,13 +213,15 @@ class Tree(object):
         self.best_error.resize((capacity,), refcheck=False)
         self.init_error.resize((capacity,), refcheck=False)
         self.n_samples.resize((capacity,), refcheck=False)
+        self.weighted_n_samples.resize((capacity,), refcheck=False)
 
         # if capacity smaller than node_count, adjust the counter
         if capacity < self.node_count:
             self.node_count = capacity
 
     def add_split_node(self, parent, is_left_child, feature, threshold,
-                       best_error, init_error, n_samples, value):
+                       best_error, init_error,
+                       n_samples, weighted_n_samples, value):
         """Add a splitting node to the tree. The new node registers itself as
         the child of its parent. """
         node_id = self.node_count
@@ -227,6 +234,7 @@ class Tree(object):
         self.init_error[node_id] = init_error
         self.best_error[node_id] = best_error
         self.n_samples[node_id] = n_samples
+        self.weighted_n_samples[node_id] = weighted_n_samples
         self.value[node_id] = value
 
         # set as left or right child of parent
@@ -239,7 +247,8 @@ class Tree(object):
         self.node_count += 1
         return node_id
 
-    def add_leaf(self, parent, is_left_child, value, error, n_samples):
+    def add_leaf(self, parent, is_left_child, value, error,
+                 n_samples, weighted_n_samples):
         """Add a leaf to the tree. The new node registers itself as the
         child of its parent. """
         node_id = self.node_count
@@ -248,6 +257,7 @@ class Tree(object):
 
         self.value[node_id] = value
         self.n_samples[node_id] = n_samples
+        self.weighted_n_samples[node_id] = weighted_n_samples
         self.init_error[node_id] = error
         self.best_error[node_id] = error
 
@@ -266,7 +276,8 @@ class Tree(object):
         return self.value.take(out, axis=0)
 
 
-def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
+def _build_tree(X, y, is_classification, criterion,
+                max_depth, min_split, min_leaf,
                 min_density, max_features, random_state, n_classes, find_split,
                 sample_weight=None, sample_mask=None, X_argsorted=None):
     """Build a tree by recursively partitioning the data."""
@@ -285,17 +296,24 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
         # Count samples
         n_node_samples = sample_mask.sum()
 
+        if sample_weight is not None:
+            assert sample_weight.shape[0] == y.shape[0]
+            current_sample_weight = sample_weight[sample_mask]
+            weighted_n_node_samples = current_sample_weight.sum()
+        else:
+            current_sample_weight = None
+            weighted_n_node_samples = n_node_samples
+
         if n_node_samples == 0:
             raise ValueError("Attempting to find a split "
                              "with an empty sample_mask")
 
-        if sample_weight is not None:
-            assert sample_weight.shape[0] == y.shape[0]
-
         # Split samples
-        if depth < max_depth and n_node_samples >= min_split:
+        if depth < max_depth and n_node_samples >= min_split \
+           and n_node_samples >= 2 * min_leaf:
             feature, threshold, best_error, init_error = find_split(
-                X, y, X_argsorted, sample_weight, sample_mask, n_node_samples,
+                X, y, X_argsorted, sample_weight, sample_mask,
+                n_node_samples, weighted_n_node_samples, min_leaf,
                 max_features, criterion, random_state)
 
         else:
@@ -307,7 +325,12 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
         if is_classification:
             value = np.zeros((n_classes,))
             t = current_y.max() + 1
-            value[:t] = np.bincount(current_y.astype(np.int))
+            value[:t] = np.bincount(current_y.astype(np.int),
+                                    weights=current_sample_weight)
+
+        elif current_sample_weight is not None:
+            value = np.asarray((current_y * current_sample_weight).sum() /
+                               weighted_n_node_samples)
 
         else:
             value = np.asarray(np.mean(current_y))
@@ -317,8 +340,10 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
             # compute error at leaf
             error = _tree._error_at_leaf(y, sample_weight,
                                          sample_mask, criterion,
-                                         n_node_samples)
-            tree.add_leaf(parent, is_left_child, value, error, n_node_samples)
+                                         n_node_samples,
+                                         weighted_n_node_samples)
+            tree.add_leaf(parent, is_left_child, value, error,
+                          n_node_samples, weighted_n_node_samples)
 
         # Internal node
         else:
@@ -329,7 +354,7 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
                     np.argsort(X.T, axis=1).astype(np.int32).T)
                 y = current_y
                 if sample_weight is not None:
-                    sample_weight = sample_weight[sample_mask]
+                    sample_weight = current_sample_weight
                 sample_mask = np.ones((X.shape[0],), dtype=np.bool)
 
             # Split and and recurse
@@ -337,7 +362,9 @@ def _build_tree(X, y, is_classification, criterion, max_depth, min_split,
 
             node_id = tree.add_split_node(parent, is_left_child, feature,
                                           threshold, best_error, init_error,
-                                          n_node_samples, value)
+                                          n_node_samples,
+                                          weighted_n_node_samples,
+                                          value)
 
             # left child recursion
             recursive_partition(X, X_argsorted, y, sample_weight,
@@ -379,6 +406,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
     def __init__(self, criterion,
                        max_depth,
                        min_split,
+                       min_leaf,
                        min_density,
                        max_features,
                        compute_importances,
@@ -386,6 +414,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         self.criterion = criterion
         self.max_depth = max_depth
         self.min_split = min_split
+        self.min_leaf = min_leaf
         self.min_density = min_density
         self.max_features = max_features
         self.compute_importances = compute_importances
@@ -411,6 +440,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         y : array-like, shape = [n_samples]
             The target values (integers that correspond to classes in
             classification, real numbers in regression).
+
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
 
         Returns
         -------
@@ -477,6 +509,8 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
                              "number of samples=%d" % (len(y), n_samples))
         if self.min_split <= 0:
             raise ValueError("min_split must be greater than zero.")
+        if self.min_leaf <= 0:
+            raise ValueError("min_leaf must be greater than zero.")
         if max_depth <= 0:
             raise ValueError("max_depth must be greater than zero. ")
         if self.min_density < 0.0 or self.min_density > 1.0:
@@ -487,7 +521,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         # Build tree
         self.tree_ = _build_tree(X, y,
                                 is_classification, criterion,
-                                max_depth, self.min_split,
+                                max_depth, self.min_split, self.min_leaf,
                                 self.min_density, max_features,
                                 self.random_state, self.n_classes_,
                                 self.find_split_,
@@ -507,7 +541,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
 
                 else:
                     importances[self.tree_.feature[node]] += (
-                        self.tree_.n_samples[node] *
+                        self.tree_.weighted_n_samples[node] *
                             (self.tree_.init_error[node] -
                              self.tree_.best_error[node]))
 
@@ -571,8 +605,11 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
     min_split : integer, optional (default=1)
         The minimum number of samples required to split an internal node.
 
+    min_leaf : integer, optional (default=1)
+        The minimum number of samples required to be at a leaf node.
+
     min_density : float, optional (default=0.1)
-        This parameter trades runtime against memory requirement. It
+        This parameter controls a trade-off in an optimization heuristic. It
         controls the minimum density of the `sample_mask` (i.e. the
         fraction of samples in the mask). If the density falls below this
         threshold the mask is recomputed and the input data is packed
@@ -633,10 +670,6 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
     .. [4] L. Breiman, and A. Cutler, "Random Forests",
            http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
 
-    See also
-    --------
-    DecisionTreeRegressor
-
     Examples
     --------
     >>> from sklearn.datasets import load_iris
@@ -655,6 +688,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
     def __init__(self, criterion="gini",
                        max_depth=None,
                        min_split=1,
+                       min_leaf=1,
                        min_density=0.1,
                        max_features=None,
                        compute_importances=False,
@@ -662,6 +696,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         super(DecisionTreeClassifier, self).__init__(criterion,
                                                      max_depth,
                                                      min_split,
+                                                     min_leaf,
                                                      min_density,
                                                      max_features,
                                                      compute_importances,
@@ -731,8 +766,11 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
     min_split : integer, optional (default=1)
         The minimum number of samples required to split an internal node.
 
+    min_leaf : integer, optional (default=1)
+        The minimum number of samples required to be at a leaf node.
+
     min_density : float, optional (default=0.1)
-        This parameter trades runtime against memory requirement. It
+        This parameter controls a trade-off in an optimization heuristic. It
         controls the minimum density of the `sample_mask` (i.e. the
         fraction of samples in the mask). If the density falls below this
         threshold the mask is recomputed and the input data is packed
@@ -774,6 +812,10 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
 
             I(f) = \sum_{nodes A for which f is used} n_samples(A) * \Delta err
 
+    See also
+    --------
+    DecisionTreeClassifier
+
     Notes
     -----
     **References**:
@@ -788,10 +830,6 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
 
     .. [4] L. Breiman, and A. Cutler, "Random Forests",
            http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
-
-    See also
-    --------
-    DecisionTreeClassifier
 
     Examples
     --------
@@ -813,6 +851,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
     def __init__(self, criterion="mse",
                        max_depth=None,
                        min_split=1,
+                       min_leaf=1,
                        min_density=0.1,
                        max_features=None,
                        compute_importances=False,
@@ -820,6 +859,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         super(DecisionTreeRegressor, self).__init__(criterion,
                                                     max_depth,
                                                     min_split,
+                                                    min_leaf,
                                                     min_density,
                                                     max_features,
                                                     compute_importances,
@@ -852,6 +892,7 @@ class ExtraTreeClassifier(DecisionTreeClassifier):
     def __init__(self, criterion="gini",
                        max_depth=None,
                        min_split=1,
+                       min_leaf=1,
                        min_density=0.1,
                        max_features="auto",
                        compute_importances=False,
@@ -859,6 +900,7 @@ class ExtraTreeClassifier(DecisionTreeClassifier):
         super(ExtraTreeClassifier, self).__init__(criterion,
                                                   max_depth,
                                                   min_split,
+                                                  min_leaf,
                                                   min_density,
                                                   max_features,
                                                   compute_importances,
@@ -893,6 +935,7 @@ class ExtraTreeRegressor(DecisionTreeRegressor):
     def __init__(self, criterion="mse",
                        max_depth=None,
                        min_split=1,
+                       min_leaf=1,
                        min_density=0.1,
                        max_features="auto",
                        compute_importances=False,
@@ -900,6 +943,7 @@ class ExtraTreeRegressor(DecisionTreeRegressor):
         super(ExtraTreeRegressor, self).__init__(criterion,
                                                  max_depth,
                                                  min_split,
+                                                 min_leaf,
                                                  min_density,
                                                  max_features,
                                                  compute_importances,

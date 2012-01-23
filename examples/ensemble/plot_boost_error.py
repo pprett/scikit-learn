@@ -59,22 +59,20 @@ y_train, y_test = y[:n_split], y[n_split:]
 test_errors = []
 train_errors = []
 
-bdt = BoostedClassifier(DecisionTreeClassifier(min_split=10),
-                        n_estimators=50)
+bdt = BoostedClassifier(DecisionTreeClassifier(min_leaf=100),
+                        n_estimators=200)
 
-for i, boost in enumerate(bdt.fit_generator(X_train, y_train)):
+bdt.fit(X_train, y_train, verbose=True)
 
-    y_test_predict = boost.predict(X_test)
-    y_train_predict = boost.predict(X_train)
-    print "boost %d: weight: %.3f error: %.3f" % \
-          (i, boost.boost_weights_[-1], boost.errs_[-1])
+from itertools import izip
 
-    test_errors.append(sum(y_test_predict != y_test) / float(len(y_test)))
-    train_errors.append(sum(y_train_predict != y_train) / float(len(y_train)))
+for y_test_predict, y_train_predict in izip(bdt.iter_predict(X_test),
+                                            bdt.iter_predict(X_train)):
+    test_errors.append((y_test_predict != y_test).sum() / float(y_test.shape[0]))
+    train_errors.append((y_train_predict != y_train).sum() / float(y_train.shape[0]))
 
-n_trees = xrange(1, bdt.n_estimators + 1)
+n_trees = xrange(1, len(bdt) + 1)
 
-# Plot the feature importances of the trees and of the forest
 import pylab as pl
 pl.figure(figsize=(15, 5))
 
@@ -86,13 +84,18 @@ pl.ylabel('Error')
 pl.xlabel('Number of Trees')
 
 pl.subplot(1, 3, 2)
-pl.plot(n_trees, bdt.boost_weights_, "b")
-pl.ylabel('Boost Weight')
-pl.xlabel('Number of Trees')
-
-pl.subplot(1, 3, 3)
 pl.plot(n_trees, bdt.errs_, "b")
 pl.ylabel('Error')
 pl.xlabel('Tree')
+pl.ylim((.2, .8))
+pl.xlim((-20, len(bdt) + 20))
+
+pl.subplot(1, 3, 3)
+pl.plot(n_trees, bdt.boost_weights_, "b")
+pl.ylabel('Boost Weight')
+pl.xlabel('Number of Trees')
+pl.ylim((0, .8))
+pl.xlim((-20, len(bdt) + 20))
+
 
 pl.show()
