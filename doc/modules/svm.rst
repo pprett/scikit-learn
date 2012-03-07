@@ -82,9 +82,10 @@ training samples::
     >>> X = [[0, 0], [1, 1]]
     >>> Y = [0, 1]
     >>> clf = svm.SVC()
-    >>> clf.fit(X, Y)
-    SVC(C=1.0, cache_size=200, coef0=0.0, degree=3, gamma=0.5, kernel='rbf',
-      probability=False, scale_C=True, shrinking=True, tol=0.001)
+    >>> clf.fit(X, Y)  # doctest: +NORMALIZE_WHITESPACE
+    SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0, degree=3,
+    gamma=0.5, kernel='rbf', probability=False, scale_C=True, shrinking=True,
+    tol=0.001)
 
 After being fitted, the model can then be used to predict new values::
 
@@ -120,9 +121,10 @@ classifiers are constructed and each one trains data from two classes::
     >>> X = [[0], [1], [2], [3]]
     >>> Y = [0, 1, 2, 3]
     >>> clf = svm.SVC()
-    >>> clf.fit(X, Y)
-    SVC(C=1.0, cache_size=200, coef0=0.0, degree=3, gamma=1.0, kernel='rbf',
-      probability=False, scale_C=True, shrinking=True, tol=0.001)
+    >>> clf.fit(X, Y) # doctest: +NORMALIZE_WHITESPACE
+    SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0, degree=3,
+    gamma=1.0, kernel='rbf', probability=False, scale_C=True, shrinking=True,
+    tol=0.001)
     >>> dec = clf.decision_function([[1]])
     >>> dec.shape[1] # 4 classes: 4*3/2 = 6
     6
@@ -132,9 +134,10 @@ multi-class strategy, thus training n_class models. If there are only
 two classes, only one model is trained::
 
     >>> lin_clf = svm.LinearSVC()
-    >>> lin_clf.fit(X, Y)
-    LinearSVC(C=1.0, dual=True, fit_intercept=True, intercept_scaling=1,
-         loss='l2', multi_class=False, penalty='l2', scale_C=True, tol=0.0001)
+    >>> lin_clf.fit(X, Y) # doctest: +NORMALIZE_WHITESPACE
+    LinearSVC(C=1.0, class_weight=None, dual=True, fit_intercept=True,
+    intercept_scaling=1, loss='l2', multi_class=False, penalty='l2',
+    scale_C=True, tol=0.0001)
     >>> dec = lin_clf.decision_function([[1]])
     >>> dec.shape[1]
     4
@@ -258,9 +261,10 @@ floating point values instead of integer values::
     >>> X = [[0, 0], [2, 2]]
     >>> y = [0.5, 2.5]
     >>> clf = svm.SVR()
-    >>> clf.fit(X, y)
-    SVR(C=1.0, cache_size=200, coef0=0.0, degree=3, epsilon=0.1, gamma=0.5,
-      kernel='rbf', probability=False, scale_C=True, shrinking=True, tol=0.001)
+    >>> clf.fit(X, y) # doctest: +NORMALIZE_WHITESPACE
+    SVR(C=1.0, cache_size=200, coef0=0.0, degree=3,
+    epsilon=0.1, gamma=0.5, kernel='rbf', probability=False, scale_C=True,
+    shrinking=True, tol=0.001)
     >>> clf.predict([[1, 1]])
     array([ 1.5])
 
@@ -335,13 +339,16 @@ Tips on Practical Use
     the SGDClassifier class instead. The objective function can be
     configured to be almost the same as the LinearSVC model.
 
-
   * **Kernel cache size**: For SVC, SVR, nuSVC and NuSVR, the size of
     the kernel cache has a strong impact on run times for larger
     problems.  If you have enough RAM available, it is recommended to
     set `cache_size` to a higher value than the default of 200(MB),
     such as 500(MB) or 1000(MB).
 
+  * **Setting C**: In constrast to the scaling in LibSVM and LibLinear,
+    the ``C`` parameter in `sklearn.svm` is a per sample penalty.
+    Commonly good values for ``C`` often are very large (i.e. ``10**4``)
+    and seldom below ``1``.
 
   * Support Vector Machine algorithms are not scale invariant, so **it
     is highly recommended to scale your data**. For example, scale each
@@ -451,10 +458,10 @@ vectors and the test vectors must be provided.
     >>> clf = svm.SVC(kernel='precomputed')
     >>> # linear kernel computation
     >>> gram = np.dot(X, X.T)
-    >>> clf.fit(gram, y)
-    SVC(C=1.0, cache_size=200, coef0=0.0, degree=3, gamma=0.0,
-      kernel='precomputed', probability=False, scale_C=True, shrinking=True,
-      tol=0.001)
+    >>> clf.fit(gram, y) # doctest: +NORMALIZE_WHITESPACE
+    SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0, degree=3,
+    gamma=0.0, kernel='precomputed', probability=False, scale_C=True,
+    shrinking=True, tol=0.001)
     >>> # predict on training examples
     >>> clf.predict(gram)
     array([ 0.,  1.])

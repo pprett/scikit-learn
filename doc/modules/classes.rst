@@ -144,6 +144,7 @@ Loaders
    datasets.fetch_olivetti_faces
    datasets.load_sample_image
    datasets.load_sample_images
+   datasets.load_svmlight_file
 
 Samples generator
 -----------------
@@ -603,7 +604,7 @@ Regression metrics
    :template: function.rst
 
    metrics.r2_score
-   metrics.mean_square_error
+   metrics.mean_squared_error
 
 Clustering metrics
 ------------------

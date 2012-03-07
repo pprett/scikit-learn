@@ -40,12 +40,21 @@ Changelog
    - Added BIC/AIC model selection to classical :ref:`gmm` and unified 
      the API with the remainder of scikit-learn, by `Bertrand Thirion`_
 
-   - :ref:`k-means:` can now be run in parallel, using the `n_jobs` argument
+   - :ref:`k_means` can now be run in parallel, using the `n_jobs` argument
      to either :ref:`k_means` or :class:`KMeans`, by `Robert Layton`_.
 
    - Improved :ref:`cross_validation` and :ref:`grid_search` documentation
      and introduced the new :func:`cross_validation.train_test_split`
      helper function by `Olivier Grisel`_
+
+   - :class:`svm.SVC` members `coef_` and `intercept_` changed sign for consistency
+     with `decision_function`; for ``kernel==linear``, `coef_` was fixed
+     in the the one-vs-one case, by `Andreas Müller`_.
+
+   - Performance improvements to efficient leave-one-out cross-validated
+     Ridge regression, esp. for the ``n_samples > n_features`` case, in
+     :class:`linear_model.RidgeCV`, by Reuben Fletcher-Costin.
+
 
 
 API changes summary
@@ -64,6 +73,11 @@ API changes summary
    - attribute `_scores` and `_pvalues` in univariate feature selection
      objects are now deprecated.
      `scores_` or `pvalues_` should be used instead.
+
+   - In :class:`LogisticRegression`, :class:`LinearSVC`, :class:`SVC` and
+     :class:`NuSVC`, the `class_weight` parameter is now an initialization
+     parameter, not a parameter to fit. This makes grid searches
+     over this parameter possible.
 
    - LFW ``data`` is now always shape ``(n_samples, n_features)`` to be
      consistent with the Olivetti faces dataset. Use ``images`` and
