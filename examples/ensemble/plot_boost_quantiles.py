@@ -19,7 +19,6 @@ from sklearn.tree import DecisionTreeClassifier
 n_classes = 3
 plot_colors = "bry"
 plot_step = 0.02
-pl.set_cmap(pl.cm.Paired)
 
 model = AdaBoostClassifier(DecisionTreeClassifier(min_leaf=10),
                            n_estimators=200)
@@ -56,6 +55,8 @@ pl.axis("tight")
 for i, c in zip(xrange(n_classes), plot_colors):
     idx = np.where(y == i)
     pl.scatter(X[idx, 0], X[idx, 1], c=c)
+
+pl.set_cmap(pl.cm.Paired)
 
 pl.axis("tight")
 
