@@ -17,7 +17,7 @@ import scipy.sparse as sp
 
 from .base import is_classifier, clone
 from .utils import check_arrays, check_random_state
-from .utils.fixes import unique
+from .utils.fixes import unique, in1d
 from .externals.joblib import Parallel, delayed
 
 
@@ -204,6 +204,12 @@ class KFold(object):
         mask array. Integer indices are required when dealing with sparse
         matrices, since those cannot be indexed by boolean masks.
 
+    shuffle: boolean, optional
+        whether to shuffle the data before splitting into batches
+
+    random_state: int or RandomState
+            Pseudo number generator state used for random sampling.
+
     Examples
     --------
     >>> from sklearn import cross_validation
@@ -233,8 +239,10 @@ class KFold(object):
     classification tasks).
     """
 
-    def __init__(self, n, k, indices=True):
+    def __init__(self, n, k, indices=True, shuffle=False, random_state=None):
         _validate_kfold(k, n)
+        random_state = check_random_state(random_state)
+
         if abs(n - int(n)) >= np.finfo('f').eps:
             raise ValueError("n must be an integer")
         self.n = int(n)
@@ -242,6 +250,9 @@ class KFold(object):
             raise ValueError("k must be an integer")
         self.k = int(k)
         self.indices = indices
+        self.idxs = np.arange(n)
+        if shuffle:
+            random_state.shuffle(self.idxs)
 
     def __iter__(self):
         n = self.n
@@ -251,14 +262,13 @@ class KFold(object):
         for i in xrange(k):
             test_index = np.zeros(n, dtype=np.bool)
             if i < k - 1:
-                test_index[i * fold_size:(i + 1) * fold_size] = True
+                test_index[self.idxs[i * fold_size:(i + 1) * fold_size]] = True
             else:
-                test_index[i * fold_size:] = True
+                test_index[self.idxs[i * fold_size:]] = True
             train_index = np.logical_not(test_index)
             if self.indices:
-                ind = np.arange(n)
-                train_index = ind[train_index]
-                test_index = ind[test_index]
+                train_index = self.idxs[train_index]
+                test_index = self.idxs[test_index]
             yield train_index, test_index
 
     def __repr__(self):
@@ -325,10 +335,10 @@ class StratifiedKFold(object):
         _, y_sorted = unique(y, return_inverse=True)
         min_labels = np.min(np.bincount(y_sorted))
         if k > min_labels:
-            raise ValueError("Cannot have number of folds k=%d"
-                             " smaller than %d, the minimum"
-                             " number of labels for any class."
-                             % (k, min_labels))
+            raise ValueError("The least populated class in y has only %d"
+                             " members, which is too few. The minimum"
+                             " number of labels for any class cannot"
+                             " be less than k=%d." % (min_labels, k))
         self.y = y
         self.k = k
         self.indices = indices
@@ -383,7 +393,7 @@ class LeaveOneLabelOut(object):
         matrices, since those cannot be indexed by boolean masks.
 
     Examples
-    ----------
+    --------
     >>> from sklearn import cross_validation
     >>> X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
     >>> y = np.array([1, 2, 1, 2])
@@ -468,7 +478,7 @@ class LeavePLabelOut(object):
         matrices, since those cannot be indexed by boolean masks.
 
     Examples
-    ----------
+    --------
     >>> from sklearn import cross_validation
     >>> X = np.array([[1, 2], [3, 4], [5, 6]])
     >>> y = np.array([1, 2, 1])
@@ -632,7 +642,7 @@ class Bootstrap(object):
         self.random_state = random_state
 
     def __iter__(self):
-        rng = self.random_state = check_random_state(self.random_state)
+        rng = check_random_state(self.random_state)
         for i in range(self.n_bootstraps):
             # random partition
             permutation = rng.permutation(self.n)
@@ -743,7 +753,7 @@ class ShuffleSplit(object):
                 (train_fraction, test_fraction))
 
     def __iter__(self):
-        rng = self.random_state = check_random_state(self.random_state)
+        rng = check_random_state(self.random_state)
         n_test = ceil(self.test_fraction * self.n)
         if self.train_fraction is None:
             n_train = self.n - n_test
@@ -771,6 +781,168 @@ class ShuffleSplit(object):
                     self.n,
                     self.n_iterations,
                     str(self.test_fraction),
+                    self.indices,
+                    self.random_state,
+                ))
+
+    def __len__(self):
+        return self.n_iterations
+
+
+def _validate_stratified_shuffle_split(y, test_size, train_size):
+    y = unique(y, return_inverse=True)[1]
+    if np.min(np.bincount(y)) < 2:
+        raise ValueError("The least populated class in y has only 1"
+                         " member, which is too few. The minimum"
+                         " number of labels for any class cannot"
+                         " be less than 2.")
+
+    if isinstance(test_size, float) and test_size >= 1.:
+        raise ValueError(
+            'test_size=%f should be smaller '
+            'than 1.0 or be an integer' % test_size)
+    elif isinstance(test_size, int) and test_size >= y.size:
+        raise ValueError(
+            'test_size=%d should be smaller '
+            'than the number of samples %d' % (test_size, y.size))
+
+    if train_size is not None:
+        if isinstance(train_size, float) and train_size >= 1.:
+            raise ValueError("train_size=%f should be smaller "
+                             "than 1.0 or be an integer" % train_size)
+        elif isinstance(train_size, int) and train_size >= y.size:
+            raise ValueError("train_size=%d should be smaller "
+                             "than the number of samples %d" %
+                             (train_size, y.size))
+
+    if isinstance(test_size, float):
+        n_test = ceil(test_size * y.size)
+    else:
+        n_test = float(test_size)
+
+    if train_size is None:
+        if isinstance(test_size, float):
+            n_train = y.size - n_test
+        else:
+            n_train = float(y.size - test_size)
+    else:
+        if isinstance(train_size, float):
+            n_train = floor(train_size * y.size)
+        else:
+            n_train = float(train_size)
+
+    if n_train + n_test > y.size:
+        raise ValueError('The sum of n_train and n_test = %d, should '
+                         'be smaller than the number of samples %d. '
+                         'Reduce test_size and/or train_size.' %
+                         (n_train + n_test, y.size))
+
+    return n_train, n_test
+
+
+class StratifiedShuffleSplit(object):
+    """Stratified ShuffleSplit cross validation iterator
+
+    Provides train/test indices to split data in train test sets.
+
+    This cross-validation object is a merge of StratifiedKFold and
+    ShuffleSplit, which returns stratified randomized folds. The folds
+    are made by preserving the percentage of samples for each class.
+
+    Note: like the ShuffleSplit strategy, stratified random splits
+    do not guarantee that all folds will be different, although this is
+    still very likely for sizeable datasets.
+
+    Parameters
+    ----------
+    y: array, [n_samples]
+        Labels of samples.
+
+    n_iterations : int (default 10)
+        Number of re-shuffling & splitting iterations.
+
+    test_size : float (default 0.1) or int
+        If float, should be between 0.0 and 1.0 and represent the
+        proportion of the dataset to include in the test split. If
+        int, represents the absolute number of test samples.
+
+    train_size : float, int, or None (default is None)
+        If float, should be between 0.0 and 1.0 and represent the
+        proportion of the dataset to include in the train split. If
+        int, represents the absolute number of train samples. If None,
+        the value is automatically set to the complement of the test fraction.
+
+    indices: boolean, optional (default True)
+        Return train/test split as arrays of indices, rather than a boolean
+        mask array. Integer indices are required when dealing with sparse
+        matrices, since those cannot be indexed by boolean masks.
+
+    Examples
+    --------
+    >>> from sklearn.cross_validation import StratifiedShuffleSplit
+    >>> X = np.array([[1, 2], [3, 4], [1, 2], [3, 4]])
+    >>> y = np.array([0, 0, 1, 1])
+    >>> sss = StratifiedShuffleSplit(y, 3, test_size=0.5, random_state=0)
+    >>> len(sss)
+    3
+    >>> print sss       # doctest: +ELLIPSIS
+    StratifiedShuffleSplit(labels=[0 0 1 1], n_iterations=3, ...)
+    >>> for train_index, test_index in sss:
+    ...    print "TRAIN:", train_index, "TEST:", test_index
+    ...    X_train, X_test = X[train_index], X[test_index]
+    ...    y_train, y_test = y[train_index], y[test_index]
+    TRAIN: [0 3] TEST: [1 2]
+    TRAIN: [0 2] TEST: [1 3]
+    TRAIN: [1 2] TEST: [0 3]
+    """
+
+    def __init__(self, y, n_iterations=10, test_size=0.1,
+                 train_size=None, indices=True, random_state=None):
+
+        self.y = np.asarray(y)
+        self.n = self.y.shape[0]
+        self.n_iterations = n_iterations
+        self.test_size = test_size
+        self.train_size = train_size
+        self.random_state = random_state
+        self.indices = indices
+        self.n_train, self.n_test = \
+            _validate_stratified_shuffle_split(y, test_size, train_size)
+
+    def __iter__(self):
+        rng = check_random_state(self.random_state)
+
+        y = self.y.copy()
+        n = y.size
+        k = ceil(n / self.n_test)
+        l = floor((n - self.n_test) / self.n_train)
+
+        for i in xrange(self.n_iterations):
+            ik = i % k
+            permutation = rng.permutation(self.n)
+            idx = np.argsort(y[permutation])
+            ind_test = permutation[idx[ik::k]]
+            inv_test = np.setdiff1d(idx, idx[ik::k])
+            train_idx = idx[np.where(in1d(idx, inv_test))[0]]
+            ind_train = permutation[train_idx[::l]][:self.n_train]
+            test_index = ind_test
+            train_index = ind_train
+
+            if not self.indices:
+                test_index = np.zeros(n, dtype=np.bool)
+                test_index[ind_test] = True
+                train_index = np.zeros(n, dtype=np.bool)
+                train_index[ind_train] = True
+
+            yield train_index, test_index
+
+    def __repr__(self):
+        return ('%s(labels=%s, n_iterations=%d, test_size=%s, indices=%s, '
+                'random_state=%s)' % (
+                    self.__class__.__name__,
+                    self.y,
+                    self.n_iterations,
+                    str(self.test_size),
                     self.indices,
                     self.random_state,
                 ))
@@ -965,7 +1137,7 @@ def permutation_test_score(estimator, X, y, score_func, cv=None,
         The returned value equals p-value if `score_func` returns bigger
         numbers for better scores (e.g., zero_one). If `score_func` is rather a
         loss function (i.e. when lower is better such as with
-        `mean_square_error`) then this is actually the complement of the
+        `mean_squared_error`) then this is actually the complement of the
         p-value:  1 - p-value.
 
     Notes
@@ -996,3 +1168,85 @@ def permutation_test_score(estimator, X, y, score_func, cv=None,
 
 
 permutation_test_score.__test__ = False  # to avoid a pb with nosetests
+
+
+def train_test_split(*arrays, **options):
+    """Split arrays or matrices into random train and test subsets
+
+    Quick utility that wraps calls to ``check_arrays`` and
+    ``iter(ShuffleSplit(n_samples)).next()`` and application to input
+    data into a single call for splitting (and optionally subsampling)
+    data in a oneliner.
+
+    Parameters
+    ----------
+    *arrays : sequence of arrays or scipy.sparse matrices with same shape[0]
+        Python lists or tuples occurring in arrays are converted to 1D numpy
+        arrays.
+
+    test_fraction : float (default 0.25)
+        Should be between 0.0 and 1.0 and represent the proportion of
+        the dataset to include in the test split.
+
+    train_fraction : float or None (default is None)
+        Should be between 0.0 and 1.0 and represent the proportion of
+        the dataset to include in the train split. If None, the value is
+        automatically set to the complement of the test fraction.
+
+    random_state : int or RandomState
+        Pseudo-random number generator state used for random sampling.
+
+    dtype : a numpy dtype instance, None by default
+        Enforce a specific dtype.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sklearn.cross_validation import train_test_split
+    >>> a, b = np.arange(10).reshape((5, 2)), range(5)
+    >>> a
+    array([[0, 1],
+           [2, 3],
+           [4, 5],
+           [6, 7],
+           [8, 9]])
+    >>> b
+    [0, 1, 2, 3, 4]
+
+    >>> a_train, a_test, b_train, b_test = train_test_split(
+    ...     a, b, test_fraction=0.33, random_state=42)
+    ...
+    >>> a_train
+    array([[4, 5],
+           [0, 1],
+           [6, 7]])
+    >>> b_train
+    array([2, 0, 3])
+    >>> a_test
+    array([[2, 3],
+           [8, 9]])
+    >>> b_test
+    array([1, 4])
+
+    """
+    n_arrays = len(arrays)
+    if n_arrays == 0:
+        raise ValueError("At least one array required as input")
+
+    test_fraction = options.pop('test_fraction', 0.25)
+    train_fraction = options.pop('train_fraction', None)
+    random_state = options.pop('random_state', None)
+    options['sparse_format'] = 'csr'
+
+    arrays = check_arrays(*arrays, **options)
+    n_samples = arrays[0].shape[0]
+    cv = ShuffleSplit(n_samples, test_fraction=test_fraction,
+                      train_fraction=train_fraction,
+                      random_state=random_state,
+                      indices=True)
+    train, test = iter(cv).next()
+    splitted = []
+    for a in arrays:
+        splitted.append(a[train])
+        splitted.append(a[test])
+    return splitted

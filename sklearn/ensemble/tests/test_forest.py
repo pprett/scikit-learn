@@ -10,6 +10,7 @@ from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
 from numpy.testing import assert_almost_equal
+from nose.tools import assert_true
 
 from sklearn.grid_search import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
@@ -105,14 +106,14 @@ def test_boston():
     """Check consistency on dataset boston house prices."""
     for c in ("mse",):
         # Random forest
-        clf = RandomForestRegressor(n_estimators=10, criterion=c,
+        clf = RandomForestRegressor(n_estimators=5, criterion=c,
                                     random_state=1)
         clf.fit(boston.data, boston.target)
         score = clf.score(boston.data, boston.target)
         assert score < 3, ("Failed with max_features=None, "
                            "criterion %s and score = %f" % (c, score))
 
-        clf = RandomForestRegressor(n_estimators=10, criterion=c,
+        clf = RandomForestRegressor(n_estimators=5, criterion=c,
                                     max_features=6, random_state=1)
         clf.fit(boston.data, boston.target)
         score = clf.score(boston.data, boston.target)
@@ -120,13 +121,13 @@ def test_boston():
                            "criterion %s and score = %f" % (c, score))
 
         # Extra-trees
-        clf = ExtraTreesRegressor(n_estimators=10, criterion=c, random_state=1)
+        clf = ExtraTreesRegressor(n_estimators=5, criterion=c, random_state=1)
         clf.fit(boston.data, boston.target)
         score = clf.score(boston.data, boston.target)
         assert score < 3, ("Failed with max_features=None, "
                            "criterion %s and score = %f" % (c, score))
 
-        clf = ExtraTreesRegressor(n_estimators=10, criterion=c, max_features=6,
+        clf = ExtraTreesRegressor(n_estimators=5, criterion=c, max_features=6,
                                   random_state=1)
         clf.fit(boston.data, boston.target)
         score = clf.score(boston.data, boston.target)
@@ -137,7 +138,8 @@ def test_boston():
 def test_probability():
     """Predict probabilities."""
     # Random forest
-    clf = RandomForestClassifier(n_estimators=10, random_state=1)
+    clf = RandomForestClassifier(n_estimators=10, random_state=1,
+            max_features=1, max_depth=1)
     clf.fit(iris.data, iris.target)
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
@@ -145,7 +147,8 @@ def test_probability():
                               np.exp(clf.predict_log_proba(iris.data)))
 
     # Extra-trees
-    clf = ExtraTreesClassifier(n_estimators=10, random_state=1)
+    clf = ExtraTreesClassifier(n_estimators=10, random_state=1, max_features=1,
+            max_depth=1)
     clf.fit(iris.data, iris.target)
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
@@ -172,7 +175,11 @@ def test_importances():
     assert_equal(n_important, 3)
 
     X_new = clf.transform(X, threshold="mean")
-    assert 0 < X_new.shape[1] < X.shape[1]
+    assert_true(0 < X_new.shape[1] < X.shape[1])
+
+    clf = RandomForestClassifier(n_estimators=10)
+    clf.fit(X, y)
+    assert_true(clf.feature_importances_ is None)
 
 
 def test_oob_score_classification():
@@ -188,13 +195,13 @@ def test_oob_score_classification():
 def test_oob_score_regression():
     """Check that oob prediction is pessimistic estimate.
     Not really a good test that prediction is independent."""
-    clf = RandomForestRegressor(n_estimators=30, oob_score=True)
+    clf = RandomForestRegressor(n_estimators=50, oob_score=True)
     n_samples = boston.data.shape[0]
     clf.fit(boston.data[:n_samples / 2, :], boston.target[:n_samples / 2])
     test_score = clf.score(boston.data[n_samples / 2:, :],
-            boston.target[n_samples / 2:])
-    assert(test_score > clf.oob_score_)
-    assert(clf.oob_score_ > .8)
+                           boston.target[n_samples / 2:])
+    assert_true(test_score > clf.oob_score_)
+    assert_true(clf.oob_score_ > .8)
 
 
 def test_gridsearch():
@@ -220,7 +227,7 @@ def test_parallel():
     forest = RandomForestClassifier(n_estimators=10, n_jobs=3, random_state=0)
 
     forest.fit(iris.data, iris.target)
-    assert 10 == len(forest)
+    assert_true(10 == len(forest))
 
     forest.set_params(n_jobs=1)
     y1 = forest.predict(iris.data)
@@ -232,13 +239,13 @@ def test_parallel():
     forest = RandomForestRegressor(n_estimators=10, n_jobs=3, random_state=0)
 
     forest.fit(boston.data, boston.target)
-    assert 10 == len(forest)
+    assert_true(10 == len(forest))
 
     forest.set_params(n_jobs=1)
     y1 = forest.predict(boston.data)
     forest.set_params(n_jobs=2)
     y2 = forest.predict(boston.data)
-    assert_array_almost_equal(y1, y2, 10)
+    assert_array_almost_equal(y1, y2, 3)
 
     # Use all cores on the classification dataset
     forest = RandomForestClassifier(n_jobs=-1)
@@ -258,7 +265,7 @@ def test_pickle():
     obj2 = pickle.loads(s)
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(iris.data, iris.target)
-    assert score == score2
+    assert_true(score == score2)
 
     obj = RandomForestRegressor()
     obj.fit(boston.data, boston.target)
@@ -268,7 +275,7 @@ def test_pickle():
     obj2 = pickle.loads(s)
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(boston.data, boston.target)
-    assert score == score2
+    assert_true(score == score2)
 
     # Extra-trees
     obj = ExtraTreesClassifier()
@@ -279,7 +286,7 @@ def test_pickle():
     obj2 = pickle.loads(s)
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(iris.data, iris.target)
-    assert score == score2
+    assert_true(score == score2)
 
     obj = ExtraTreesRegressor()
     obj.fit(boston.data, boston.target)
@@ -289,7 +296,7 @@ def test_pickle():
     obj2 = pickle.loads(s)
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(boston.data, boston.target)
-    assert score == score2
+    assert_true(score == score2)
 
 
 if __name__ == "__main__":

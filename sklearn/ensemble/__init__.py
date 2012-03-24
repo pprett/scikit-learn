@@ -9,3 +9,5 @@ from .forest import RandomForestRegressor
 from .forest import ExtraTreesClassifier
 from .forest import ExtraTreesRegressor
 from .boosting import  AdaBoostClassifier
+from .gradient_boosting import GradientBoostingClassifier
+from .gradient_boosting import GradientBoostingRegressor

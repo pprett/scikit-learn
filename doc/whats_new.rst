@@ -4,21 +4,79 @@
 
 0.11
 ====
-   - Merged dense and sparse implementations and added `partial_fit` (support
-     for online/minibatch learning) to the :ref:`sgd` module by
-     `Mathieu Blondel`_.
 
-   - Dense and sparse implementations of :class:`svm.LinearSVC` and
+Changelog
+---------
+
+   - Gradient boosted regression trees (:ref:`gradient_boosting`)
+     for classification and regression by `Peter Prettenhofer`_
+     and `Scott White`_ .
+
+   - Merged dense and sparse implementations of :ref:`sgd` module and
+     exposed utility extension types for sequential
+     datasets :ref:`seq_dataset` and weight vectors :ref:`weight_vector`
+     by `Peter Prettenhofer`_.
+
+   - Added `partial_fit` (support for online/minibatch learning) and
+     warm_start to the :ref:`sgd` module by `Mathieu Blondel`_.
+
+   - Dense and sparse implementations of :ref:`svm` classes and
      :class:`linear_model.LogisticRegression` merged by `Lars Buitinck`_.
 
    - Regressors can now be used as base estimator in the :ref:`multiclass`
      module by `Mathieu Blondel`_.
 
-Changelog
----------
+   - Simple dict-based feature loader with support for categorical variables
+     (:class:`feature_extraction.DictVectorizer`) by `Lars Buitinck`_.
 
-    - :ref:`out_of_bag` of generalization error for :ref:`ensemble`
-      by `Andreas Müller`_.
+   - Added Matthews correlation coefficient (:func:`metrics.matthews_corrcoef`)
+     and added macro and micro average options to
+     :func:`metrics.precision_score`, :func:`metrics.recall_score` and
+     :func:`metrics.f1_score` by `Satrajit Ghosh`_.
+
+   - Added n_jobs option to :func:`metrics.pairwise.pairwise_distances`
+     and :func:`metrics.pairwise.pairwise_kernels` for parallel computation,
+     by `Mathieu Blondel`_.
+
+   - :ref:`out_of_bag` of generalization error for :ref:`ensemble`
+     by `Andreas Müller`_.
+
+   - :ref:`randomized_l1`: Randomized sparse linear models for feature
+     selection, by `Alexandre Gramfort`_ and `Gael Varoquaux`_
+
+   - :ref:`label_propagation` for semi-supervised learning, by Clay
+     Woolam. **Note** the semi-supervised API is still work in progress,
+     and may change.
+
+   - Added BIC/AIC model selection to classical :ref:`gmm` and unified
+     the API with the remainder of scikit-learn, by `Bertrand Thirion`_
+
+   - :ref:`k_means` can now be run in parallel, using the `n_jobs` argument
+     to either :ref:`k_means` or :class:`KMeans`, by `Robert Layton`_.
+
+   - Improved :ref:`cross_validation` and :ref:`grid_search` documentation
+     and introduced the new :func:`cross_validation.train_test_split`
+     helper function by `Olivier Grisel`_
+
+   - :class:`svm.SVC` members `coef_` and `intercept_` changed sign for consistency
+     with `decision_function`; for ``kernel==linear``, `coef_` was fixed
+     in the the one-vs-one case, by `Andreas Müller`_.
+
+   - Performance improvements to efficient leave-one-out cross-validated
+     Ridge regression, esp. for the ``n_samples > n_features`` case, in
+     :class:`linear_model.RidgeCV`, by Reuben Fletcher-Costin.
+
+   - Refactoring and simplication of the :ref:`text_feature_extraction`
+     API and fixed a bug that caused possible negative IDF,
+     by `Olivier Grisel`_.
+
+   - Beam pruning option in :class:`_BaseHMM` module has been removed since it
+     is difficult to cythonize. If you are interested in contributing a cython
+     version, you can use the python version in the git history as a reference.
+
+   - Added :class:`sklearn.cross_validation.StratifiedShuffleSplit`, which is
+     a :class:`sklearn.cross_validation.ShuffleSplit` with balanced splits,
+     by `Yannick Schwartz`_.
 
 
 API changes summary
@@ -30,6 +88,67 @@ API changes summary
      and/or :class:`RadiusNeighborsRegressor` instead.
 
    - Sparse classes in the :ref:`sgd` module are now deprecated.
+
+   - methods `rvs` and `decode` in :class:`GMM` module are now deprecated.
+     `sample` and `score` or `predict` should be used instead.
+
+   - attribute `_scores` and `_pvalues` in univariate feature selection
+     objects are now deprecated.
+     `scores_` or `pvalues_` should be used instead.
+
+   - In :class:`LogisticRegression`, :class:`LinearSVC`, :class:`SVC` and
+     :class:`NuSVC`, the `class_weight` parameter is now an initialization
+     parameter, not a parameter to fit. This makes grid searches
+     over this parameter possible.
+
+   - LFW ``data`` is now always shape ``(n_samples, n_features)`` to be
+     consistent with the Olivetti faces dataset. Use ``images`` and
+     ``pairs`` attribute to access the natural images shapes instead.
+
+   - Setting scale_C=True by default in SVM and LogisticRegression
+     models. This allows to have a regularization parameter independent
+     of the number of samples. The scale_C parameter will disappear in v0.12.
+
+   - In :class:`svm.LinearSVC`, the meaning of the `multi_class` parameter changed.
+     Options now are 'ovr' and 'crammer_singer', with 'ovr' being the default.
+     This does not change the default behavior but hopefully is less confusing.
+
+   - Classs :class:`feature_selection.text.Vectorizer` is deprecated and
+     replaced by :class:`feature_selection.text.TfidfVectorizer`.
+
+   - The preprocessor / analyzer nested structure for text feature
+     extraction has been removed. All those features are
+     now directly passed as flat constructor arguments
+     to :class:`feature_selection.text.TfidfVectorizer` and
+     :class:`feature_selection.text.CountVectorizer`, in particular the
+     following parameters are now used:
+
+       - ``analyzer`` can be `'word'` or `'char'` to switch the default
+         analysis scheme, or use a specific python callable (as previously).
+
+       - ``tokenizer`` and ``preprocessor`` have been introduced to make it
+         still possible to customize those steps with the new API.
+
+       - ``input`` explicitly control how to interpret the sequence passed to
+         ``fit`` and ``predict``: filenames, file objects or direct (byte or
+         unicode) strings.
+
+       - charset decoding is explicit and strict by default.
+
+       - the ``vocabulary``, fitted or not is now stored in the
+         ``vocabulary_`` attribute to be consistent with the project
+         conventions.
+
+   - Class :class:`feature_selection.text.TfidfVectorizer` now derives directly
+     from :class:`feature_selection.text.CountVectorizer` to make grid
+     search trivial.
+
+   - methods `rvs` in :class:`_BaseHMM` module are now deprecated.
+     `sample` should be used instead.
+
+   - Beam pruning option in :class:`_BaseHMM` module is removed since it is
+     difficult to be Cythonized. If you are interested, you can look in the
+     history codes by git.
 
 .. _changes_0_10:
 
@@ -963,3 +1082,7 @@ of commits):
 .. _Brian Holt: http://info.ee.surrey.ac.uk/Personal/B.Holt/
 
 .. _Satrajit Ghosh: http://www.mit.edu/~satra/
+
+.. _Robert Layton: http://www.twitter.com/robertlayton
+
+.. _Scott White: http://twitter.com/scottblanc

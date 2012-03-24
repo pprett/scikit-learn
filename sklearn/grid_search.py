@@ -24,7 +24,7 @@ class IterGrid(object):
     """Generators on the combination of the various parameter lists given
 
     Parameters
-    -----------
+    ----------
     param_grid: dict of string to sequence
         The parameter grid to explore, as a dictionary mapping estimator
         parameters to sequences of allowed values.
@@ -36,12 +36,17 @@ class IterGrid(object):
         allowed values.
 
     Examples
-    ---------
+    --------
     >>> from sklearn.grid_search import IterGrid
     >>> param_grid = {'a':[1, 2], 'b':[True, False]}
     >>> list(IterGrid(param_grid)) #doctest: +NORMALIZE_WHITESPACE
     [{'a': 1, 'b': True}, {'a': 1, 'b': False},
      {'a': 2, 'b': True}, {'a': 2, 'b': False}]
+
+    See also
+    --------
+    :class:`GridSearchCV`:
+        uses ``IterGrid`` to perform a full parallelized grid search.
     """
 
     def __init__(self, param_grid):
@@ -90,8 +95,20 @@ def fit_grid_point(X, y, sample_weight, base_clf, clf_params, train, test, loss_
             ind = np.arange(X.shape[0])
             train = ind[train]
             test = ind[test]
-        X_train = X[train]
-        X_test = X[test]
+        if hasattr(base_clf, 'kernel_function'):
+            # cannot compute the kernel values with custom function
+            raise ValueError(
+                "Cannot use a custom kernel function. "
+                "Precompute the kernel matrix instead.")
+        if getattr(base_clf, 'kernel', '') == 'precomputed':
+            # X is a precomputed square kernel matrix
+            if X.shape[0] != X.shape[1]:
+                raise ValueError("X should be a square kernel matrix")
+            X_train = X[np.ix_(train, train)]
+            X_test = X[np.ix_(test, train)]
+        else:
+            X_train = X[train]
+            X_test = X[test]
     if y is not None:
         y_test = y[test]
         y_train = y[train]
@@ -221,9 +238,9 @@ class GridSearchCV(BaseEstimator):
     >>> clf.fit(iris.data, iris.target)
     ...                             # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
     GridSearchCV(cv=None,
-        estimator=SVC(C=1.0, cache_size=..., coef0=..., degree=...,
+        estimator=SVC(C=None, cache_size=..., coef0=..., degree=...,
             gamma=..., kernel='rbf', probability=False,
-            scale_C=False, shrinking=True, tol=...),
+            scale_C=True, shrinking=True, tol=...),
         fit_params={}, iid=True, loss_func=None, n_jobs=1,
             param_grid=...,
             ...)
@@ -240,7 +257,6 @@ class GridSearchCV(BaseEstimator):
 
     `best_score_` : float
         score of best_estimator on the left out data.
-
 
     Notes
     ------
@@ -259,7 +275,13 @@ class GridSearchCV(BaseEstimator):
 
     See Also
     ---------
-    IterGrid
+    :class:`IterGrid`:
+        generates all the combinations of a an hyperparameter grid.
+
+    :func:`sklearn.cross_validation.train_test_split`:
+        utility function to split the data into a development set usable
+        for fitting a GridSearchCV instance and an evaluation set for
+        its final evaluation.
 
     """
 
@@ -361,6 +383,8 @@ class GridSearchCV(BaseEstimator):
                 score /= float(n_test_samples)
             scores.append((score, estimator))
             cv_scores.append(these_points)
+
+        cv_scores = np.asarray(cv_scores)
 
         # Note: we do not use max(out) to make ties deterministic even if
         # comparison on estimator instances is not deterministic

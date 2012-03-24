@@ -18,21 +18,50 @@ import scipy.sparse as sp
 from scipy import linalg
 import scipy.sparse.linalg as sp_linalg
 
+from ..externals.joblib import Parallel, delayed
 from ..base import BaseEstimator
 from ..base import RegressorMixin
-from ..base import ClassifierMixin
-from ..base import TransformerMixin
 from ..utils.extmath import safe_sparse_dot
 from ..utils import array2d, as_float_array, safe_asarray
+from ..utils.fixes import lsqr
+
 
 ###
 ### TODO: intercept for all models
 ### We should define a common function to center data instead of
 ### repeating the same code inside each fit method.
-###
-### Also, bayesian_ridge_regression and bayesian_regression_ard
+
+### TODO: bayesian_ridge_regression and bayesian_regression_ard
 ### should be squashed into its respective objects.
-###
+
+
+def center_data(X, y, fit_intercept, normalize=False, copy=True):
+    """
+    Centers data to have mean zero along axis 0. This is here because
+    nearly all linear models will want their data to be centered.
+    """
+    X = as_float_array(X, copy)
+
+    if fit_intercept:
+        if sp.issparse(X):
+            X_mean = np.zeros(X.shape[1])
+            X_std = np.ones(X.shape[1])
+        else:
+            X_mean = X.mean(axis=0)
+            X -= X_mean
+            if normalize:
+                X_std = np.sqrt(np.sum(X ** 2, axis=0))
+                X_std[X_std == 0] = 1
+                X /= X_std
+            else:
+                X_std = np.ones(X.shape[1])
+        y_mean = y.mean(axis=0)
+        y = y - y_mean
+    else:
+        X_mean = np.zeros(X.shape[1])
+        X_std = np.ones(X.shape[1])
+        y_mean = 0. if y.ndim == 1 else np.zeros(y.shape[1], dtype=X.dtype)
+    return X, y, X_mean, y_mean, X_std
 
 
 class LinearModel(BaseEstimator, RegressorMixin):
@@ -67,36 +96,7 @@ class LinearModel(BaseEstimator, RegressorMixin):
         """
         return self.decision_function(X)
 
-    @staticmethod
-    def _center_data(X, y, fit_intercept, normalize=False, copy=True):
-        """
-        Centers data to have mean zero along axis 0. This is here because
-        nearly all linear models will want their data to be centered.
-
-        If copy is False, modifies X in-place.
-        """
-        X = as_float_array(X, copy)
-
-        if fit_intercept:
-            if sp.issparse(X):
-                X_mean = np.zeros(X.shape[1])
-                X_std = np.ones(X.shape[1])
-            else:
-                X_mean = X.mean(axis=0)
-                X -= X_mean
-                if normalize:
-                    X_std = np.sqrt(np.sum(X ** 2, axis=0))
-                    X_std[X_std == 0] = 1
-                    X /= X_std
-                else:
-                    X_std = np.ones(X.shape[1])
-            y_mean = y.mean()
-            y = y - y_mean
-        else:
-            X_mean = np.zeros(X.shape[1])
-            X_std = np.ones(X.shape[1])
-            y_mean = 0.
-        return X, y, X_mean, y_mean, X_std
+    _center_data = staticmethod(center_data)
 
     def _set_intercept(self, X_mean, y_mean, X_std):
         """Set the intercept_
@@ -141,7 +141,7 @@ class LinearRegression(LinearModel):
         self.normalize = normalize
         self.copy_X = copy_X
 
-    def fit(self, X, y):
+    def fit(self, X, y, n_jobs=1):
         """
         Fit linear model.
 
@@ -149,8 +149,12 @@ class LinearRegression(LinearModel):
         ----------
         X : numpy array or sparse matrix of shape [n_samples,n_features]
             Training data
-        y : numpy array of shape [n_samples]
+        y : numpy array of shape [n_samples, n_responses]
             Target values
+        n_jobs : The number of jobs to use for the computation.
+            If -1 all CPUs are used. This will only provide speedup for
+            n_response > 1 and sufficient large problems
+
         Returns
         -------
         self : returns an instance of self.
@@ -162,17 +166,20 @@ class LinearRegression(LinearModel):
                 self.fit_intercept, self.normalize, self.copy_X)
 
         if sp.issparse(X):
-            if hasattr(sp_linalg, 'lsqr'):
-                out = sp_linalg.lsqr(X, y)
+            if y.ndim < 2:
+                out = lsqr(X, y)
                 self.coef_ = out[0]
                 self.residues_ = out[3]
             else:
-                # DEPENDENCY: scipy 0.7
-                self.coef_ = sp_linalg.spsolve(X, y)
-                self.residues_ = y - safe_sparse_dot(X, self.coef_)
+                # sparse_lstsq cannot handle y with shape (M, K)
+                outs = Parallel(n_jobs=n_jobs)(delayed(lsqr)
+                        (X, y[:, j].ravel()) for j in range(y.shape[1]))
+                self.coef_ = np.vstack(out[0] for out in outs)
+                self.residues_ = np.vstack(out[3] for out in outs)
         else:
             self.coef_, self.residues_, self.rank_, self.singular_ = \
                     linalg.lstsq(X, y)
+            self.coef_ = self.coef_.T
 
         self._set_intercept(X_mean, y_mean, X_std)
         return self
@@ -192,7 +199,7 @@ class BaseSGD(BaseEstimator):
                  verbose=0, seed=0, learning_rate="optimal", eta0=0.0,
                  power_t=0.5, warm_start=False):
         self.loss = str(loss)
-        self.penalty = str(penalty)
+        self.penalty = str(penalty).lower()
         self._set_loss_function(self.loss)
         self._set_penalty_type(self.penalty)
 
@@ -254,7 +261,7 @@ class BaseSGD(BaseEstimator):
         raise NotImplementedError("BaseSGD is an abstract class.")
 
     def _set_penalty_type(self, penalty):
-        penalty_types = {"l2": 2, "l1": 1, "elasticnet": 3}
+        penalty_types = {"none": 0, "l2": 2, "l1": 1, "elasticnet": 3}
         try:
             self.penalty_type = penalty_types[penalty]
         except KeyError:
@@ -333,22 +340,3 @@ class BaseSGD(BaseEstimator):
         n_samples, _ = X.shape
         if n_samples != y.shape[0]:
             raise ValueError("Shapes of X and y do not match.")
-
-
-class CoefSelectTransformerMixin(TransformerMixin):
-    """Mixin for linear models that can find sparse solutions."""
-
-    def transform(self, X, threshold=1e-10):
-        if len(self.coef_.shape) == 1 or self.coef_.shape[1] == 1:
-            # 2-class case
-            coef = np.ravel(self.coef_)
-        else:
-            # multi-class case
-            coef = np.mean(self.coef_, axis=0)
-
-        if sp.isspmatrix(X):
-            X = X.tocsc()
-            ind = np.arange(X.shape[1])
-            return X[:, ind[coef > threshold]]
-        else:
-            return X[:, coef > threshold]

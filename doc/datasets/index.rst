@@ -125,6 +125,7 @@ can be used to build artifical datasets of controled size and complexity.
    make_friedman1
    make_friedman2
    make_friedman3
+   make_hastie_10_2
    make_low_rank_matrix
    make_sparse_coded_signal
    make_sparse_uncorrelated
@@ -171,11 +172,11 @@ features::
  _`Faster API-compatible implementation`: https://github.com/mblondel/svmlight-loader
 
 
-.. include:: olivetti_faces.rst 
+.. include:: olivetti_faces.inc
 
-.. include:: twenty_newsgroups.rst
+.. include:: twenty_newsgroups.inc
 
-.. include:: mldata.rst
+.. include:: mldata.inc
 
-.. include:: labeled_faces.rst
+.. include:: labeled_faces.inc
 
