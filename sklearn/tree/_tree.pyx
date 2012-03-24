@@ -397,15 +397,15 @@ cdef class RegressionCriterion(Criterion):
         """
         self.n_right = self.n_samples
         self.n_left = 0
-        self.weighted_n_left = self.weighted_n_samples
-        self.weighted_n_right = 0.0
+        self.weighted_n_right = self.weighted_n_samples
+        self.weighted_n_left = 0.0
         self.mean_right = self.mean_init
         self.mean_left = 0.0
         self.sq_sum_right = self.sq_sum_init
         self.sq_sum_left = 0.0
         self.var_left = 0.0
         self.var_right = self.sq_sum_right - \
-            self.n_samples * (self.mean_right * self.mean_right)
+            self.weighted_n_samples * (self.mean_right * self.mean_right)
 
     cdef int update(self, int a, int b,
                     DTYPE_t *y, DTYPE_t *sample_weight,
@@ -872,8 +872,8 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
     # Compute the initial criterion value
     X_argsorted_i = <int *>X_argsorted.data
     criterion.init(y_ptr, sample_weight_ptr,
-                   sample_mask_ptr, n_samples, weighted_n_samples,
-                   n_total_samples)
+                   sample_mask_ptr,
+                   n_samples, weighted_n_samples, n_total_samples)
     initial_error = criterion.eval()
 
     if initial_error == 0:  # break early if the node is pure
