@@ -7,7 +7,8 @@ randomized trees.
 # Copyright (C) 2008-2011, Luis Pedro Coelho <luis@luispedro.org>
 # License: MIT. See COPYING.MIT file in the milk distribution
 
-# Authors: Brian Holt, Peter Prettenhofer, Satrajit Ghosh, Gilles Louppe
+# Authors: Brian Holt, Peter Prettenhofer, Satrajit Ghosh, Gilles Louppe,
+#          Noel Dawe
 # License: BSD3
 
 from __future__ import division
@@ -277,9 +278,11 @@ class Tree(object):
 
     def build(self, X, y, criterion, max_depth, min_samples_split,
               min_samples_leaf, min_density, max_features, random_state,
-              find_split, sample_mask=None, X_argsorted=None):
+              find_split, sample_mask=None, X_argsorted=None,
+              sample_weight=None):
         # Recursive algorithm
-        def recursive_partition(X, X_argsorted, y, sample_mask, depth,
+        def recursive_partition(X, X_argsorted, y, sample_weight,
+                                sample_mask, depth,
                                 parent, is_left_child):
             # Count samples
             n_node_samples = sample_mask.sum()
@@ -287,24 +290,35 @@ class Tree(object):
             if n_node_samples == 0:
                 raise ValueError("Attempting to find a split "
                                  "with an empty sample_mask")
+            if sample_weight is not None:
+                assert sample_weight.shape[0] == y.shape[0]
+                current_sample_weight = sample_weight[sample_mask]
+                weighted_n_node_samples = current_sample_weight.sum()
+            else:
+                current_sample_weight = None
+                weighted_n_node_samples = n_node_samples
 
             # Split samples
             if depth < max_depth and n_node_samples >= min_samples_split \
                and n_node_samples >= 2 * min_samples_leaf:
                 feature, threshold, best_error, init_error = find_split(
-                    X, y, X_argsorted, sample_mask, n_node_samples,
+                    X, y, X_argsorted, sample_weight, sample_mask,
+                    n_node_samples, weighted_n_node_samples,
                     min_samples_leaf, max_features, criterion, random_state)
             else:
                 feature = -1
-                init_error = _tree._error_at_leaf(y, sample_mask, criterion,
-                                                  n_node_samples)
+                init_error = _tree._error_at_leaf(y, sample_weight,
+                                                  sample_mask, criterion,
+                                                  n_node_samples,
+                                                  weighted_n_node_samples)
 
             value = criterion.init_value()
 
             # Current node is leaf
             if feature == -1:
                 self._add_leaf(parent, is_left_child, value,
-                               init_error, n_node_samples)
+                               init_error,
+                               n_node_samples, weighted_n_node_samples)
 
             # Current node is internal node (= split node)
             else:
@@ -314,6 +328,8 @@ class Tree(object):
                     X_argsorted = np.asfortranarray(
                         np.argsort(X.T, axis=1).astype(np.int32).T)
                     y = y[sample_mask]
+                    if sample_weight is not None:
+                        sample_weight = current_sample_weight
                     sample_mask = np.ones((X.shape[0],), dtype=np.bool)
 
                 # Split and and recurse
@@ -321,16 +337,18 @@ class Tree(object):
 
                 node_id = self._add_split_node(parent, is_left_child, feature,
                                                threshold, best_error,
-                                               init_error, n_node_samples,
+                                               init_error,
+                                               n_node_samples,
+                                               weighted_n_node_samples,
                                                value)
 
                 # left child recursion
-                recursive_partition(X, X_argsorted, y,
+                recursive_partition(X, X_argsorted, y, sample_weight,
                                     np.logical_and(split, sample_mask),
                                     depth + 1, node_id, True)
 
                 # right child recursion
-                recursive_partition(X, X_argsorted, y,
+                recursive_partition(X, X_argsorted, y, sample_weight,
                                     np.logical_and(np.logical_not(split),
                                                    sample_mask),
                                     depth + 1, node_id, False)
@@ -361,7 +379,8 @@ class Tree(object):
         self._resize(init_capacity)
 
         # Build the tree by recursive partitioning
-        recursive_partition(X, X_argsorted, y, sample_mask, 0, -1, False)
+        recursive_partition(X, X_argsorted, y, sample_weight,
+                            sample_mask, 0, -1, False)
 
         # Compactify the tree data structure
         self._resize(self.node_count)

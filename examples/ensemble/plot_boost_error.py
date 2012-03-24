@@ -24,7 +24,7 @@ y_train, y_test = y[:n_split], y[n_split:]
 test_errors = []
 train_errors = []
 
-bdt = AdaBoostClassifier(DecisionTreeClassifier(min_leaf=100),
+bdt = AdaBoostClassifier(DecisionTreeClassifier(min_samples_leaf=100),
                          n_estimators=200)
 
 bdt.fit(X_train, y_train, verbose=True)

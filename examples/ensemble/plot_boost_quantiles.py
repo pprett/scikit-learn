@@ -20,7 +20,7 @@ n_classes = 3
 plot_colors = "bry"
 plot_step = 0.02
 
-model = AdaBoostClassifier(DecisionTreeClassifier(min_leaf=10),
+model = AdaBoostClassifier(DecisionTreeClassifier(min_samples_leaf=10),
                            n_estimators=200)
 
 # Load data

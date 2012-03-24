@@ -28,7 +28,6 @@ n_classes = 3
 n_estimators = 30
 plot_colors = "bry"
 plot_step = 0.02
-pl.set_cmap(pl.cm.Paired)
 
 # Load data
 iris = load_iris()
@@ -91,6 +90,7 @@ for pair in ([0, 1], [0, 2], [2, 3]):
 
         plot_idx += 1
 
+pl.set_cmap(pl.cm.Paired)
 pl.suptitle("Decision surfaces of a decision tree and of "
             "a boosted decision tree.")
 pl.show()

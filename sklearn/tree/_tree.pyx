@@ -3,7 +3,7 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 #
-# Author: Peter Prettenhofer, Brian Holt, Gilles Louppe
+# Author: Peter Prettenhofer, Brian Holt, Gilles Louppe, Noel Dawe
 #
 # License: BSD Style.
 
