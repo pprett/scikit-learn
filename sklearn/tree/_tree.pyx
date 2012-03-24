@@ -383,8 +383,8 @@ cdef class RegressionCriterion(Criterion):
                 w = sample_weight[j]
             self.sq_sum_init += (y[j] * y[j] * w * w)
             self.mean_init += y[j] * w
-
-        self.mean_init = self.mean_init / self.weighted_n_samples
+        
+        self.mean_init /= self.weighted_n_samples
 
         self.reset()
 
