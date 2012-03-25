@@ -401,7 +401,7 @@ class Tree(object):
             or "squared".
         """
         if method == "gini":
-            method = lambda node: (self.n_samples[node] * \
+            method = lambda node: (self.weighted_n_samples[node] * \
                                      (self.init_error[node] -
                                       self.best_error[node]))
         elif method == "squared":
