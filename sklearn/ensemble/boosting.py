@@ -64,7 +64,8 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier()
         elif not isinstance(base_estimator, ClassifierMixin):
-            raise TypeError("estimator must be a subclass of ClassifierMixin")
+            raise TypeError("base_estimator must be a "
+                            "subclass of ClassifierMixin")
 
         super(AdaBoostClassifier, self).__init__(
             base_estimator=base_estimator,
@@ -166,12 +167,18 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                 sample_weight *= X.shape[0] / sample_weight.sum()
 
         # sum the importances
-        if self.compute_importances:
-            norm = sum(self.boost_weights_)
-            self.feature_importances_ = \
-                sum(weight * clf.feature_importances_ for
-                  weight, clf in zip(self.boost_weights_, self.estimators_)) \
-                / norm
+        try:
+            if self.compute_importances:
+                norm = sum(self.boost_weights_)
+                self.feature_importances_ = \
+                    sum(weight * clf.feature_importances_ for
+                      weight, clf in zip(self.boost_weights_, self.estimators_)) \
+                    / norm
+        except AttributeError:
+            raise AttributeError("Unable to compute feature importances "
+                                 "since base_estimator does not have a "
+                                 "feature_importances_ attribute")
+
         return self
 
     def predict(self, X):
@@ -193,7 +200,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         return self.classes_.take(
             np.argmax(self.predict_proba(X), axis=1),  axis=0)
 
-    def iter_predict(self, X):
+    def staged_predict(self, X):
         """Predict class for X.
 
         The predicted class of an input sample is computed as the weighted
@@ -211,7 +218,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         y : array of shape = [n_samples]
             The predicted classes.
         """
-        for proba in self.iter_predict_proba(X):
+        for proba in self.staged_predict_proba(X):
             yield self.classes_.take(np.argmax(proba, axis=1),  axis=0)
 
     def predict_proba(self, X):
@@ -247,7 +254,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             p /= norm
         return p
 
-    def iter_predict_proba(self, X):
+    def staged_predict_proba(self, X):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as

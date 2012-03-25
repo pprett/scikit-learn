@@ -31,8 +31,8 @@ bdt.fit(X_train, y_train, verbose=True)
 
 from itertools import izip
 
-for y_test_predict, y_train_predict in izip(bdt.iter_predict(X_test),
-                                            bdt.iter_predict(X_train)):
+for y_test_predict, y_train_predict in izip(bdt.staged_predict(X_test),
+                                            bdt.staged_predict(X_train)):
     test_errors.append((y_test_predict != y_test).sum() / float(y_test.shape[0]))
     train_errors.append((y_train_predict != y_train).sum() / float(y_train.shape[0]))
 
