@@ -121,11 +121,11 @@ cdef class ClassificationCriterion(Criterion):
     cdef ndarray_label_count_init
 
     def __init__(self, int n_classes):
-        cdef np.ndarray[DTYPE_t, ndim=1] ndarray_label_count_left \
+        cdef np.ndarray[np.float64_t, ndim=1] ndarray_label_count_left \
             = np.zeros((n_classes,), dtype=DTYPE, order='C')
-        cdef np.ndarray[DTYPE_t, ndim=1] ndarray_label_count_right \
+        cdef np.ndarray[np.float64_t, ndim=1] ndarray_label_count_right \
             = np.zeros((n_classes,), dtype=DTYPE, order='C')
-        cdef np.ndarray[DTYPE_t, ndim=1] ndarray_label_count_init \
+        cdef np.ndarray[np.float64_t, ndim=1] ndarray_label_count_init \
             = np.zeros((n_classes,), dtype=DTYPE, order='C')
 
         self.n_classes = n_classes
