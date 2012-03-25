@@ -107,9 +107,9 @@ cdef class ClassificationCriterion(Criterion):
     cdef int n_classes
     cdef int n_samples
     cdef double weighted_n_samples
-    cdef DTYPE_t* label_count_left
-    cdef DTYPE_t* label_count_right
-    cdef DTYPE_t* label_count_init
+    cdef np.float64_t* label_count_left
+    cdef np.float64_t* label_count_right
+    cdef np.float64_t* label_count_init
     cdef int n_left
     cdef int n_right
     cdef double weighted_n_left
@@ -122,11 +122,11 @@ cdef class ClassificationCriterion(Criterion):
 
     def __init__(self, int n_classes):
         cdef np.ndarray[np.float64_t, ndim=1] ndarray_label_count_left \
-            = np.zeros((n_classes,), dtype=DTYPE, order='C')
+            = np.zeros((n_classes,), dtype=np.float64, order='C')
         cdef np.ndarray[np.float64_t, ndim=1] ndarray_label_count_right \
-            = np.zeros((n_classes,), dtype=DTYPE, order='C')
+            = np.zeros((n_classes,), dtype=np.float64, order='C')
         cdef np.ndarray[np.float64_t, ndim=1] ndarray_label_count_init \
-            = np.zeros((n_classes,), dtype=DTYPE, order='C')
+            = np.zeros((n_classes,), dtype=np.float64, order='C')
 
         self.n_classes = n_classes
         self.n_samples = 0
@@ -135,9 +135,9 @@ cdef class ClassificationCriterion(Criterion):
         self.n_right = 0
         self.weighted_n_left = 0.0
         self.weighted_n_right = 0.0
-        self.label_count_left = <DTYPE_t *>ndarray_label_count_left.data
-        self.label_count_right = <DTYPE_t *>ndarray_label_count_right.data
-        self.label_count_init = <DTYPE_t *>ndarray_label_count_init.data
+        self.label_count_left = <np.float64_t *>ndarray_label_count_left.data
+        self.label_count_right = <np.float64_t *>ndarray_label_count_right.data
+        self.label_count_init = <np.float64_t *>ndarray_label_count_init.data
         self.ndarray_label_count_left = ndarray_label_count_left
         self.ndarray_label_count_right = ndarray_label_count_right
         self.ndarray_label_count_init = ndarray_label_count_init
