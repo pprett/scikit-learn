@@ -29,9 +29,11 @@ from ..base import ClassifierMixin
 from ..base import RegressorMixin
 from ..utils import check_random_state
 
-from ..tree.tree import Tree
+from ..tree.tree import _grow, LEAF
+from ..tree._tree import Tree
 from ..tree._tree import _find_best_split
 from ..tree._tree import _predict_regression_tree_inplace as _tree_predict
+from ..tree._tree import predict_chain
 from ..tree._tree import _random_sample_mask
 from ..tree._tree import _apply_tree
 from ..tree._tree import MSE
@@ -152,7 +154,7 @@ class LossFunction(object):
         masked_terminal_regions[~sample_mask] = -1
 
         # update each leaf (= perform line search)
-        for leaf in np.where(tree.children[:, 0] == Tree.LEAF)[0]:
+        for leaf in np.where(tree.children[:, 0] == LEAF)[0]:
             self._update_terminal_region(tree, masked_terminal_regions,
                                          leaf, X, y, residual,
                                          y_pred[:, k])
@@ -359,12 +361,12 @@ class BaseGradientBoosting(BaseEnsemble):
 
         self.random_state = check_random_state(random_state)
 
-        self.estimators_ = []
+        self.estimators_ = np.empty((0,), dtype=np.object)
 
-    def fit_stage(self, X, X_argsorted, y, y_pred, sample_mask):
+    def fit_stage(self, i, X, X_argsorted, y, y_pred, sample_mask):
         """Fit another stage of ``n_classes`` trees to the boosting model. """
         loss = self.loss_
-        self.estimators_.append([])
+        self.estimators_[i] = np.empty((loss.K,), dtype=np.object)
         original_y = y
 
         for k in range(loss.K):
@@ -375,10 +377,10 @@ class BaseGradientBoosting(BaseEnsemble):
 
             # induce regression tree on residuals
             tree = Tree(1, self.n_features)
-            tree.build(X, residual, MSE(), self.max_depth,
-                       self.min_samples_split, self.min_samples_leaf, 0.0,
-                       self.n_features, self.random_state, _find_best_split,
-                       sample_mask, X_argsorted)
+            _grow(tree, X, residual, MSE(), self.max_depth,
+                  self.min_samples_split, self.min_samples_leaf, 0.0,
+                  self.n_features, self.random_state, _find_best_split,
+                  sample_mask, X_argsorted)
 
             # update tree leaves
             self.loss_.update_terminal_regions(tree, X, y, residual, y_pred,
@@ -386,7 +388,7 @@ class BaseGradientBoosting(BaseEnsemble):
                                                k=k)
 
             # add tree to ensemble
-            self.estimators_[-1].append(tree)
+            self.estimators_[i][k] = tree
 
         return y_pred
 
@@ -438,7 +440,7 @@ class BaseGradientBoosting(BaseEnsemble):
         # init predictions
         y_pred = self.init.predict(X)
 
-        self.estimators_ = []
+        self.estimators_ = np.empty((self.n_estimators,), dtype=np.object)
 
         self.train_score_ = np.zeros((self.n_estimators,), dtype=np.float64)
         self.oob_score_ = np.zeros((self.n_estimators), dtype=np.float64)
@@ -456,7 +458,7 @@ class BaseGradientBoosting(BaseEnsemble):
                                                   self.random_state)
 
             # fit next stage of trees
-            y_pred = self.fit_stage(X, X_argsorted, y, y_pred, sample_mask)
+            y_pred = self.fit_stage(i, X, X_argsorted, y, y_pred, sample_mask)
 
             # track deviance (= loss)
             if self.subsample < 1.0:
@@ -490,11 +492,12 @@ class BaseGradientBoosting(BaseEnsemble):
                               k, y)
         else:
             y = self.init.predict(X)
-            for stage in self.estimators_:
-                for k, tree in enumerate(stage):
-                    _tree_predict(X, tree.children, tree.feature,
-                                  tree.threshold, tree.value, learn_rate,
-                                  k, y)
+            predict_chain(self.estimators_, X, learn_rate, y)
+            #for stage in self.estimators_:
+            #    for k, tree in enumerate(stage):
+            #        _tree_predict(X, tree.children, tree.feature,
+            #                      tree.threshold, tree.value, learn_rate,
+            #                      k, y)
 
         return y
 

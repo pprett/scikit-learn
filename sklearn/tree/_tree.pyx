@@ -104,7 +104,7 @@ cdef class ClassificationCriterion(Criterion):
     cdef ndarray_label_count_right
     cdef ndarray_label_count_init
 
-    def __init__(self, int n_classes):
+    def __cinit__(self, int n_classes):
         cdef np.ndarray[np.int32_t, ndim=1] ndarray_label_count_left \
             = np.zeros((n_classes,), dtype=np.int32, order='C')
         cdef np.ndarray[np.int32_t, ndim=1] ndarray_label_count_right \
@@ -296,7 +296,7 @@ cdef class RegressionCriterion(Criterion):
     cdef double var_left
     cdef double var_right
 
-    def __init__(self):
+    def __cinit__(self):
         self.n_samples = 0
         self.n_left = 0
         self.n_right = 0
@@ -465,7 +465,8 @@ def _predict_tree(np.ndarray[DTYPE_t, ndim=2] X,
                   np.ndarray[np.int32_t, ndim=1] feature,
                   np.ndarray[np.float64_t, ndim=1] threshold,
                   np.ndarray[np.float64_t, ndim=2] values,
-                  np.ndarray[np.float64_t, ndim=2] pred):
+                  np.ndarray[np.float64_t, ndim=2] pred,
+                  double scale):
     """Finds the terminal region (=leaf node) values for each sample. """
     cdef int i = 0
     cdef int n = X.shape[0]
@@ -480,10 +481,11 @@ def _predict_tree(np.ndarray[DTYPE_t, ndim=2] X,
             else:
                 node_id = children[node_id, 1]
         for k in xrange(K):
-            pred[i, k] = values[node_id, k]
+            pred[i, k] += scale * values[node_id, k]
 
 
-def _predict_regression_tree_inplace(np.ndarray[DTYPE_t, ndim=2] X,
+@cython.nonecheck(False)
+cpdef _predict_regression_tree_inplace(np.ndarray[DTYPE_t, ndim=2] X,
                                      np.ndarray[np.int32_t, ndim=2] children,
                                      np.ndarray[np.int32_t, ndim=1] feature,
                                      np.ndarray[np.float64_t, ndim=1] threshold,
@@ -508,7 +510,8 @@ def _predict_regression_tree_inplace(np.ndarray[DTYPE_t, ndim=2] X,
 
 
 def _error_at_leaf(np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
-                   np.ndarray sample_mask, Criterion criterion,
+                   np.ndarray sample_mask,
+                   Criterion criterion,
                    int n_samples):
     """Compute criterion error at leaf with terminal region defined
     by `sample_mask`. """
@@ -695,6 +698,7 @@ def _find_best_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
 
     return best_i, best_t, best_error, initial_error
 
+
 def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                             np.ndarray[DTYPE_t, ndim=1, mode="c"] y,
                             np.ndarray[np.int32_t, ndim=2, mode="fortran"] X_argsorted,
@@ -838,3 +842,178 @@ def _find_best_random_split(np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
             best_error = error
 
     return best_i, best_t, best_error, initial_error
+
+
+cdef int LEAF = -1
+cdef int UNDEFINED = -2
+
+
+@cython.final
+cdef class Tree:
+    """Struct-of-arrays representation of a binary decision tree.
+
+    The binary tree is represented as a number of parallel arrays.
+    The i-th element of each array holds information about the
+    node `i`. You can find a detailed description of all arrays
+    below. NOTE: Some of the arrays only apply to either leaves or
+    split nodes, resp. In this case the values of nodes of the other
+    type are arbitrary!
+
+    Attributes
+    ----------
+    node_count : int
+        Number of nodes (internal nodes + leaves) in the tree.
+
+    children : np.ndarray, shape=(node_count, 2), dtype=int32
+        `children[i, 0]` holds the node id of the left child of node `i`.
+        `children[i, 1]` holds the node id of the right child of node `i`.
+        For leaves `children[i, 0] == children[i, 1] == LEAF == -1`.
+
+    feature : np.ndarray of int32
+        The feature to split on (only for internal nodes).
+
+    threshold : np.ndarray of float64
+        The threshold of each node (only for leaves).
+
+    value : np.ndarray of float64, shape=(capacity, n_classes)
+        Contains the constant prediction value of each node.
+
+    best_error : np.ndarray of float64
+        The error of the (best) split.
+        For leaves `init_error == `best_error`.
+
+    init_error : np.ndarray of float64
+        The initial error of the node (before splitting).
+        For leaves `init_error == `best_error`.
+
+    n_samples : np.ndarray of np.int32
+        The number of samples at each node.
+    """
+
+    cdef public int n_classes
+    cdef public int n_features
+    cdef public int node_count
+
+    cdef public np.ndarray children
+    cdef public np.ndarray feature
+    cdef public np.ndarray threshold
+    cdef public np.ndarray value
+    cdef public np.ndarray best_error
+    cdef public np.ndarray init_error
+    cdef public np.ndarray n_samples
+
+    def __cinit__(self, n_classes, n_features, capacity=3):
+        self.n_classes = int(n_classes)
+        self.n_features = int(n_features)
+        self.node_count = 0
+
+        self.children = np.empty((capacity, 2), dtype=np.int32)
+        self.children.fill(UNDEFINED)
+
+        self.feature = np.empty((capacity,), dtype=np.int32)
+        self.feature.fill(UNDEFINED)
+
+        self.threshold = np.empty((capacity,), dtype=np.float64)
+        self.value = np.empty((capacity, n_classes), dtype=np.float64)
+
+        self.best_error = np.empty((capacity,), dtype=np.float32)
+        self.init_error = np.empty((capacity,), dtype=np.float32)
+        self.n_samples = np.empty((capacity,), dtype=np.int32)
+
+    cpdef _resize(self, capacity=None):
+        """Resize tree arrays to `capacity`, if `None` double capacity. """
+        if capacity is None:
+            capacity = int(self.children.shape[0] * 2.0)
+
+        if capacity == self.children.shape[0]:
+            return
+
+        self.children.resize((capacity, 2), refcheck=False)
+        self.feature.resize((capacity,), refcheck=False)
+        self.threshold.resize((capacity,), refcheck=False)
+        self.value.resize((capacity, self.value.shape[1]), refcheck=False)
+        self.best_error.resize((capacity,), refcheck=False)
+        self.init_error.resize((capacity,), refcheck=False)
+        self.n_samples.resize((capacity,), refcheck=False)
+
+        # if capacity smaller than node_count, adjust the counter
+        if capacity < self.node_count:
+            self.node_count = capacity
+
+    def _add_split_node(self, parent, is_left_child, feature, threshold,
+                        best_error, init_error, n_samples, value):
+        """Add a splitting node to the tree. The new node registers itself as
+        the child of its parent. """
+        node_id = self.node_count
+        if node_id >= self.children.shape[0]:
+            self._resize(None)
+
+        self.feature[node_id] = feature
+        self.threshold[node_id] = threshold
+
+        self.init_error[node_id] = init_error
+        self.best_error[node_id] = best_error
+        self.n_samples[node_id] = n_samples
+        self.value[node_id] = value
+
+        # set as left or right child of parent
+        if parent > LEAF:
+            if is_left_child:
+                self.children[parent, 0] = node_id
+            else:
+                self.children[parent, 1] = node_id
+
+        self.node_count += 1
+        return node_id
+
+    def _add_leaf(self, parent, is_left_child, value, error, n_samples):
+        """Add a leaf to the tree. The new node registers itself as the
+        child of its parent. """
+        node_id = self.node_count
+        if node_id >= self.children.shape[0]:
+            self._resize()
+
+        self.value[node_id] = value
+        self.n_samples[node_id] = n_samples
+        self.init_error[node_id] = error
+        self.best_error[node_id] = error
+
+        if is_left_child:
+            self.children[parent, 0] = node_id
+        else:
+            self.children[parent, 1] = node_id
+
+        self.children[node_id, :] = LEAF
+
+        self.node_count += 1
+        return node_id
+
+    cpdef predict(self, X, scale=1.0, out=None):
+        if out is None:
+            out = np.zeros((X.shape[0], self.value.shape[1]), dtype=np.float64)
+
+        _predict_tree(X, self.children,
+                      self.feature,
+                      self.threshold,
+                      self.value,
+                      out,
+                      scale)
+
+        return out
+
+@cython.nonecheck(False)
+def predict_chain(np.ndarray estimators,
+                  np.ndarray[DTYPE_t, ndim=2] X, double scale,
+                  np.ndarray[np.float64_t, ndim=2] pred):
+    cdef np.ndarray stage
+    cdef Tree tree
+    cdef int i
+    cdef int k
+    cdef int K = estimators[0].shape[0]
+    for i in range(estimators.shape[0]):
+        stage = <np.ndarray>estimators[i]
+        for k in range(K):
+            tree = <Tree>stage[k]
+            _predict_regression_tree_inplace(X, tree.children, tree.feature,
+                                             tree.threshold, tree.value,
+                                             scale, k, pred)
