@@ -22,6 +22,8 @@ uses.
 
 **User guide:** See the :ref:`clustering` section for further details.
 
+Classes
+-------
 .. currentmodule:: sklearn
 
 .. autosummary::
@@ -36,11 +38,19 @@ uses.
    cluster.SpectralClustering
    cluster.Ward
 
+Functions
+---------
 .. autosummary::
    :toctree: generated/
    :template: function.rst
 
    cluster.estimate_bandwidth
+   cluster.k_means
+   cluster.ward_tree
+   cluster.affinity_propagation
+   cluster.dbscan
+   cluster.mean_shift
+   cluster.spectral_clustering
 
 .. _covariance_ref:
 
@@ -60,12 +70,13 @@ uses.
    :template: class.rst
 
    covariance.EmpiricalCovariance
-   covariance.ShrunkCovariance
-   covariance.LedoitWolf
-   covariance.OAS
+   covariance.EllipticEnvelop
    covariance.GraphLasso
    covariance.GraphLassoCV
+   covariance.LedoitWolf
    covariance.MinCovDet
+   covariance.OAS
+   covariance.ShrunkCovariance
 
 .. autosummary::
    :toctree: generated/
@@ -502,6 +513,7 @@ For dense data
    linear_model.LinearRegression
    linear_model.Ridge
    linear_model.RidgeClassifier
+   linear_model.RidgeClassifierCV
    linear_model.RidgeCV
    linear_model.Lasso
    linear_model.LassoCV
