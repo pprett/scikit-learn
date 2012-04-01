@@ -58,9 +58,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
     def __init__(self, base_estimator=None,
                        n_estimators=10,
                        beta=.5,
-                       compute_importances=False,
-                       fit_params=None,
-                       ):
+                       compute_importances=False):
         if base_estimator is None:
             base_estimator = DecisionTreeClassifier()
         elif not isinstance(base_estimator, ClassifierMixin):
@@ -77,13 +75,17 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         self.boost_weights_ = list()
         self.errs_ = list()
         self.beta = beta
-        self.fit_params = fit_params if fit_params is not None else {}
         self.compute_importances = compute_importances
         self.feature_importances_ = None
         if compute_importances:
-            self.base_estimator.compute_importances = True
+            try:
+                self.base_estimator.compute_importances = True
+            except AttributeError:
+                raise AttributeError("Unable to compute feature importances "
+                                     "since base_estimator does not have a "
+                                     "compute_importances attribute")
 
-    def fit(self, X, y, sample_weight=None, verbose=False, **params):
+    def fit(self, X, y, sample_weight=None, **params):
         """Build a boosted classifier from the training set (X, y).
 
         Parameters
@@ -98,12 +100,15 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         sample_weight : array-like, shape = [n_samples], optional
             Sample weights
 
+        params : dict
+            extra keyword arguments passed to the fit method of
+            base_estimator.
+
         Returns
         -------
         self : object
             Returns self.
         """
-        self._set_params(**params)
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
 
@@ -133,10 +138,11 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                 # computations when calling fit + predict
                 # on the same input X
                 p = estimator.fit_predict(X, y,
-                    sample_weight=sample_weight, **self.fit_params)
+                                          sample_weight=sample_weight,
+                                          **params)
             else:
                 p = estimator.fit(X, y, sample_weight=sample_weight,
-                    **self.fit_params).predict(X)
+                                  **params).predict(X)
             # instances incorrectly classified
             incorrect = (p != y).astype(np.int32)
             # error fraction
@@ -145,9 +151,6 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             if err <= 0:
                 self.boost_weights_.append(1.)
                 self.errs_.append(err)
-                if verbose:
-                    print "boost %d: weight: %.3f error: %.3f" % \
-                        (boost, 1., err)
                 break
             # stop if the error is at least as bad as random guessing
             if err >= 1. - (1. / self.n_classes_):
@@ -158,9 +161,6 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
                                  math.log(self.n_classes_ - 1.))
             self.boost_weights_.append(alpha)
             self.errs_.append(err)
-            if verbose:
-                print "boost %d: weight: %.3f error: %.3f" % \
-                    (boost, alpha, err)
             if boost < self.n_estimators - 1:
                 sample_weight *= np.exp(alpha * incorrect)
                 # normalize
