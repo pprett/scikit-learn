@@ -14,7 +14,7 @@ Changelog
 
    - Merged dense and sparse implementations of :ref:`sgd` module and
      exposed utility extension types for sequential
-     datasets :ref:`seq_dataset` and weight vectors :ref:`weight_vector`
+     datasets `seq_dataset` and weight vectors `weight_vector`
      by `Peter Prettenhofer`_.
 
    - Added `partial_fit` (support for online/minibatch learning) and
@@ -76,8 +76,11 @@ Changelog
 
    - Added :class:`sklearn.cross_validation.StratifiedShuffleSplit`, which is
      a :class:`sklearn.cross_validation.ShuffleSplit` with balanced splits,
-     by `Yannick Schwartz`_.
+     by `Yannick Schwartz`.
 
+   - :class:`sklean.neighbors.NearestCentroid` classifier added, along with a
+      ``shrink_threshold`` parameter, which implements shrunken centroid
+      classification, by `Robert Layton`_.
 
 API changes summary
 -------------------
@@ -804,7 +807,7 @@ Changelog
 
   - Lots of cool new examples and a new section that uses real-world
     datasets was created. These include:
-    :ref:`example_applications_face_recognition.py`,
+    :ref:`example_applications_plot_face_recognition.py`,
     :ref:`example_applications_plot_species_distribution_modeling.py`,
     :ref:`example_applications_svm_gui.py`,
     :ref:`example_applications_wikipedia_principal_eigenvector.py` and

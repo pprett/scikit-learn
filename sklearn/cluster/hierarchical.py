@@ -80,6 +80,9 @@ def ward_tree(X, connectivity=None, n_components=None, copy=True):
             " connectivity matrix is %d > 1. Completing it to avoid"
             " stopping the tree early."
             % n_components)
+            if copy:
+                connectivity = connectivity.copy()
+                copy = False
             connectivity = _fix_connectivity(X, connectivity,
                                             n_components, labels)
             n_components = 1
@@ -203,6 +206,7 @@ def _fix_connectivity(X, connectivity, n_components, labels):
 
 ###############################################################################
 # Functions for cutting  hierarchical clustering tree
+
 
 def _hc_cut(n_clusters, children, n_leaves):
     """Function cutting the ward tree for a given number of clusters.
