@@ -54,7 +54,7 @@ __all__ = ["RandomForestClassifier",
 MAX_INT = np.iinfo(np.int32).max
 
 
-def _parallel_build_trees(n_trees, forest, X, y,
+def _parallel_build_trees(n_trees, forest, X, y, sample_weight,
                           sample_mask, X_argsorted, seed, verbose):
     """Private function used to build a batch of trees within a job."""
     random_state = check_random_state(seed)
@@ -72,12 +72,16 @@ def _parallel_build_trees(n_trees, forest, X, y,
         if forest.bootstrap:
             n_samples = X.shape[0]
             indices = random_state.randint(0, n_samples, n_samples)
-            tree.fit(X[indices], y[indices],
+            if sample_weight is not None:
+                curr_sample_weight = sample_weight[indices]
+            else:
+                curr_sample_weight = None
+            tree.fit(X[indices], y[indices], curr_sample_weight,
                      sample_mask=sample_mask, X_argsorted=X_argsorted)
             tree.indices_ = indices
 
         else:
-            tree.fit(X, y,
+            tree.fit(X, y, sample_weight,
                      sample_mask=sample_mask, X_argsorted=X_argsorted)
 
         trees.append(tree)
@@ -159,7 +163,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self.feature_importances_ = None
         self.verbose = verbose
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
         """Build a forest of trees from the training set (X, y).
 
         Parameters
@@ -170,6 +174,9 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         y : array-like, shape = [n_samples]
             The target values (integers that correspond to classes in
             classification, real numbers in regression).
+
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights
 
         Returns
         -------
@@ -208,6 +215,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                 self,
                 X,
                 y,
+                sample_weight,
                 sample_mask,
                 X_argsorted,
                 self.random_state.randint(MAX_INT),
