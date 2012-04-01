@@ -422,7 +422,9 @@ class Tree(object):
             else:
                 importances[self.feature[node]] += method(node)
 
-        importances /= np.sum(importances)
+        _sum = np.sum(importances)
+        if _sum != 0.:
+            importances /= _sum
 
         return importances
 
