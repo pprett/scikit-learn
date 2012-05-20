@@ -137,6 +137,8 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
             sys.stdout.write('.')
             sys.stdout.flush()
 
+    tiny = np.finfo(np.float).tiny  # to avoid division by 0 warning
+
     while True:
         if Cov.size:
             C_idx = np.argmax(np.abs(Cov))
@@ -226,8 +228,8 @@ def lars_path(X, y, Xy=None, Gram=None, max_iter=500,
             corr_eq_dir = np.dot(Gram[:n_active, n_active:].T,
                                  least_squares)
 
-        g1 = arrayfuncs.min_pos((C - Cov) / (AA - corr_eq_dir))
-        g2 = arrayfuncs.min_pos((C + Cov) / (AA + corr_eq_dir))
+        g1 = arrayfuncs.min_pos((C - Cov) / (AA - corr_eq_dir + tiny))
+        g2 = arrayfuncs.min_pos((C + Cov) / (AA + corr_eq_dir + tiny))
         gamma_ = min(g1, g2, C / AA)
 
         # TODO: better names for these variables: z
@@ -367,7 +369,7 @@ class Lars(LinearModel):
     ... # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     Lars(copy_X=True, eps=..., fit_intercept=True, n_nonzero_coefs=1,
        normalize=True, precompute='auto', verbose=False)
-    >>> print clf.coef_ # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    >>> print(clf.coef_) # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [ 0. -1.11...]
 
     See also
@@ -503,7 +505,7 @@ class LassoLars(Lars):
     ... # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     LassoLars(alpha=0.01, copy_X=True, eps=..., fit_intercept=True,
          max_iter=500, normalize=True, precompute='auto', verbose=False)
-    >>> print clf.coef_ # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    >>> print(clf.coef_) # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [ 0.         -0.963257...]
 
     See also
@@ -945,7 +947,7 @@ class LassoLarsIC(LassoLars):
     LassoLarsIC(copy_X=True, criterion='bic', eps=..., fit_intercept=True,
           max_iter=500, normalize=True, precompute='auto',
           verbose=False)
-    >>> print clf.coef_ # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+    >>> print(clf.coef_) # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
     [ 0.  -1.11...]
 
     Notes

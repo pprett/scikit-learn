@@ -1,4 +1,5 @@
-import cPickle as pickle
+import pickle
+from io import BytesIO
 import numpy as np
 import scipy.sparse
 
@@ -95,6 +96,10 @@ def test_discretenb_pickle():
         clf = pickle.load(StringIO(store.getvalue()))
 
         assert_array_equal(y_pred, clf.predict(X2))
+
+    store = BytesIO()
+    pickle.dump(clf, store)
+    clf = pickle.load(BytesIO(store.getvalue()))
 
 
 def test_input_check():
