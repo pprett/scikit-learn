@@ -145,6 +145,9 @@ array of shape [n_classes, n_features] and `intercept_` is a one
 dimensional array of shape [n_classes]. The i-th row of `coef_` holds
 the weight vector of the OVA classifier for the i-th class; classes are
 indexed in ascending order (see attribute `classes`).
+Note that, in principle, since they allow to create a probability model,
+`loss="log"` and `loss="modified_huber"` are more suitable for
+one-vs-all classification.
 
 :class:`SGDClassifier` supports both weighted classes and weighted
 instances via the fit parameters `class_weight` and `sample_weight`. See
@@ -341,7 +344,8 @@ where :math:`t` is the time step (there are a total of `n_samples * epochs`
 time steps), :math:`t_0` is determined based on a heuristic proposed by Léon Bottou
 such that the expected initial updates are comparable with the expected
 size of the weights (this assuming that the norm of the training samples is
-approx. 1). See `"The Tradeoffs of Large Scale Machine Learning" <http://leon.bottou.org/slides/largescale/lstut.pdf>`_ by Léon Bottou for further details.
+approx. 1). The exact definition can be found in ``_init_t`` in :class:`BaseSGD`.
+
 
 For regression, the default learning rate schedule, inverse scaling
 (`learning_rate='invscaling'`), is given by

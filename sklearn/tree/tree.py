@@ -13,6 +13,7 @@ randomized trees.
 
 from __future__ import division
 import numpy as np
+from abc import ABCMeta, abstractmethod
 
 from ..base import BaseEstimator, ClassifierMixin, RegressorMixin
 from ..feature_selection.selector_mixin import SelectorMixin
@@ -437,6 +438,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
     Warning: This class should not be used directly.
     Use derived classes instead.
     """
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
     def __init__(self, criterion,
                        max_depth,
                        min_samples_split,
@@ -668,9 +672,6 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         total reduction of error brought by that feature. It is also known as
         the Gini importance [4]_.
 
-        .. math::
-
-            I(f) = \sum_{nodes A for which f is used} n_samples(A) * \Delta err
 
     See also
     --------
@@ -830,9 +831,6 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         total reduction of error brought by that feature. It is also known as
         the Gini importance [4]_.
 
-        .. math::
-
-            I(f) = \sum_{nodes A for which f is used} n_samples(A) * \Delta err
 
     See also
     --------
