@@ -181,7 +181,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
 
         return self
 
-    def predict(self, X):
+    def predict(self, X, limit=-1):
         """Predict class for X.
 
         The predicted class of an input sample is computed as the weighted
@@ -192,15 +192,21 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
+        limit : int, optional (default=-1)
+            Use only the first N=limit classifiers for the prediction. This is
+            useful for grid searching the n_estimators parameter since it is not
+            necessary to fit separately for all choices of n_estimators, but
+            only the highest n_estimators.
+
         Returns
         -------
         y : array of shape = [n_samples]
             The predicted classes.
         """
         return self.classes_.take(
-            np.argmax(self.predict_proba(X), axis=1),  axis=0)
+            np.argmax(self.predict_proba(X, limit=limit), axis=1),  axis=0)
 
-    def staged_predict(self, X):
+    def staged_predict(self, X, limit=-1):
         """Predict class for X.
 
         The predicted class of an input sample is computed as the weighted
@@ -213,15 +219,18 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
+        limit : int, optional (default=-1)
+            See docs above for the predict method
+
         Returns
         -------
         y : array of shape = [n_samples]
             The predicted classes.
         """
-        for proba in self.staged_predict_proba(X):
+        for proba in self.staged_predict_proba(X, limit=limit):
             yield self.classes_.take(np.argmax(proba, axis=1),  axis=0)
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, limit=-1):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
@@ -232,6 +241,9 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         ----------
         X : array-like of shape = [n_samples, n_features]
             The input samples.
+
+        limit : int, optional (default=-1)
+            See docs above for the predict method
 
         Returns
         -------
@@ -243,7 +255,10 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
 
         norm = sum(self.boost_weights_)
-        for alpha, estimator in zip(self.boost_weights_, self.estimators_):
+        for i, (alpha, estimator) in enumerate(
+                zip(self.boost_weights_, self.estimators_)):
+            if i == limit:
+                break
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
             else:
@@ -254,7 +269,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             p /= norm
         return p
 
-    def staged_predict_proba(self, X):
+    def staged_predict_proba(self, X, limit=-1):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
@@ -268,6 +283,9 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
+        limit : int, optional (default=-1)
+            See docs above for the predict method
+
         Returns
         -------
         p : array of shape = [n_samples]
@@ -278,7 +296,10 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
 
         norm = 0.
-        for alpha, estimator in zip(self.boost_weights_, self.estimators_):
+        for i, (alpha, estimator) in enumerate(
+                zip(self.boost_weights_, self.estimators_)):
+            if i == limit:
+                break
             if self.n_classes_ == estimator.n_classes_:
                 p += alpha * estimator.predict_proba(X)
             else:
@@ -288,7 +309,7 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
             norm += alpha
             yield p / norm if norm > 0 else p
 
-    def predict_log_proba(self, X):
+    def predict_log_proba(self, X, limit=-1):
         """Predict class log-probabilities for X.
 
         The predicted class log-probabilities of an input sample is computed as
@@ -300,10 +321,13 @@ class AdaBoostClassifier(BaseEnsemble, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
+        limit : int, optional (default=-1)
+            See docs above for the predict method
+
         Returns
         -------
         p : array of shape = [n_samples]
             The class log-probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        return np.log(self.predict_proba(X))
+        return np.log(self.predict_proba(X, limit=limit))
