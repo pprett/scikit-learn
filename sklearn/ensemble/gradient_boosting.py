@@ -528,7 +528,7 @@ class BaseGradientBoosting(BaseEnsemble):
         self : object
             Returns self.
         """
-        X = np.asfortranarray(X, dtype=DTYPE)
+        X = np.asarray(X, dtype=DTYPE, order='F')
         y = np.ravel(y, order='C')
 
         n_samples, n_features = X.shape
@@ -959,6 +959,7 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
             Returns self.
         """
         self.n_classes_ = 1
+        y = np.asarray(y, dtype=np.float64, order='C')
         return super(GradientBoostingRegressor, self).fit(X, y)
 
     def predict(self, X):

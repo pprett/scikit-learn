@@ -149,6 +149,7 @@ def test_iris():
     for subsample in (1.0, 0.5):
         clf = GradientBoostingClassifier(n_estimators=100, loss='deviance',
                                          random_state=1, subsample=subsample)
+        print iris.target
         clf.fit(iris.data, iris.target)
         score = clf.score(iris.data, iris.target)
         assert score > 0.9, "Failed with subsample %.1f " \
@@ -195,13 +196,23 @@ def test_regression_synthetic():
 def test_feature_importances():
     clf = GradientBoostingRegressor(n_estimators=100, max_depth=4,
                                     min_samples_split=1, random_state=1)
-    clf.fit(boston.data, boston.target)
+    X = np.array(boston.data, dtype=np.float32)
+    y = np.array(boston.target, dtype=np.float64)
+    clf.fit(X, y)
     feature_importances = clf.feature_importances_
 
     # true feature importance ranking
     true_ranking = np.array([3, 1, 8, 10, 2, 9, 4, 11, 0, 6, 7, 5, 12])
 
     assert_array_equal(true_ranking, feature_importances.argsort())
+
+    clf.fit(X, boston.target)
+    assert_array_equal(feature_importances, clf.feature_importances_,
+                       err_msg='list')
+
+    clf.fit(X.astype(np.float64), y.astype(np.float64))
+    assert_array_equal(feature_importances, clf.feature_importances_,
+                       err_msg='float64')
 
 
 def test_probability():
@@ -412,3 +423,44 @@ def test_mem_layout():
     clf.fit(X, y_)
     assert_array_equal(clf.predict(T), true_result)
     assert_equal(100, len(clf.estimators_))
+
+def test_clf_prediction_consistency():
+    """Check clf consistency with different dtypes and layouts. """
+    X_ = np.asfortranarray(X)
+    clf = GradientBoostingClassifier(n_estimators=100, random_state=1)
+    clf.fit(X_, y)
+    y_pred = clf.predict(X_)
+
+    assert_array_equal(y_pred, clf.predict(X_.astype(np.float64)),
+                       err_msg='float64')
+
+    assert_array_equal(y_pred, clf.predict(X_.tolist()),
+                       err_msg='list')
+
+    assert_array_equal(y_pred, clf.predict(np.ascontiguousarray(X_)),
+                       err_msg='float32 - c-style')
+
+    assert_array_equal(y_pred, clf.predict(np.ascontiguousarray(
+        X_, dtype=np.float64)), err_msg='float64 - c-style')
+
+
+def test_reg_prediction_boston():
+    """Check regression consistency with different dtypes and layouts. """
+    X_ = np.asfortranarray(boston.data)
+    y_ = boston.target
+    clf = GradientBoostingRegressor(n_estimators=100, random_state=1)
+    clf.fit(X_, y_)
+    y_pred = clf.predict(X_)
+
+    assert_array_equal(y_pred, clf.predict(X_.astype(np.float64)),
+                       err_msg='float64')
+
+    assert_array_equal(y_pred, clf.predict(X_.tolist()),
+                       err_msg='list')
+
+    assert_array_equal(y_pred, clf.predict(np.ascontiguousarray(X_)),
+                       err_msg='float32 - c-style')
+
+    assert_array_equal(y_pred, clf.predict(np.ascontiguousarray(
+        X_, dtype=np.float64)), err_msg='float64 - c-style')
+
