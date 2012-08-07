@@ -27,7 +27,7 @@ train_errors = []
 bdt = AdaBoostClassifier(DecisionTreeClassifier(min_samples_leaf=100),
                          n_estimators=200)
 
-bdt.fit(X_train, y_train, verbose=True)
+bdt.fit(X_train, y_train)
 
 from itertools import izip
 
