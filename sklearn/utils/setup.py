@@ -1,29 +1,28 @@
+import os
 from os.path import join
-from numpy.distutils.system_info import get_info
 
+from sklearn._build_utils import get_blas_info
 
 def configuration(parent_package='', top_path=None):
     import numpy
     from numpy.distutils.misc_util import Configuration
 
     config = Configuration('utils', parent_package, top_path)
-
     config.add_subpackage('sparsetools')
 
-    # cd fast needs CBLAS
-    blas_info = get_info('blas_opt', 0)
-    if (not blas_info) or (
-        ('NO_ATLAS_INFO', 1) in blas_info.get('define_macros', [])):
-        cblas_libs = ['cblas']
-        blas_info.pop('libraries', None)
-    else:
-        cblas_libs = blas_info.pop('libraries', [])
+    cblas_libs, blas_info = get_blas_info()
+
+    libraries = []
+    if os.name == 'posix':
+        libraries.append('m')
+        cblas_libs.append('m')
 
     config.add_extension('arraybuilder',
          sources=['arraybuilder.c'])
 
     config.add_extension('sparsefuncs',
-         sources=['sparsefuncs.c'])
+         sources=['sparsefuncs.c'],
+         libraries=libraries)
 
     config.add_extension('arrayfuncs',
          sources=['arrayfuncs.c'],
@@ -51,7 +50,8 @@ def configuration(parent_package='', top_path=None):
 
     config.add_extension('weight_vector',
          sources=['weight_vector.c'],
-         include_dirs=[numpy.get_include()])
+         include_dirs=[numpy.get_include()],
+         libraries=libraries)
 
     return config
 

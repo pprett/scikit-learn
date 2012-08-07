@@ -68,13 +68,14 @@ def spectral_embedding(adjacency, n_components=8, mode=None,
         amg_loaded = True
     except ImportError:
         amg_loaded = False
+        if mode == "amg":
+            raise ValueError("The mode was set to 'amg', but pyamg is "
+                             "not available.")
 
     random_state = check_random_state(random_state)
 
     n_nodes = adjacency.shape[0]
     # XXX: Should we check that the matrices given is symmetric
-    if not amg_loaded:
-        warnings.warn('pyamg not available, using scipy.sparse')
     if mode is None:
         mode = 'arpack'
     laplacian, dd = graph_laplacian(adjacency,
@@ -139,8 +140,8 @@ def spectral_embedding(adjacency, n_components=8, mode=None,
     return embedding
 
 
-def spectral_clustering(affinity, k=8, n_components=None, mode=None,
-                        random_state=None, n_init=10):
+def spectral_clustering(affinity, n_clusters=8, n_components=None, mode=None,
+                        random_state=None, n_init=10, k=None):
     """Apply k-means to a projection to the normalized laplacian
 
     In practice Spectral Clustering is very useful when the structure of
@@ -163,7 +164,7 @@ def spectral_clustering(affinity, k=8, n_components=None, mode=None,
           - heat kernel of the pairwise distance matrix of the samples,
           - symmetic k-nearest neighbours connectivity matrix of the samples.
 
-    k: integer, optional
+    n_clusters: integer, optional
         Number of clusters to extract.
 
     n_components: integer, optional, default is k
@@ -189,9 +190,6 @@ def spectral_clustering(affinity, k=8, n_components=None, mode=None,
     labels: array of integers, shape: n_samples
         The labels of the clusters.
 
-    centers: array of integers, shape: k
-        The indices of the cluster centers
-
     References
     ----------
 
@@ -211,12 +209,15 @@ def spectral_clustering(affinity, k=8, n_components=None, mode=None,
     This algorithm solves the normalized cut for k=2: it is a
     normalized spectral clustering.
     """
+    if not k is None:
+        warnings.warn("'k' was renamed to n_clusters", DeprecationWarning)
+        n_clusters = k
     random_state = check_random_state(random_state)
-    n_components = k if n_components is None else n_components
+    n_components = n_clusters if n_components is None else n_components
     maps = spectral_embedding(affinity, n_components=n_components,
                               mode=mode, random_state=random_state)
     maps = maps[1:]
-    _, labels, _ = k_means(maps.T, k, random_state=random_state,
+    _, labels, _ = k_means(maps.T, n_clusters, random_state=random_state,
                     n_init=n_init)
     return labels
 
@@ -235,20 +236,20 @@ class SpectralClustering(BaseEstimator):
 
     Parameters
     -----------
-    k: integer, optional
+    n_clusters : integer, optional
         The dimension of the projection subspace.
 
-    mode: {None, 'arpack' or 'amg'}
+    mode : {None, 'arpack' or 'amg'}
         The eigenvalue decomposition strategy to use. AMG requires pyamg
         to be installed. It can be faster on very large, sparse problems,
         but may also lead to instabilities
 
-    random_state: int seed, RandomState instance, or None (default)
+    random_state : int seed, RandomState instance, or None (default)
         A pseudo random number generator used for the initialization
         of the lobpcg eigen vectors decomposition when mode == 'amg'
         and by the K-Means initialization.
 
-    n_init: int, optional, default: 10
+    n_init : int, optional, default: 10
         Number of time the k-means algorithm will be run with different
         centroid seeds. The final results will be the best output of
         n_init consecutive runs in terms of inertia.
@@ -271,8 +272,12 @@ class SpectralClustering(BaseEstimator):
       http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.165.9323
     """
 
-    def __init__(self, k=8, mode=None, random_state=None, n_init=10):
-        self.k = k
+    def __init__(self, n_clusters=8, mode=None, random_state=None, n_init=10,
+            k=None):
+        if not k is None:
+            warnings.warn("'k' was renamed to n_clusters", DeprecationWarning)
+            n_clusters = k
+        self.n_clusters = n_clusters
         self.mode = mode
         self.random_state = random_state
         self.n_init = n_init
@@ -306,7 +311,7 @@ class SpectralClustering(BaseEstimator):
         speeds up computation.
         """
         self.random_state = check_random_state(self.random_state)
-        self.labels_ = spectral_clustering(X, k=self.k, mode=self.mode,
-                                           random_state=self.random_state,
-                                           n_init=self.n_init)
+        self.labels_ = spectral_clustering(X, n_clusters=self.n_clusters,
+                mode=self.mode, random_state=self.random_state,
+                n_init=self.n_init)
         return self

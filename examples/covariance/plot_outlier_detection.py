@@ -52,7 +52,6 @@ n_outliers = int(outliers_fraction * n_samples)
 ground_truth = np.ones(n_samples, dtype=int)
 ground_truth[-n_outliers:] = 0
 
-
 # Fit the problem with varying cluster separation
 for i, offset in enumerate(clusters_separation):
     np.random.seed(42)
@@ -65,7 +64,6 @@ for i, offset in enumerate(clusters_separation):
 
     # Fit the model with the One-Class SVM
     pl.figure(figsize=(10, 5))
-    pl.set_cmap(pl.cm.Blues_r)
     for i, (clf_name, clf) in enumerate(classifiers.iteritems()):
         # fit the data and tag outliers
         clf.fit(X)
@@ -79,8 +77,8 @@ for i, offset in enumerate(clusters_separation):
         Z = Z.reshape(xx.shape)
         subplot = pl.subplot(1, 2, i + 1)
         subplot.set_title("Outlier detection")
-        subplot.contourf(xx, yy, Z,
-                         levels=np.linspace(Z.min(), threshold, 7))
+        subplot.contourf(xx, yy, Z, levels=np.linspace(Z.min(), threshold, 7),
+                cmap=pl.cm.Blues_r)
         a = subplot.contour(xx, yy, Z, levels=[threshold],
                             linewidths=2, colors='red')
         subplot.contourf(xx, yy, Z, levels=[threshold, Z.max()],

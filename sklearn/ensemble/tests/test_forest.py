@@ -12,6 +12,8 @@ from numpy.testing import assert_equal
 from numpy.testing import assert_almost_equal
 from nose.tools import assert_true
 
+from sklearn.utils.testing import assert_less, assert_greater
+
 from sklearn.grid_search import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
@@ -28,15 +30,15 @@ true_result = [-1, 1, 1]
 # also load the iris dataset
 # and randomly permute it
 iris = datasets.load_iris()
-np.random.seed([1])
-perm = np.random.permutation(iris.target.size)
+rng = np.random.RandomState(0)
+perm = rng.permutation(iris.target.size)
 iris.data = iris.data[perm]
 iris.target = iris.target[perm]
 
 # also load the boston dataset
 # and randomly permute it
 boston = datasets.load_boston()
-perm = np.random.permutation(boston.target.size)
+perm = rng.permutation(boston.target.size)
 boston.data = boston.data[perm]
 boston.target = boston.target[perm]
 
@@ -137,6 +139,8 @@ def test_boston():
 
 def test_probability():
     """Predict probabilities."""
+    olderr = np.seterr(divide="ignore")
+
     # Random forest
     clf = RandomForestClassifier(n_estimators=10, random_state=1,
             max_features=1, max_depth=1)
@@ -154,6 +158,8 @@ def test_probability():
                               np.ones(iris.data.shape[0]))
     assert_array_almost_equal(clf.predict_proba(iris.data),
                               np.exp(clf.predict_log_proba(iris.data)))
+
+    np.seterr(**olderr)
 
 
 def test_importances():
@@ -175,7 +181,7 @@ def test_importances():
     assert_equal(n_important, 3)
 
     X_new = clf.transform(X, threshold="mean")
-    assert_true(0 < X_new.shape[1] < X.shape[1])
+    assert_less(0 < X_new.shape[1], X.shape[1])
 
     clf = RandomForestClassifier(n_estimators=10)
     clf.fit(X, y)
@@ -186,7 +192,7 @@ def test_oob_score_classification():
     """Check that oob prediction is as acurate as
     usual prediction on the training set.
     Not really a good test that prediction is independent."""
-    clf = RandomForestClassifier(oob_score=True)
+    clf = RandomForestClassifier(oob_score=True, random_state=rng)
     clf.fit(X, y)
     training_score = clf.score(X, y)
     assert_almost_equal(training_score, clf.oob_score_)
@@ -195,13 +201,14 @@ def test_oob_score_classification():
 def test_oob_score_regression():
     """Check that oob prediction is pessimistic estimate.
     Not really a good test that prediction is independent."""
-    clf = RandomForestRegressor(n_estimators=50, oob_score=True)
+    clf = RandomForestRegressor(n_estimators=50, oob_score=True,
+            random_state=rng)
     n_samples = boston.data.shape[0]
     clf.fit(boston.data[:n_samples / 2, :], boston.target[:n_samples / 2])
     test_score = clf.score(boston.data[n_samples / 2:, :],
                            boston.target[n_samples / 2:])
-    assert_true(test_score > clf.oob_score_)
-    assert_true(clf.oob_score_ > .8)
+    assert_greater(test_score, clf.oob_score_)
+    assert_greater(clf.oob_score_, .8)
 
 
 def test_gridsearch():
@@ -257,7 +264,7 @@ def test_pickle():
     import pickle
 
     # Random forest
-    obj = RandomForestClassifier()
+    obj = RandomForestClassifier(random_state=0)
     obj.fit(iris.data, iris.target)
     score = obj.score(iris.data, iris.target)
     s = pickle.dumps(obj)
@@ -267,7 +274,7 @@ def test_pickle():
     score2 = obj2.score(iris.data, iris.target)
     assert_true(score == score2)
 
-    obj = RandomForestRegressor()
+    obj = RandomForestRegressor(random_state=0)
     obj.fit(boston.data, boston.target)
     score = obj.score(boston.data, boston.target)
     s = pickle.dumps(obj)
@@ -278,7 +285,7 @@ def test_pickle():
     assert_true(score == score2)
 
     # Extra-trees
-    obj = ExtraTreesClassifier()
+    obj = ExtraTreesClassifier(random_state=0)
     obj.fit(iris.data, iris.target)
     score = obj.score(iris.data, iris.target)
     s = pickle.dumps(obj)
@@ -288,7 +295,7 @@ def test_pickle():
     score2 = obj2.score(iris.data, iris.target)
     assert_true(score == score2)
 
-    obj = ExtraTreesRegressor()
+    obj = ExtraTreesRegressor(random_state=0)
     obj.fit(boston.data, boston.target)
     score = obj.score(boston.data, boston.target)
     s = pickle.dumps(obj)
@@ -297,6 +304,64 @@ def test_pickle():
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(boston.data, boston.target)
     assert_true(score == score2)
+
+
+def test_multioutput():
+    """Check estimators on multi-output problems."""
+    olderr = np.seterr(divide="ignore")
+
+    X = [[-2, -1],
+         [-1, -1],
+         [-1, -2],
+         [1, 1],
+         [1, 2],
+         [2, 1],
+         [-2, 1],
+         [-1, 1],
+         [-1, 2],
+         [2, -1],
+         [1, -1],
+         [1, -2]]
+
+    y = [[-1, 0],
+         [-1, 0],
+         [-1, 0],
+         [1, 1],
+         [1, 1],
+         [1, 1],
+         [-1, 2],
+         [-1, 2],
+         [-1, 2],
+         [1, 3],
+         [1, 3],
+         [1, 3]]
+
+    T = [[-1, -1], [1, 1], [-1, 1], [1, -1]]
+    y_true = [[-1, 0], [1, 1], [-1, 2], [1, 3]]
+
+    # toy classification problem
+    clf = ExtraTreesClassifier(random_state=0)
+    y_hat = clf.fit(X, y).predict(T)
+    assert_array_equal(y_hat, y_true)
+    assert_equal(y_hat.shape, (4, 2))
+
+    proba = clf.predict_proba(T)
+    assert_equal(len(proba), 2)
+    assert_equal(proba[0].shape, (4, 2))
+    assert_equal(proba[1].shape, (4, 4))
+
+    log_proba = clf.predict_log_proba(T)
+    assert_equal(len(log_proba), 2)
+    assert_equal(log_proba[0].shape, (4, 2))
+    assert_equal(log_proba[1].shape, (4, 4))
+
+    # toy regression problem
+    clf = ExtraTreesRegressor(random_state=5)
+    y_hat = clf.fit(X, y).predict(T)
+    assert_almost_equal(y_hat, y_true)
+    assert_equal(y_hat.shape, (4, 2))
+
+    np.seterr(**olderr)
 
 
 if __name__ == "__main__":

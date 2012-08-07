@@ -7,19 +7,25 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from sklearn.utils.testing import assert_less, assert_greater
+
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.svm import LinearSVC
 
 import numpy as np
+from nose import SkipTest
 from nose.tools import assert_equal, assert_equals, \
             assert_false, assert_not_equal, assert_true
 from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_raises
 
+from collections import defaultdict, Mapping
+from functools import partial
 import pickle
 from StringIO import StringIO
+
 
 JUNK_FOOD_DOCS = (
     "the pizza pizza beer copyright",
@@ -186,20 +192,20 @@ def test_char_ngram_analyzer():
 
 
 def test_countvectorizer_custom_vocabulary():
-    what_we_like = ["pizza", "beer"]
-    vect = CountVectorizer(vocabulary=what_we_like)
-    vect.fit(JUNK_FOOD_DOCS)
-    assert_equal(set(vect.vocabulary_), set(what_we_like))
-    X = vect.transform(JUNK_FOOD_DOCS)
-    assert_equal(X.shape[1], len(what_we_like))
-
-    # try again with a dict vocabulary
     vocab = {"pizza": 0, "beer": 1}
-    vect = CountVectorizer(vocabulary=vocab)
-    vect.fit(JUNK_FOOD_DOCS)
-    assert_equal(vect.vocabulary_, vocab)
-    X = vect.transform(JUNK_FOOD_DOCS)
-    assert_equal(X.shape[1], len(what_we_like))
+    terms = set(vocab.keys())
+
+    # Try a few of the supported types.
+    for typ in [dict, list, iter, partial(defaultdict, int)]:
+        v = typ(vocab)
+        vect = CountVectorizer(vocabulary=v)
+        vect.fit(JUNK_FOOD_DOCS)
+        if isinstance(v, Mapping):
+            assert_equal(vect.vocabulary_, vocab)
+        else:
+            assert_equal(set(vect.vocabulary_), terms)
+        X = vect.transform(JUNK_FOOD_DOCS)
+        assert_equal(X.shape[1], len(terms))
 
 
 def test_countvectorizer_custom_vocabulary_pipeline():
@@ -258,10 +264,21 @@ def test_tfidf_no_smoothing():
          [1, 0, 0]]
     tr = TfidfTransformer(smooth_idf=False, norm='l2')
 
+    # First we need to verify that numpy here provides div 0 warnings
+    with warnings.catch_warnings(record=True) as w:
+        1. / np.array([0.])
+        numpy_provides_div0_warning = len(w) == 1
+
     with warnings.catch_warnings(record=True) as w:
         tfidf = tr.fit_transform(X).toarray()
+        if not numpy_provides_div0_warning:
+            raise SkipTest("Numpy does not provide div 0 warnings.")
         assert_equal(len(w), 1)
-        assert_true("divide by zero encountered in divide" in w[0].message)
+        # For Python 3 compatibility
+        if hasattr(w[0].message, 'args'):
+            assert_true("divide by zero" in w[0].message.args[0])
+        else:
+            assert_true("divide by zero" in w[0].message)
 
 
 def test_sublinear_tf():
@@ -269,10 +286,10 @@ def test_sublinear_tf():
     tr = TfidfTransformer(sublinear_tf=True, use_idf=False, norm=None)
     tfidf = tr.fit_transform(X).toarray()
     assert_equal(tfidf[0], 1)
-    assert_true(tfidf[1] > tfidf[0])
-    assert_true(tfidf[2] > tfidf[1])
-    assert_true(tfidf[1] < 2)
-    assert_true(tfidf[2] < 3)
+    assert_greater(tfidf[1], tfidf[0])
+    assert_greater(tfidf[2], tfidf[1])
+    assert_less(tfidf[1], 2)
+    assert_less(tfidf[2], 3)
 
 
 def test_vectorizer():
