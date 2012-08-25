@@ -1,11 +1,15 @@
 """
 General tests for all estimators in sklearn.
 """
+import os
 import warnings
+import sys
+
 import numpy as np
 from nose.tools import assert_raises, assert_equal
 from numpy.testing import assert_array_equal
 
+import sklearn
 from sklearn.utils.testing import all_estimators
 from sklearn.utils.testing import assert_greater
 from sklearn.base import clone, ClassifierMixin, RegressorMixin
@@ -15,7 +19,7 @@ from sklearn.preprocessing import Scaler
 from sklearn.datasets import load_iris, load_boston
 from sklearn.metrics import zero_one_score
 from sklearn.lda import LDA
-from sklearn.svm.base import BaseLibSVM, BaseLibLinear
+from sklearn.svm.base import BaseLibSVM
 
 # import "special" estimators
 from sklearn.grid_search import GridSearchCV
@@ -44,7 +48,7 @@ def test_all_estimators():
             continue
         # test default-constructibility
         # get rid of deprecation warnings
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             if E in meta_estimators:
                 e = E(clf)
             else:
@@ -74,7 +78,7 @@ def test_classifiers_train():
             # TODO also test these!
             continue
         # catch deprecation warnings
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             clf = Clf()
         # fit
         clf.fit(X, y)
@@ -84,28 +88,27 @@ def test_classifiers_train():
         assert_greater(zero_one_score(y, y_pred), 0.78)
 
         # raises error on malformed input for predict
-        if isinstance(clf, BaseLibSVM) or isinstance(clf, BaseLibLinear):
-            # TODO: libsvm decision functions, input validation
-            continue
         assert_raises(ValueError, clf.predict, X.T)
         if hasattr(clf, "decision_function"):
             try:
-                # raises error on malformed input for decision_function
-                assert_raises(ValueError, clf.decision_function, X.T)
                 # decision_function agrees with predict:
                 decision = clf.decision_function(X)
                 assert_equal(decision.shape, (n_samples, n_labels))
-                assert_array_equal(np.argmax(decision, axis=1), y_pred)
+                if not isinstance(clf, BaseLibSVM):
+                    # 1on1 of LibSVM works differently
+                    assert_array_equal(np.argmax(decision, axis=1), y_pred)
+                # raises error on malformed input for decision_function
+                assert_raises(ValueError, clf.decision_function, X.T)
             except NotImplementedError:
                 pass
         if hasattr(clf, "predict_proba"):
             try:
-                # raises error on malformed input for predict_proba
-                assert_raises(ValueError, clf.predict_proba, X.T)
                 # predict_proba agrees with predict:
                 y_prob = clf.predict_proba(X)
                 assert_equal(y_prob.shape, (n_samples, n_labels))
                 assert_array_equal(np.argmax(y_prob, axis=1), y_pred)
+                # raises error on malformed input for predict_proba
+                assert_raises(ValueError, clf.predict_proba, X.T)
             except NotImplementedError:
                 pass
 
@@ -130,7 +133,7 @@ def test_classifiers_classes():
             continue
 
         # catch deprecation warnings
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             clf = Clf()
         # fit
         clf.fit(X, y)
@@ -138,8 +141,6 @@ def test_classifiers_classes():
         # training set performance
         assert_array_equal(np.unique(y), np.unique(y_pred))
         assert_greater(zero_one_score(y, y_pred), 0.78)
-
-
 
 
 def test_regressors_train():
@@ -157,7 +158,7 @@ def test_regressors_train():
         if Reg in dont_test or Reg in meta_estimators:
             continue
         # catch deprecation warnings
-        with warnings.catch_warnings(record=True) as w:
+        with warnings.catch_warnings(record=True):
             reg = Reg()
         if hasattr(reg, 'alpha'):
             reg.set_params(alpha=0.01)
@@ -166,3 +167,26 @@ def test_regressors_train():
         reg.fit(X, y)
         reg.predict(X)
         assert_greater(reg.score(X, y), 0.5)
+
+
+def test_configure():
+    # Smoke test the 'configure' step of setup, this tests all the
+    # 'configure' functions in the setup.pys in the scikit
+    cwd = os.getcwd()
+    setup_path = os.path.abspath(os.path.join(sklearn.__path__[0], '..'))
+    setup_filename = os.path.join(setup_path, 'setup.py')
+    if not os.path.exists(setup_filename):
+        return
+    try:
+        os.chdir(setup_path)
+        old_argv = sys.argv
+        sys.argv = ['setup.py', 'config']
+        with warnings.catch_warnings():
+            # The configuration spits out warnings when not finding
+            # Blas/Atlas development headers
+            warnings.simplefilter('ignore',  UserWarning)
+            execfile('setup.py', dict(__name__='__main__'))
+    finally:
+        sys.argv = old_argv
+        os.chdir(cwd)
+
