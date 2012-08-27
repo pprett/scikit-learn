@@ -14,6 +14,7 @@ from .base import get_data_home
 from .base import clear_data_home
 from .base import load_sample_images
 from .base import load_sample_image
+from .base import load_landsat
 from .mlcomp import load_mlcomp
 from .lfw import load_lfw_pairs
 from .lfw import load_lfw_people
