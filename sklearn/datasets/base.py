@@ -503,3 +503,26 @@ def load_sample_image(image_name):
     if index is None:
         raise AttributeError("Cannot find sample image: %s" % image_name)
     return images.images[index]
+
+
+def load_landsat():
+    """Load and return the LandSat dataset (classification).
+
+    ==============      ==================
+    Samples total       6435
+    Dimensionality      36
+    Features            integer, in [0,255]
+    Targets             integer, {1,2,3,4,5,7}
+    ==============      ==================
+
+    Returns
+    -------
+    data : Bunch
+        Dictionary-like object, the interesting attributes are:
+        'data', the data to learn and 'target', the class label
+        for each sample.
+    """
+    base_dir = join(dirname(__file__), 'data')
+    data = np.loadtxt(join(base_dir, 'landsat_data.csv.gz'))
+    target = np.loadtxt(join(base_dir, 'landsat_target.csv.gz'))
+    return Bunch(data=data, target=target)
