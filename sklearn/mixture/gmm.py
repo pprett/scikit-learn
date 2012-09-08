@@ -14,7 +14,7 @@ import warnings
 
 from ..base import BaseEstimator
 from ..utils import check_random_state, deprecated
-from ..utils.extmath import logsumexp
+from ..utils.extmath import logsumexp, pinvh
 from .. import cluster
 
 EPS = np.finfo(float).eps
@@ -308,12 +308,12 @@ class GMM(BaseEstimator):
         responsibilities = np.exp(lpr - logprob[:, np.newaxis])
         return logprob, responsibilities
 
-    @deprecated("""will be removed in v0.12;
+    @deprecated("""will be removed in v0.13;
     use the score or predict method instead, depending on the question""")
     def decode(self, X):
         """Find most likely mixture components for each point in X.
 
-        DEPRECATED IN VERSION 0.10; WILL BE REMOVED IN VERSION 0.12
+        DEPRECATED IN VERSION 0.11; WILL BE REMOVED IN VERSION 0.13.
         use the score or predict method instead, depending on the question.
 
         Parameters
@@ -381,7 +381,7 @@ class GMM(BaseEstimator):
         logprob, responsibilities = self.eval(X)
         return responsibilities
 
-    @deprecated("""will be removed in v0.12;
+    @deprecated("""will be removed in v0.13;
     use the score or predict method instead, depending on the question""")
     def rvs(self, n_samples=1, random_state=None):
         """Generate random samples from the model.
@@ -448,7 +448,7 @@ class GMM(BaseEstimator):
             corresponds to a single data point.
         """
         ## initialization step
-        X = np.asarray(X)
+        X = np.asarray(X, dtype=np.float)
         if X.ndim == 1:
             X = X[:, np.newaxis]
         if X.shape[0] < self.n_components:
@@ -457,8 +457,9 @@ class GMM(BaseEstimator):
                 (self.n_components, X.shape[0]))
         if kwargs:
             warnings.warn("Setting parameters in the 'fit' method is"
-                    "deprecated. Set it on initialization instead.",
-                    DeprecationWarning)
+                          "deprecated and will be removed in 0.13. Set it on "
+                          "initialization instead.", DeprecationWarning,
+                          stacklevel=2)
             # initialisations for in case the user still adds parameters to fit
             # so things don't break
             if 'n_iter' in kwargs:
@@ -473,7 +474,7 @@ class GMM(BaseEstimator):
             if 'init_params' in kwargs:
                 self.init_params = kwargs['init_params']
 
-        max_log_prob = - np.infty
+        max_log_prob = -np.infty
 
         for _ in range(self.n_init):
             if 'm' in self.init_params or not hasattr(self, 'means_'):
@@ -615,7 +616,7 @@ def _log_multivariate_normal_density_tied(X, means, covars):
     """Compute Gaussian log-density at X for a tied model"""
     from scipy import linalg
     n_samples, n_dim = X.shape
-    icv = linalg.pinv(covars)
+    icv = pinvh(covars)
     lpr = -0.5 * (n_dim * np.log(2 * np.pi) + np.log(linalg.det(covars) + 0.1)
                   + np.sum(X * np.dot(X, icv), 1)[:, np.newaxis]
                   - 2 * np.dot(np.dot(X, icv), means.T)

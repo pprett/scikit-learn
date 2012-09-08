@@ -46,7 +46,7 @@ from ..feature_selection.selector_mixin import SelectorMixin
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor, \
                    ExtraTreeClassifier, ExtraTreeRegressor
 from ..tree._tree import DTYPE, DOUBLE
-from ..utils import array2d, check_random_state
+from ..utils import array2d, check_random_state, check_arrays
 from ..metrics import r2_score
 
 from .base import BaseEnsemble
@@ -202,7 +202,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self.compute_importances = compute_importances
         self.oob_score = oob_score
         self.n_jobs = n_jobs
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
         self.n_features_ = None
         self.n_outputs_ = None
@@ -232,7 +232,10 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self : object
             Returns self.
         """
+        self.random_state = check_random_state(self.random_state)
+
         # Precompute some data
+        X, y = check_arrays(X, y, sparse_format="dense")
         if getattr(X, "dtype", None) != DTYPE or \
            X.ndim != 2 or not X.flags.fortran:
             X = array2d(X, dtype=DTYPE, order="F")
@@ -479,7 +482,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
         # Reduce
         p = all_p[0]
 
-        for j in xrange(1, self.n_jobs):
+        for j in xrange(1, len(all_p)):
             for k in xrange(self.n_outputs_):
                 p[k] += all_p[j][k]
 

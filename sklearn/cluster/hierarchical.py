@@ -14,7 +14,7 @@ import numpy as np
 from scipy import sparse
 from scipy.cluster import hierarchy
 
-from ..base import BaseEstimator
+from ..base import BaseEstimator, ClusterMixin
 from ..utils._csgraph import cs_graph_components
 from ..externals.joblib import Memory
 from ..metrics import euclidean_distances
@@ -243,7 +243,7 @@ def _hc_cut(n_clusters, children, n_leaves):
 
     Returns
     -------
-    labels : array [n_points]
+    labels : array [n_samples]
         cluster labels for each point
 
     """
@@ -273,7 +273,7 @@ def _hc_cut(n_clusters, children, n_leaves):
 ###############################################################################
 # Class for Ward hierarchical clustering
 
-class Ward(BaseEstimator):
+class Ward(BaseEstimator, ClusterMixin):
     """Ward hierarchical clustering: constructs a tree and cuts it.
 
     Parameters
@@ -313,7 +313,7 @@ class Ward(BaseEstimator):
     `children_` : array-like, shape = [n_nodes, 2]
         List of the children of each nodes.  Leaves of the tree do not appear.
 
-    `labels_` : array [n_points]
+    `labels_` : array [n_samples]
         cluster labels for each point
 
     `n_leaves_` : int
@@ -432,7 +432,7 @@ class WardAgglomeration(AgglomerationTransform, Ward):
         List of the children of each nodes.
         Leaves of the tree do not appear.
 
-    `labels_` : array [n_points]
+    `labels_` : array [n_samples]
         cluster labels for each point
 
     `n_leaves_` : int
