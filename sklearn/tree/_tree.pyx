@@ -364,7 +364,9 @@ cdef class Tree:
             self.node_count = capacity
 
     cpdef build(self, np.ndarray X, np.ndarray y,
-                np.ndarray sample_mask=None, np.ndarray X_argsorted=None):
+                np.ndarray sample_mask=None,
+                np.ndarray X_argsorted=None,
+                np.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y).
 
         Parameters
