@@ -301,8 +301,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
                                 self.min_density, max_features,
                                 self.find_split_, self.random_state)
 
-        self.tree_.build(X, y, sample_mask=sample_mask,
+        self.tree_.build(X, y,
                          sample_weight=sample_weight,
+                         sample_mask=sample_mask,
                          X_argsorted=X_argsorted)
 
         if self.compute_importances:
