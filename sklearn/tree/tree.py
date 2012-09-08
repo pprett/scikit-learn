@@ -172,8 +172,10 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         self.tree_ = None
         self.feature_importances_ = None
 
-    def fit(self, X, y, sample_weight=None,
-            sample_mask=None, X_argsorted=None):
+    def fit(self, X, y,
+            sample_mask=None,
+            X_argsorted=None,
+            sample_weight=None):
         """Build a decision tree from the training set (X, y).
 
         Parameters

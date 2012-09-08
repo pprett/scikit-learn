@@ -73,8 +73,9 @@ cdef class Tree:
     cdef void resize(self, int capacity=*)
 
     cpdef build(self, np.ndarray X, np.ndarray y,
-                np.ndarray sample_weight=*,
-                np.ndarray sample_mask=*, np.ndarray X_argsorted=*)
+                np.ndarray sample_mask=*,
+                np.ndarray X_argsorted=*,
+                np.ndarray sample_weight=*)
 
     cdef void recursive_partition(self,
                                   np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
