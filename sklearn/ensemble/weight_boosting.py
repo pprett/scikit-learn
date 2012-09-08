@@ -80,9 +80,10 @@ class BaseWeightBoosting(BaseEnsemble):
             try:
                 base_estimator.compute_importances = True
             except AttributeError:
-                raise AttributeError("Unable to compute feature importances "
-                                     "since base_estimator does not have a "
-                                     "compute_importances attribute")
+                raise AttributeError(
+                        "Unable to compute feature importances "
+                        "since base_estimator does not have a "
+                        "compute_importances attribute")
         super(BaseWeightBoosting, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators)
@@ -129,7 +130,7 @@ class BaseWeightBoosting(BaseEnsemble):
         self.boost_weights_ = list()
         self.errs_ = list()
 
-        for boost in xrange(self.n_estimators):
+        for iboost in xrange(self.n_estimators):
             estimator = self._make_estimator()
             if hasattr(estimator, 'fit_predict'):
                 # optim for estimators that are able to save redundant
@@ -141,12 +142,15 @@ class BaseWeightBoosting(BaseEnsemble):
                 p = estimator.fit(X, y,
                         sample_weight=sample_weight).predict(X)
 
-            sample_weight = self.boost(sample_weight, p, y,
-                    boost == self.n_estimators - 1)
+            sample_weight, alpha, err = self.boost(sample_weight, p, y,
+                    iboost == self.n_estimators - 1)
+            print alpha, err
             # early termination
             if sample_weight is None:
                 break
-            if boost < self.n_estimators - 1:
+            self.boost_weights_.append(alpha)
+            self.errs_.append(err)
+            if iboost < self.n_estimators - 1:
                 # normalize
                 sample_weight /= sample_weight.sum()
 
@@ -154,16 +158,84 @@ class BaseWeightBoosting(BaseEnsemble):
         try:
             if self.compute_importances:
                 norm = sum(self.boost_weights_)
-                self.feature_importances_ = \
-                    sum(weight * clf.feature_importances_ for
-                      weight, clf in zip(self.boost_weights_, self.estimators_)) \
-                    / norm
+                self.feature_importances_ = (
+                    sum(weight * clf.feature_importances_ for weight, clf
+                      in zip(self.boost_weights_, self.estimators_))
+                    / norm)
         except AttributeError:
-            raise AttributeError("Unable to compute feature importances "
-                                 "since base_estimator does not have a "
-                                 "feature_importances_ attribute")
+            raise AttributeError(
+                    "Unable to compute feature importances "
+                    "since base_estimator does not have a "
+                    "feature_importances_ attribute")
 
         return self
+
+    def predict(self, X, limit=-1):
+        """Predict class for X.
+
+        The predicted class of an input sample is computed as the weighted
+        mean prediction of the classifiers in the ensemble.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        limit : int, optional (default=-1)
+            Use only the first N=limit classifiers for the prediction. This is
+            useful for grid searching the n_estimators parameter since it is not
+            necessary to fit separately for all choices of n_estimators, but
+            only the highest n_estimators.
+
+        Returns
+        -------
+        y : array of shape = [n_samples]
+            The predicted classes.
+        """
+        X = np.atleast_2d(X)
+        p = np.zeros(X.shape[0], dtype=np.float64)
+
+        norm = sum(self.boost_weights_)
+        for i, (alpha, estimator) in enumerate(
+                zip(self.boost_weights_, self.estimators_)):
+            if i == limit:
+                break
+            p += alpha * estimator.predict(X)
+        p /= norm
+        return p
+
+    def staged_predict(self, X, limit=-1):
+        """Predict class for X.
+
+        The predicted class of an input sample is computed as the weighted
+        mean prediction of the classifiers in the ensemble.
+        This method allows monitoring (i.e. determine error on testing set)
+        after each boost. See examples/ensemble/plot_boost_error.py
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        limit : int, optional (default=-1)
+            See docs above for the predict method
+
+        Returns
+        -------
+        y : array of shape = [n_samples]
+            The predicted classes.
+        """
+        X = np.atleast_2d(X)
+        p = np.zeros(X.shape[0], dtype=np.float64)
+
+        norm = 0.
+        for i, (alpha, estimator) in enumerate(
+                zip(self.boost_weights_, self.estimators_)):
+            if i == limit:
+                break
+            p += alpha * estimator.predict(X)
+            norm += alpha
+            yield p / norm
 
 
 class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
@@ -218,71 +290,19 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         if err <= 0:
             self.boost_weights_.append(1.)
             self.errs_.append(err)
-            return None
+            return None, None, None
 
         # stop if the error is at least as bad as random guessing
         if err >= 1. - (1. / self.n_classes_):
             self.estimators_.pop(-1)
-            return None
+            return None, None, None
 
         # boost weight using multi-class AdaBoost SAMME alg
         alpha = self.learn_rate * (math.log((1. - err) / err) +
                              math.log(self.n_classes_ - 1.))
-
-        self.boost_weights_.append(alpha)
-        self.errs_.append(err)
         if not is_last:
             sample_weight *= np.exp(alpha * incorrect)
-        return sample_weight
-
-    def predict(self, X, limit=-1):
-        """Predict class for X.
-
-        The predicted class of an input sample is computed as the weighted
-        mean prediction of the classifiers in the ensemble.
-
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The input samples.
-
-        limit : int, optional (default=-1)
-            Use only the first N=limit classifiers for the prediction. This is
-            useful for grid searching the n_estimators parameter since it is not
-            necessary to fit separately for all choices of n_estimators, but
-            only the highest n_estimators.
-
-        Returns
-        -------
-        y : array of shape = [n_samples]
-            The predicted classes.
-        """
-        return self.classes_.take(
-            np.argmax(self.predict_proba(X, limit=limit), axis=1),  axis=0)
-
-    def staged_predict(self, X, limit=-1):
-        """Predict class for X.
-
-        The predicted class of an input sample is computed as the weighted
-        mean prediction of the classifiers in the ensemble.
-        This method allows monitoring (i.e. determine error on testing set)
-        after each boost. See examples/ensemble/plot_boost_error.py
-
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The input samples.
-
-        limit : int, optional (default=-1)
-            See docs above for the predict method
-
-        Returns
-        -------
-        y : array of shape = [n_samples]
-            The predicted classes.
-        """
-        for proba in self.staged_predict_proba(X, limit=limit):
-            yield self.classes_.take(np.argmax(proba, axis=1),  axis=0)
+        return sample_weight, alpha, err
 
     def predict_proba(self, X, limit=-1):
         """Predict class probabilities for X.
@@ -313,12 +333,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            if self.n_classes_ == estimator.n_classes_:
-                p += alpha * estimator.predict_proba(X)
-            else:
-                proba = alpha * estimator.predict_proba(X)
-                for j, c in enumerate(estimator.classes_):
-                    p[:, c] += proba[:, j]
+            p += alpha * estimator.predict_proba(X)
         if norm > 0:
             p /= norm
         return p
@@ -354,12 +369,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            if self.n_classes_ == estimator.n_classes_:
-                p += alpha * estimator.predict_proba(X)
-            else:
-                proba = alpha * estimator.predict_proba(X)
-                for j, c in enumerate(estimator.classes_):
-                    p[:, c] += proba[:, j]
+            p += alpha * estimator.predict_proba(X)
             norm += alpha
             yield p / norm if norm > 0 else p
 
@@ -437,88 +447,17 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
         if err == 0:
             self.boost_weights_.append(1.)
             self.errs_.append(err)
-            return None
+            return None, None, None
 
         # stop if the error is at least as bad as random guessing
         if err >= .5:
             self.estimators_.pop(-1)
-            return None
+            return None, None, None
 
         beta = err / (1. - err)
 
         # boost weight using AdaBoost.R2 alg
         alpha = self.learn_rate * math.log(1. / beta)
-
-        self.boost_weights_.append(alpha)
-        self.errs_.append(err)
         if not is_last:
             sample_weight *= np.power(beta, (1. - err_vect) * self.learn_rate)
-        return sample_weight
-
-    def predict(self, X, limit=-1):
-        """Predict class for X.
-
-        The predicted class of an input sample is computed as the weighted
-        mean prediction of the classifiers in the ensemble.
-
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The input samples.
-
-        limit : int, optional (default=-1)
-            Use only the first N=limit classifiers for the prediction. This is
-            useful for grid searching the n_estimators parameter since it is not
-            necessary to fit separately for all choices of n_estimators, but
-            only the highest n_estimators.
-
-        Returns
-        -------
-        y : array of shape = [n_samples]
-            The predicted classes.
-        """
-        X = np.atleast_2d(X)
-        p = np.zeros(X.shape[0], dtype=np.float64)
-
-        norm = sum(self.boost_weights_)
-        for i, (alpha, estimator) in enumerate(
-                zip(self.boost_weights_, self.estimators_)):
-            if i == limit:
-                break
-            p += alpha * estimator.predict(X)
-        if norm > 0:
-            p /= norm
-        return p
-
-    def staged_predict(self, X, limit=-1):
-        """Predict class for X.
-
-        The predicted class of an input sample is computed as the weighted
-        mean prediction of the classifiers in the ensemble.
-        This method allows monitoring (i.e. determine error on testing set)
-        after each boost. See examples/ensemble/plot_boost_error.py
-
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The input samples.
-
-        limit : int, optional (default=-1)
-            See docs above for the predict method
-
-        Returns
-        -------
-        y : array of shape = [n_samples]
-            The predicted classes.
-        """
-        X = np.atleast_2d(X)
-        p = np.zeros(X.shape[0], dtype=np.float64)
-
-        norm = 0.
-        for i, (alpha, estimator) in enumerate(
-                zip(self.boost_weights_, self.estimators_)):
-            if i == limit:
-                break
-            p += alpha * estimator.predict(X)
-            norm += alpha
-            yield p / norm if norm > 0 else p
+        return sample_weight, alpha, err
