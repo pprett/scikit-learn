@@ -67,7 +67,8 @@ class IterGrid(object):
                 yield params
 
 
-def fit_grid_point(X, y, sample_weight, base_clf, clf_params, train, test, loss_func,
+def fit_grid_point(X, y, sample_weight, base_clf,
+                   clf_params, train, test, loss_func,
                    score_func, verbose, **fit_params):
     """Run fit on one set of parameters
 
@@ -332,7 +333,7 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
         if hasattr(self.best_estimator_, 'predict_proba'):
             self.predict_proba = self.best_estimator_.predict_proba
 
-    def fit(self, X, y=None, sample_weight=None, **params):
+    def fit(self, X, y=None, sample_weight=None):
         """Run fit with all sets of parameters
 
         Returns the best classifier
@@ -351,9 +352,9 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
         sample_weight : array-like, shape = [n_samples], optional
             Sample weights
         """
-        return self._fit(X, y)
+        return self._fit(X, y, sample_weight)
 
-    def _fit(self, X, y):
+    def _fit(self, X, y, sample_weight):
         estimator = self.estimator
         cv = self.cv
 
@@ -436,9 +437,16 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
             # clone first to work around broken estimators
             best_estimator = clone(base_clf).set_params(**best_params)
             if y is not None:
-                best_estimator.fit(X, y, **self.fit_params)
+                if sample_weight is not None:
+                    best_estimator.fit(X, y, sample_weight, **self.fit_params)
+                else:
+                    best_estimator.fit(X, y, **self.fit_params)
             else:
-                best_estimator.fit(X, **self.fit_params)
+                if sample_weight is not None:
+                    best_estimator.fit(X, sample_weight=sample_weight,
+                            **self.fit_params)
+                else:
+                    best_estimator.fit(X, **self.fit_params)
             self.best_estimator_ = best_estimator
             self._set_methods()
 
