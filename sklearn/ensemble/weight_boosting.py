@@ -78,7 +78,7 @@ class BaseWeightBoosting(BaseEnsemble):
         self.feature_importances_ = None
         if compute_importances:
             try:
-                self.base_estimator.compute_importances = True
+                base_estimator.compute_importances = True
             except AttributeError:
                 raise AttributeError("Unable to compute feature importances "
                                      "since base_estimator does not have a "
