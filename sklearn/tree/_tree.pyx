@@ -450,9 +450,8 @@ cdef class Tree:
            n_node_samples >= 2 * self.min_samples_leaf:
             self.find_split(X_ptr, X_stride,
                             X_argsorted_ptr, X_argsorted_stride,
-                            y_ptr,
+                            y_ptr, y_stride,
                             sample_weight_ptr,
-                            y_stride,
                             sample_mask_ptr,
                             n_node_samples,
                             weighted_n_node_samples,
@@ -461,9 +460,11 @@ cdef class Tree:
 
         else:
             feature = -1
-            criterion.init(y_ptr, sample_weight_ptr, y_stride,
+            criterion.init(y_ptr, y_stride,
+                           sample_weight_ptr,
                            sample_mask_ptr,
-                           n_node_samples, weighted_n_node_samples,
+                           n_node_samples,
+                           weighted_n_node_samples,
                            n_total_samples)
             init_error = criterion.eval()
 
@@ -521,7 +522,8 @@ cdef class Tree:
                                           init_error, n_node_samples)
 
             # Left child recursion
-            self.recursive_partition(X, X_argsorted, y, sample_weight,
+            self.recursive_partition(X, X_argsorted,
+                                     y, sample_weight,
                                      sample_mask_left,
                                      n_node_samples_left,
                                      weighted_n_node_samples_left,
@@ -529,7 +531,8 @@ cdef class Tree:
                                      True, buffer_value)
 
             # Right child recursion
-            self.recursive_partition(X, X_argsorted, y, sample_weight,
+            self.recursive_partition(X, X_argsorted,
+                                     y, sample_weight,
                                      sample_mask_right,
                                      n_node_samples_right,
                                      weighted_n_node_samples_right,
@@ -600,8 +603,8 @@ cdef class Tree:
     cdef void find_split(self, DTYPE_t* X_ptr, int X_stride,
                          int* X_argsorted_ptr, int X_argsorted_stride,
                          DOUBLE_t* y_ptr,
-                         DOUBLE_t* sample_weight_ptr,
                          int y_stride,
+                         DOUBLE_t* sample_weight_ptr,
                          BOOL_t* sample_mask_ptr,
                          int n_node_samples,
                          double weighted_n_node_samples,
@@ -610,9 +613,10 @@ cdef class Tree:
                          double* _initial_error):
         """Find the best dimension and threshold that minimises the error."""
         if self.find_split_algorithm == _TREE_SPLIT_BEST:
-            self.find_best_split(X_ptr, X_stride, X_argsorted_ptr,
-                                 X_argsorted_stride, y_ptr, sample_weight_ptr,
-                                 y_stride,
+            self.find_best_split(X_ptr, X_stride,
+                                 X_argsorted_ptr, X_argsorted_stride,
+                                 y_ptr, y_stride,
+                                 sample_weight_ptr,
                                  sample_mask_ptr,
                                  n_node_samples,
                                  weighted_n_node_samples,
@@ -620,9 +624,10 @@ cdef class Tree:
                                  _best_error, _initial_error)
 
         elif self.find_split_algorithm == _TREE_SPLIT_RANDOM:
-            self.find_random_split(X_ptr, X_stride, X_argsorted_ptr,
-                                   X_argsorted_stride, y_ptr, sample_weight_ptr,
-                                   y_stride,
+            self.find_random_split(X_ptr, X_stride,
+                                   X_argsorted_ptr, X_argsorted_stride,
+                                   y_ptr, y_stride,
+                                   sample_weight_ptr,
                                    sample_mask_ptr,
                                    n_node_samples,
                                    weighted_n_node_samples,
@@ -631,8 +636,8 @@ cdef class Tree:
 
     cdef void find_best_split(self, DTYPE_t* X_ptr, int X_stride,
                               int* X_argsorted_ptr, int X_argsorted_stride,
-                              DOUBLE_t* y_ptr, DOUBLE_t* sample_weight_ptr,
-                              int y_stride,
+                              DOUBLE_t* y_ptr, int y_stride,
+                              DOUBLE_t* sample_weight_ptr,
                               BOOL_t* sample_mask_ptr,
                               int n_node_samples,
                               double weighted_n_node_samples,
@@ -661,8 +666,9 @@ cdef class Tree:
         cdef np.ndarray[np.int32_t, ndim=1, mode="c"] features = None
 
         # Compute the initial criterion value in the node
-        criterion.init(y_ptr, sample_weight_ptr,
-                       y_stride, sample_mask_ptr,
+        criterion.init(y_ptr, y_stride,
+                       sample_weight_ptr,
+                       sample_mask_ptr,
                        n_node_samples,
                        weighted_n_node_samples,
                        n_total_samples)
@@ -713,8 +719,9 @@ cdef class Tree:
                     break
 
                 # Better split than the best so far?
-                n_left = criterion.update(a, b, y_ptr, sample_weight_ptr,
-                                          y_stride, X_argsorted_i,
+                n_left = criterion.update(a, b, y_ptr, y_stride,
+                                          X_argsorted_i,
+                                          sample_weight_ptr,
                                           sample_mask_ptr)
 
                 # Only consider splits that respect min_leaf
@@ -746,8 +753,8 @@ cdef class Tree:
 
     cdef void find_random_split(self, DTYPE_t* X_ptr, int X_stride,
                                 int* X_argsorted_ptr, int X_argsorted_stride,
-                                DOUBLE_t* y_ptr, DOUBLE_t* sample_weight_ptr,
-                                int y_stride,
+                                DOUBLE_t* y_ptr, int y_stride,
+                                DOUBLE_t* sample_weight_ptr,
                                 BOOL_t* sample_mask_ptr,
                                 int n_node_samples,
                                 double weighted_n_node_samples,
@@ -778,8 +785,9 @@ cdef class Tree:
         cdef np.ndarray[np.int32_t, ndim=1, mode="c"] features = None
 
         # Compute the initial criterion value in the node
-        criterion.init(y_ptr, sample_weight_ptr,
-                       y_stride, sample_mask_ptr,
+        criterion.init(y_ptr, y_stride,
+                       sample_weight_ptr,
+                       sample_mask_ptr,
                        n_node_samples,
                        weighted_n_node_samples,
                        n_total_samples)
@@ -847,8 +855,10 @@ cdef class Tree:
                 c += 1
 
             # Better than the best so far?
-            n_left = criterion.update(0, c, y_ptr, sample_weight_ptr,
-                                      y_stride, X_argsorted_i, sample_mask_ptr)
+            n_left = criterion.update(0, c, y_ptr, y_stride,
+                                      X_argsorted_i,
+                                      sample_weight_ptr,
+                                      sample_mask_ptr)
             error = criterion.eval()
 
             if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
@@ -976,9 +986,11 @@ cdef class Tree:
 cdef class Criterion:
     """Interface for splitting criteria (regression and classification)."""
 
-    cdef void init(self, DOUBLE_t* y, DOUBLE_t* sample_weight,
-                   int y_stride, BOOL_t* sample_mask,
-                   int n_samples, double weighted_n_samples,
+    cdef void init(self, DOUBLE_t* y, int y_stride,
+                   DOUBLE_t* sample_weight,
+                   BOOL_t* sample_mask,
+                   int n_samples,
+                   double weighted_n_samples,
                    int n_total_samples):
         """Initialise the criterion."""
         pass
@@ -988,8 +1000,10 @@ cdef class Criterion:
         pass
 
     cdef int update(self, int a, int b,
-                    DOUBLE_t* y, DOUBLE_t* sample_weight,
-                    int y_stride, int* X_argsorted_i, BOOL_t* sample_mask):
+                    DOUBLE_t* y, int y_stride,
+                    int* X_argsorted_i,
+                    DOUBLE_t* sample_weight,
+                    BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         pass
@@ -1111,9 +1125,11 @@ cdef class ClassificationCriterion(Criterion):
     def __setstate__(self, d):
         pass
 
-    cdef void init(self, DOUBLE_t* y, DOUBLE_t* sample_weight,
-                   int y_stride, BOOL_t* sample_mask,
-                   int n_samples, double weighted_n_samples,
+    cdef void init(self, DOUBLE_t* y, int y_stride,
+                   DOUBLE_t* sample_weight,
+                   BOOL_t* sample_mask,
+                   int n_samples,
+                   double weighted_n_samples,
                    int n_total_samples):
         """Initialise the criterion."""
         cdef int n_outputs = self.n_outputs
@@ -1168,9 +1184,10 @@ cdef class ClassificationCriterion(Criterion):
                 # Reset right label counts to the initial counts
                 label_count_right[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, DOUBLE_t* sample_weight,
-                    int y_stride,
-                    int* X_argsorted_i, BOOL_t* sample_mask):
+    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+                    int* X_argsorted_i,
+                    DOUBLE_t* sample_weight,
+                    BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int n_outputs = self.n_outputs
@@ -1461,9 +1478,11 @@ cdef class RegressionCriterion(Criterion):
     def __setstate__(self, d):
         pass
 
-    cdef void init(self, DOUBLE_t* y, DOUBLE_t* sample_weight,
-                   int y_stride, BOOL_t* sample_mask,
-                   int n_samples, double weighted_n_samples,
+    cdef void init(self, DOUBLE_t* y, int y_stride,
+                   DOUBLE_t* sample_weight,
+                   BOOL_t* sample_mask,
+                   int n_samples,
+                   double weighted_n_samples,
                    int n_total_samples):
         """Initialise the criterion class; assume all samples
            are in the right branch and store the mean and squared
@@ -1549,9 +1568,10 @@ cdef class RegressionCriterion(Criterion):
             var_left[k] = 0.0
             var_right[k] = sq_sum_right[k] - n_samples * (mean_right[k] * mean_right[k])
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, DOUBLE_t* sample_weight,
-                    int y_stride,
-                    int* X_argsorted_i, BOOL_t* sample_mask):
+    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+                    int* X_argsorted_i,
+                    DOUBLE_t* sample_weight,
+                    BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef double* mean_left = self.mean_left
