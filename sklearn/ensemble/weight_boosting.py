@@ -48,10 +48,6 @@ class BaseWeightBoosting(BaseEnsemble):
     learn_rate : float, optional (default=0.5)
         learning rate shrinks the contribution of each classifier by
         `learn_rate`. There is a trade-off between learn_rate and n_estimators.
-
-    fit_params : dict, optional
-        parameters to pass to the fit method of the base estimator
-
     """
     def __init__(self, base_estimator=None,
                        n_estimators=10,
@@ -91,7 +87,7 @@ class BaseWeightBoosting(BaseEnsemble):
             base_estimator=base_estimator,
             n_estimators=n_estimators)
 
-    def fit(self, X, y, sample_weight=None, **params):
+    def fit(self, X, y, sample_weight=None):
         """Build a boosted classifier/regressor from the training set (X, y).
 
         Parameters
@@ -105,10 +101,6 @@ class BaseWeightBoosting(BaseEnsemble):
 
         sample_weight : array-like of shape = [n_samples], optional
             Sample weights
-
-        params : dict
-            extra keyword arguments passed to the fit method of
-            base_estimator.
 
         Returns
         -------
@@ -144,11 +136,10 @@ class BaseWeightBoosting(BaseEnsemble):
                 # computations when calling fit + predict
                 # on the same input X
                 p = estimator.fit_predict(X, y,
-                                          sample_weight=sample_weight,
-                                          **params)
+                        sample_weight=sample_weight)
             else:
-                p = estimator.fit(X, y, sample_weight=sample_weight,
-                                  **params).predict(X)
+                p = estimator.fit(X, y,
+                        sample_weight=sample_weight).predict(X)
 
             sample_weight = self.boost(sample_weight, p, y,
                     boost == self.n_estimators - 1)
