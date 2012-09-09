@@ -82,14 +82,18 @@ def _parallel_build_trees(n_trees, forest, X, y, sample_weight,
                 curr_sample_weight = sample_weight[indices]
             else:
                 curr_sample_weight = None
-            tree.fit(X[indices], y[indices], curr_sample_weight,
-                     sample_mask=sample_mask, X_argsorted=X_argsorted,
+            tree.fit(X[indices], y[indices],
+                     sample_weight=curr_sample_weight,
+                     sample_mask=sample_mask,
+                     X_argsorted=X_argsorted,
                      check_input=False)
             tree.indices_ = indices
 
         else:
-            tree.fit(X, y, sample_weight,
-                     sample_mask=sample_mask, X_argsorted=X_argsorted,
+            tree.fit(X, y,
+                     sample_weight=sample_weight,
+                     sample_mask=sample_mask,
+                     X_argsorted=X_argsorted,
                      check_input=False)
 
         trees.append(tree)

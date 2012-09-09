@@ -383,6 +383,11 @@ cdef class Tree:
 
         if y.dtype != DOUBLE or not y.flags.contiguous:
             y = np.asarray(y, dtype=DOUBLE, order="C")
+        
+        if sample_weight is not None:
+            if sample_weight.dtype != DOUBLE or not sample_weight.flags.contiguous:
+                sample_weight = np.asarray(
+                        sample_weight, dtype=DOUBLE, order="C")
 
         if sample_mask is None:
             sample_mask = np.ones((X.shape[0],), dtype=np.bool)
@@ -401,6 +406,13 @@ cdef class Tree:
 
         self.resize(init_capacity)
         cdef double* buffer_value = <double*> malloc(self.value_stride * sizeof(double))
+        
+        n_node_samples = np.sum(sample_mask)
+        cdef double weighted_n_node_samples
+        if sample_weight is not None:
+            weighted_n_node_samples = np.sum(sample_weight[sample_mask])
+        else:
+            weighted_n_node_samples = n_node_samples
 
         # Build the tree by recursive partitioning
         self.recursive_partition(X, X_argsorted, y, sample_mask, np.sum(sample_mask), 0, -1, False, buffer_value)
@@ -427,6 +439,11 @@ cdef class Tree:
         cdef int* X_argsorted_ptr = <int*> X_argsorted.data
         cdef DOUBLE_t* y_ptr = <DOUBLE_t*> y.data
         cdef BOOL_t* sample_mask_ptr = <BOOL_t*> sample_mask.data
+
+        cdef DOUBLE_t* sample_weight_ptr = NULL
+        if sample_weight is not None:
+            sample_weight_ptr = <DOUBLE_t*> sample_weight.data
+        cdef DOUBLE_t w = 1.0
 
         cdef int X_stride = <int> X.strides[1] / <int> X.strides[0]
         cdef int X_argsorted_stride = <int> X_argsorted.strides[1] / <int> X_argsorted.strides[0]
@@ -485,12 +502,16 @@ cdef class Tree:
                 X = X[sample_mask]
                 X_argsorted = np.asfortranarray(np.argsort(X.T, axis=1).astype(np.int32).T)
                 y = y[sample_mask]
+                if sample_weight is not None:
+                    sample_weight = sample_weight[sample_mask]
+                    sample_weight_ptr = <DOUBLE_t*> sample_weight.data
                 sample_mask = np.ones((n_node_samples, ), dtype=np.bool)
 
                 n_total_samples = n_node_samples
 
                 X_ptr = <DTYPE_t*> X.data
                 X_stride = <int> X.strides[1] / <int> X.strides[0]
+
                 sample_mask_ptr = <BOOL_t*> sample_mask.data
 
                 # !! No need to update the other variables
@@ -600,8 +621,7 @@ cdef class Tree:
 
     cdef void find_split(self, DTYPE_t* X_ptr, int X_stride,
                          int* X_argsorted_ptr, int X_argsorted_stride,
-                         DOUBLE_t* y_ptr,
-                         int y_stride,
+                         DOUBLE_t* y_ptr, int y_stride,
                          DOUBLE_t* sample_weight_ptr,
                          BOOL_t* sample_mask_ptr,
                          int n_node_samples,
@@ -1577,8 +1597,8 @@ cdef class RegressionCriterion(Criterion):
 
             for k from 0 <= k < n_outputs:
                 y_jk = y[j * y_stride + k]
-                sq_sum_init[k] += y_jk * y_jk * w * w
-                mean_init[k] += y_jk * w
+                sq_sum_init[k] += w * y_jk * y_jk
+                mean_init[k] += w * y_jk
 
         for k from 0 <= k < n_outputs:
             mean_init[k] /= weighted_n_samples
@@ -1601,7 +1621,7 @@ cdef class RegressionCriterion(Criterion):
         cdef double* var_left = self.var_left
         cdef double* var_right = self.var_right
 
-        cdef int n_samples = self.n_samples
+        cdef double weighted_n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
 
         cdef int k = 0
@@ -1617,7 +1637,8 @@ cdef class RegressionCriterion(Criterion):
             sq_sum_right[k] = sq_sum_init[k]
             sq_sum_left[k] = 0.0
             var_left[k] = 0.0
-            var_right[k] = sq_sum_right[k] - n_samples * (mean_right[k] * mean_right[k])
+            var_right[k] = (sq_sum_right[k] - 
+                    weighted_n_samples * (mean_right[k] * mean_right[k]))
 
     cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
@@ -1651,12 +1672,15 @@ cdef class RegressionCriterion(Criterion):
                 w = sample_weight[j]
 
             for k from 0 <= k < n_outputs:
-                y_idx = y[j * y_stride + k] * w
-                sq_sum_left[k] += (y_idx * y_idx)
-                sq_sum_right[k] -= (y_idx * y_idx)
+                y_idx = y[j * y_stride + k]
+                sq_sum_left[k] += w * (y_idx * y_idx)
+                sq_sum_right[k] -= w * (y_idx * y_idx)
 
-                mean_left[k] = (n_left * mean_left[k] + y_idx) / <double>(n_left + 1)
-                mean_right[k] = ((n_samples - n_left) * mean_right[k] - y_idx) / <double>(n_samples - n_left - 1)
+                mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_idx) / 
+                        <double>(weighted_n_left + w))
+                mean_right[k] = (((weighted_n_samples - weighted_n_left) *
+                        mean_right[k] - w * y_idx) /
+                        <double>(weighted_n_samples - weighted_n_left - w))
 
             n_left += 1
             self.n_left = n_left
@@ -1668,8 +1692,8 @@ cdef class RegressionCriterion(Criterion):
             self.weighted_n_right = weight_n_right
 
             for k from 0 <= k < n_outputs:
-                var_left[k] = sq_sum_left[k] - n_left * (mean_left[k] * mean_left[k])
-                var_right[k] = sq_sum_right[k] - n_right * (mean_right[k] * mean_right[k])
+                var_left[k] = sq_sum_left[k] - weighted_n_left * (mean_left[k] * mean_left[k])
+                var_right[k] = sq_sum_right[k] - weighted_n_right * (mean_right[k] * mean_right[k])
 
         return n_left
 
