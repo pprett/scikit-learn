@@ -118,8 +118,7 @@ class BaseWeightBoosting(BaseEnsemble):
 
         if sample_weight is None:
             # initialize weights to 1/N
-            sample_weight = np.ones(X.shape[0], dtype=np.float32) \
-                / X.shape[0]
+            sample_weight = np.ones(X.shape[0], dtype=np.float64) / X.shape[0]
         else:
             sample_weight = np.copy(sample_weight)
             # normalize
@@ -200,7 +199,7 @@ class BaseWeightBoosting(BaseEnsemble):
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            p += alpha * estimator.predict(X)
+            p += estimator.predict(X) * alpha
         p /= norm
         return p
 
@@ -233,7 +232,7 @@ class BaseWeightBoosting(BaseEnsemble):
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            p += alpha * estimator.predict(X)
+            p += estimator.predict(X) * alpha
             norm += alpha
             yield p / norm
 
