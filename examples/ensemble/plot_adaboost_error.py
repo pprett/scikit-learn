@@ -9,6 +9,10 @@ the left. The boost weights and error of each tree are also shown.
 """
 print __doc__
 
+from itertools import izip
+
+import pylab as pl
+
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.datasets.samples_generator import make_gaussian_quantiles
@@ -29,7 +33,6 @@ bdt = AdaBoostClassifier(DecisionTreeClassifier(min_samples_leaf=100),
 
 bdt.fit(X_train, y_train)
 
-from itertools import izip
 
 for y_test_predict, y_train_predict in izip(bdt.staged_predict(X_test),
                                             bdt.staged_predict(X_train)):
@@ -38,7 +41,6 @@ for y_test_predict, y_train_predict in izip(bdt.staged_predict(X_test),
 
 n_trees = xrange(1, len(bdt) + 1)
 
-import pylab as pl
 pl.figure(figsize=(15, 5))
 
 pl.subplot(1, 3, 1)
