@@ -111,11 +111,6 @@ class BaseWeightBoosting(BaseEnsemble):
         X = np.atleast_2d(X)
         y = np.atleast_1d(y)
 
-        if isinstance(self, ClassifierMixin):
-            self.classes_ = np.unique(y)
-            self.n_classes_ = len(self.classes_)
-            y = np.searchsorted(self.classes_, y)
-
         if sample_weight is None:
             # initialize weights to 1/N
             sample_weight = np.ones(X.shape[0], dtype=np.float64) / X.shape[0]
@@ -141,9 +136,19 @@ class BaseWeightBoosting(BaseEnsemble):
                 p = estimator.fit(X, y,
                         sample_weight=sample_weight).predict(X)
 
+            if iboost == 0:
+                self.classes_ = estimator.classes_
+                self.n_classes_ = estimator.n_classes_
+                # this is a HACK!
+                if isinstance(self.n_classes_, list):
+                    self.n_classes_ = max(self.n_classes_)
+                self.n_outputs_ = getattr(estimator, 'n_outputs_', 1)
+                # this is a HACK!
+                if self.n_outputs_ == 1 and isinstance(self.classes_, list):
+                    self.classes_ = self.classes_[0]
+
             sample_weight, alpha, err = self.boost(sample_weight, p, y,
                     iboost == self.n_estimators - 1)
-            print alpha, err
             # early termination
             if sample_weight is None:
                 break
@@ -191,17 +196,58 @@ class BaseWeightBoosting(BaseEnsemble):
         y : array of shape = [n_samples]
             The predicted classes.
         """
-        X = np.atleast_2d(X)
-        p = np.zeros(X.shape[0], dtype=np.float64)
+        if limit == 0:
+            raise ValueError("limit must not equal 0")
 
-        norm = sum(self.boost_weights_)
+        if not self.estimators_:
+            raise Exception("AdaBoost not initialized. Perform a fit first")
+
+        X = np.atleast_2d(X)
+        n_samples, n_features = X.shape
+
+        P = None
+        norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            p += estimator.predict(X) * alpha
-        p /= norm
-        return p
+            if isinstance(self, ClassifierMixin):
+                if self.n_outputs_ > 1:
+                    p = [out * alpha for out in estimator.predict_proba(X)]
+                else:
+                    p = estimator.predict_proba(X) * alpha
+            else:
+                p = estimator.predict(X) * alpha
+
+            if P is None:
+                P = p
+            else:
+                if self.n_outputs_ > 1:
+                    for i in xrange(self.n_outputs_):
+                        P[i] += p[i]
+                else:
+                    P += p
+
+            norm += alpha
+
+        if self.n_outputs_ > 1:
+            P = [P[i] / norm for i in xrange(self.n_outputs_)]
+        else:
+            P /= norm
+
+        if isinstance(self, ClassifierMixin):
+            if self.n_outputs_ > 1:
+                predictions = np.zeros((n_samples, self.n_outputs_))
+                for k in xrange(self.n_outputs_):
+                    predictions[:, k] = self.classes_[k].take(
+                            np.argmax(P[k], axis=1), axis=0)
+            else:
+                predictions = self.classes_.take(
+                        np.argmax(P, axis=1), axis=0)
+
+            return predictions
+        else:
+            return P
 
     def staged_predict(self, X, limit=-1):
         """Predict class for X.
@@ -224,17 +270,58 @@ class BaseWeightBoosting(BaseEnsemble):
         y : array of shape = [n_samples]
             The predicted classes.
         """
-        X = np.atleast_2d(X)
-        p = np.zeros(X.shape[0], dtype=np.float64)
+        if limit == 0:
+            raise ValueError("limit must not equal 0")
 
+        if not self.estimators_:
+            raise Exception("AdaBoost not initialized. Perform a fit first")
+
+        X = np.atleast_2d(X)
+        n_samples, n_features = X.shape
+
+        P = None
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            p += estimator.predict(X) * alpha
+            if isinstance(self, ClassifierMixin):
+                if self.n_outputs_ > 1:
+                    p = [out * alpha for out in estimator.predict_proba(X)]
+                else:
+                    p = estimator.predict_proba(X) * alpha
+            else:
+                p = estimator.predict(X) * alpha
+
+            if P is None:
+                P = p
+            else:
+                if self.n_outputs_ > 1:
+                    for i in xrange(self.n_outputs_):
+                        P[i] += p[i]
+                else:
+                    P += p
+
             norm += alpha
-            yield p / norm
+
+            if self.n_outputs_ > 1:
+                P_local = [P[i] / norm for i in xrange(self.n_outputs_)]
+            else:
+                P_local = P / norm
+
+            if isinstance(self, ClassifierMixin):
+                if self.n_outputs_ > 1:
+                    predictions = np.zeros((n_samples, self.n_outputs_))
+                    for k in xrange(self.n_outputs_):
+                        predictions[:, k] = self.classes_[k].take(
+                                np.argmax(P_local[k], axis=1), axis=0)
+                else:
+                    predictions = self.classes_.take(
+                            np.argmax(P_local, axis=1), axis=0)
+
+                yield predictions
+            else:
+                yield P_local
 
 
 class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
@@ -324,17 +411,21 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             The class probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        X = np.atleast_2d(X)
-        p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
-
-        norm = sum(self.boost_weights_)
+        if limit == 0:
+            raise ValueError("limit must not equal 0")
+        P = None
+        norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            p += alpha * estimator.predict_proba(X)
-        if norm > 0:
-            p /= norm
+            p = estimator.predict_proba(X) * alpha
+            if P is None:
+                P = p
+            else:
+                P += p
+            norm += alpha
+        p /= norm
         return p
 
     def staged_predict_proba(self, X, limit=-1):
@@ -360,17 +451,21 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             The class probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        X = np.atleast_2d(X)
-        p = np.zeros((X.shape[0], self.n_classes_), dtype=np.float64)
-
+        if limit == 0:
+            raise ValueError("limit must not equal 0")
+        P = None
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == limit:
                 break
-            p += alpha * estimator.predict_proba(X)
+            p = estimator.predict_proba(X) * alpha
+            if P is None:
+                P = p
+            else:
+                P += p
             norm += alpha
-            yield p / norm if norm > 0 else p
+            yield p / norm
 
     def predict_log_proba(self, X, limit=-1):
         """Predict class log-probabilities for X.
