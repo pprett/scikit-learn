@@ -54,14 +54,14 @@ pl.subplot(1, 3, 2)
 pl.plot(n_trees, bdt.errs_, "b")
 pl.ylabel('Error')
 pl.xlabel('Tree')
-pl.ylim((.2, .8))
+pl.ylim((.2, max(bdt.errs_) * 1.2))
 pl.xlim((-20, len(bdt) + 20))
 
 pl.subplot(1, 3, 3)
 pl.plot(n_trees, bdt.boost_weights_, "b")
 pl.ylabel('Boost Weight')
 pl.xlabel('Tree')
-pl.ylim((0, .8))
+pl.ylim((0, max(bdt.boost_weights_) * 1.2))
 pl.xlim((-20, len(bdt) + 20))
 
 
