@@ -68,13 +68,15 @@ for pair in ([0, 1], [0, 2], [2, 3]):
         if isinstance(model, DecisionTreeClassifier):
             Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
             Z = Z.reshape(xx.shape)
-            cs = pl.contourf(xx, yy, Z)
+            cs = pl.contourf(xx, yy, Z,
+                    cmap=pl.cm.Paired)
         else:
             norm = sum(model.boost_weights_)
             for weight, tree in zip(model.boost_weights_, model.estimators_):
                 Z = tree.predict(np.c_[xx.ravel(), yy.ravel()])
                 Z = Z.reshape(xx.shape)
-                cs = pl.contourf(xx, yy, Z, alpha=weight / norm)
+                cs = pl.contourf(xx, yy, Z, alpha=weight / norm,
+                        cmap=pl.cm.Paired)
 
         #pl.xlabel("%s / %s" % (iris.feature_names[pair[0]],
         #                       model.__class__.__name__))
@@ -84,7 +86,8 @@ for pair in ([0, 1], [0, 2], [2, 3]):
         # Plot the training points
         for i, c in zip(xrange(n_classes), plot_colors):
             idx = np.where(y == i)
-            pl.scatter(X[idx, 0], X[idx, 1], c=c, label=iris.target_names[i])
+            pl.scatter(X[idx, 0], X[idx, 1], c=c, label=iris.target_names[i],
+                    cmap=pl.cm.Paired)
 
         pl.axis("tight")
 
