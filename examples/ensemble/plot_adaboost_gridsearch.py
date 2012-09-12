@@ -9,7 +9,6 @@ classifier on the Gaussian quantiles dataset.
 print __doc__
 
 import numpy as np
-import pylab as pl
 
 from matplotlib import cm
 from matplotlib import pyplot as plt
@@ -68,7 +67,9 @@ def plot_grid_scores(
     ax = fig.add_subplot(111)
     cmap = cm.get_cmap('jet', 100) # jet doesn't have white color
     #cmap.set_bad('w') # default value is 'k'
-    ax.imshow(scores, interpolation="nearest", cmap=cmap)
+    img = ax.imshow(scores, interpolation="nearest", cmap=cmap,
+            aspect='auto',
+            origin='lower')
 
     if label_all_ticks:
         plt.xticks(range(len(param_values[param_names[1]])),
@@ -117,9 +118,10 @@ def plot_grid_scores(
         # circle the best bin and label the parameters
         pass
 
-    pl.suptitle("Classification accuracy over parameter grid search.")
-    pl.axis("tight")
-    pl.show()
+    plt.suptitle("Classification accuracy over parameter grid search.")
+    plt.colorbar(img)
+    plt.axis("tight")
+    plt.show()
 
 clf = grid_clf.best_estimator_
 grid_scores = grid_clf.grid_scores_
@@ -136,6 +138,6 @@ plot_grid_scores(
         clf.n_estimators},
     params={
         'base_estimator__min_samples_leaf':
-        'min leaf',
+        'minimum leaf size',
         'n_estimators':
-        'trees'})
+        'number of trees'})
