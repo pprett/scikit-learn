@@ -115,7 +115,9 @@ def fit_grid_point(X, y, sample_weight, base_clf,
         sample_weight_train = None
 
     if sample_weight is not None:
-        clf.fit(X_train, y_train, sample_weight=sample_weight_train, **fit_params)
+        clf.fit(X_train, y_train,
+                sample_weight=sample_weight_train,
+                **fit_params)
     else:
         clf.fit(X_train, y_train, **fit_params)
 
