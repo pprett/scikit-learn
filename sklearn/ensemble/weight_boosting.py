@@ -174,7 +174,7 @@ class BaseWeightBoosting(BaseEnsemble):
 
         return self
 
-    def predict(self, X, limit=-1):
+    def predict(self, X, n_estimators=-1):
         """Predict class for X.
 
         The predicted class of an input sample is computed as the weighted
@@ -185,19 +185,19 @@ class BaseWeightBoosting(BaseEnsemble):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
-        limit : int, optional (default=-1)
-            Use only the first N=limit classifiers for the prediction. This is
-            useful for grid searching the n_estimators parameter since it is not
-            necessary to fit separately for all choices of n_estimators, but
-            only the highest n_estimators.
+        n_estimators : int, optional (default=-1)
+            Use only the first N=n_estimators classifiers for the prediction.
+            This is useful for grid searching the n_estimators parameter since
+            it is not necessary to fit separately for all choices of
+            n_estimators, but only the highest n_estimators.
 
         Returns
         -------
         y : array of shape = [n_samples]
             The predicted classes.
         """
-        if limit == 0:
-            raise ValueError("limit must not equal 0")
+        if n_estimators == 0:
+            raise ValueError("n_estimators must not equal 0")
 
         if not self.estimators_:
             raise Exception("AdaBoost not initialized. Perform a fit first")
@@ -209,7 +209,7 @@ class BaseWeightBoosting(BaseEnsemble):
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
-            if i == limit:
+            if i == n_estimators:
                 break
             if isinstance(self, ClassifierMixin):
                 if self.n_outputs_ > 1:
@@ -249,7 +249,7 @@ class BaseWeightBoosting(BaseEnsemble):
         else:
             return P
 
-    def staged_predict(self, X, limit=-1):
+    def staged_predict(self, X, n_estimators=-1):
         """Predict class for X.
 
         The predicted class of an input sample is computed as the weighted
@@ -262,7 +262,7 @@ class BaseWeightBoosting(BaseEnsemble):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
-        limit : int, optional (default=-1)
+        n_estimators : int, optional (default=-1)
             See docs above for the predict method
 
         Returns
@@ -270,8 +270,8 @@ class BaseWeightBoosting(BaseEnsemble):
         y : array of shape = [n_samples]
             The predicted classes.
         """
-        if limit == 0:
-            raise ValueError("limit must not equal 0")
+        if n_estimators == 0:
+            raise ValueError("n_estimators must not equal 0")
 
         if not self.estimators_:
             raise Exception("AdaBoost not initialized. Perform a fit first")
@@ -283,7 +283,7 @@ class BaseWeightBoosting(BaseEnsemble):
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
-            if i == limit:
+            if i == n_estimators:
                 break
             if isinstance(self, ClassifierMixin):
                 if self.n_outputs_ > 1:
@@ -390,7 +390,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             sample_weight *= np.exp(alpha * incorrect)
         return sample_weight, alpha, err
 
-    def predict_proba(self, X, limit=-1):
+    def predict_proba(self, X, n_estimators=-1):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
@@ -402,7 +402,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
-        limit : int, optional (default=-1)
+        n_estimators : int, optional (default=-1)
             See docs above for the predict method
 
         Returns
@@ -411,13 +411,13 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             The class probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        if limit == 0:
-            raise ValueError("limit must not equal 0")
+        if n_estimators == 0:
+            raise ValueError("n_estimators must not equal 0")
         P = None
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
-            if i == limit:
+            if i == n_estimators:
                 break
             p = estimator.predict_proba(X) * alpha
             if P is None:
@@ -428,7 +428,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         p /= norm
         return p
 
-    def staged_predict_proba(self, X, limit=-1):
+    def staged_predict_proba(self, X, n_estimators=-1):
         """Predict class probabilities for X.
 
         The predicted class probabilities of an input sample is computed as
@@ -442,7 +442,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
-        limit : int, optional (default=-1)
+        n_estimators : int, optional (default=-1)
             See docs above for the predict method
 
         Returns
@@ -451,13 +451,13 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             The class probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        if limit == 0:
-            raise ValueError("limit must not equal 0")
+        if n_estimators == 0:
+            raise ValueError("n_estimators must not equal 0")
         P = None
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
-            if i == limit:
+            if i == n_estimators:
                 break
             p = estimator.predict_proba(X) * alpha
             if P is None:
@@ -467,7 +467,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             norm += alpha
             yield p / norm
 
-    def predict_log_proba(self, X, limit=-1):
+    def predict_log_proba(self, X, n_estimators=-1):
         """Predict class log-probabilities for X.
 
         The predicted class log-probabilities of an input sample is computed as
@@ -479,7 +479,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         X : array-like of shape = [n_samples, n_features]
             The input samples.
 
-        limit : int, optional (default=-1)
+        n_estimators : int, optional (default=-1)
             See docs above for the predict method
 
         Returns
@@ -488,7 +488,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             The class log-probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        return np.log(self.predict_proba(X, limit=limit))
+        return np.log(self.predict_proba(X, n_estimators=n_estimators))
 
 
 class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
