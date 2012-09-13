@@ -413,20 +413,19 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         """
         if n_estimators == 0:
             raise ValueError("n_estimators must not equal 0")
-        P = None
+        probs = None
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
-            p = estimator.predict_proba(X) * alpha
-            if P is None:
-                P = p
+            current_probs = estimator.predict_proba(X) * alpha
+            if probs is None:
+                probs = current_probs
             else:
-                P += p
+                probs += current_probs
             norm += alpha
-        p /= norm
-        return p
+        return probs / norm
 
     def staged_predict_proba(self, X, n_estimators=-1):
         """Predict class probabilities for X.
@@ -453,19 +452,19 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         """
         if n_estimators == 0:
             raise ValueError("n_estimators must not equal 0")
-        P = None
+        probs = None
         norm = 0.
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
-            p = estimator.predict_proba(X) * alpha
-            if P is None:
-                P = p
+            current_probs = estimator.predict_proba(X) * alpha
+            if probs is None:
+                probs = current_probs
             else:
-                P += p
+                probs += current_probs
             norm += alpha
-            yield p / norm
+            yield probs / norm
 
     def predict_log_proba(self, X, n_estimators=-1):
         """Predict class log-probabilities for X.

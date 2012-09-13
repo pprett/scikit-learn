@@ -12,3 +12,4 @@ from .weight_boosting import  AdaBoostClassifier
 from .weight_boosting import  AdaBoostRegressor
 from .gradient_boosting import GradientBoostingClassifier
 from .gradient_boosting import GradientBoostingRegressor
+from .grid_search import BoostGridSearchCV

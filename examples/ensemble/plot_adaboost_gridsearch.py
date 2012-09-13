@@ -18,7 +18,7 @@ from sklearn.datasets import make_gaussian_quantiles
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.cross_validation import StratifiedKFold
-from sklearn.grid_search import GridSearchCV
+from sklearn.ensemble.grid_search import BoostGridSearchCV
 from sklearn.metrics import classification_report
 
 # Load data
@@ -28,15 +28,16 @@ X, y = make_gaussian_quantiles(n_samples=5000, n_features=3,
 clf = AdaBoostClassifier(DecisionTreeClassifier(), learn_rate=0.5)
 
 grid_params = {
-    'base_estimator__min_samples_leaf': range(100, 500, 50),
-    'n_estimators': range(10, 500, 50)
+    'base_estimator__min_samples_leaf': range(10, 500, 50),
+    #'n_estimators': range(10, 800, 50)
 }
 
-grid_clf = GridSearchCV(
+grid_clf = BoostGridSearchCV(
         clf, grid_params,
+        n_estimators_range=range(10, 800, 50),
         cv=StratifiedKFold(y, 3),
         n_jobs=-1,
-        verbose=2)
+        verbose=10)
 
 grid_clf.fit(X, y)
 
