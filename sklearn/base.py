@@ -289,8 +289,8 @@ class ClassifierMixin(object):
 
         """
         if sample_weight is not None:
-            return (((self.predict(X, **predict_params) == y) * sample_weight)
-                    / sample_weight.sum())
+            return np.average((self.predict(X, **predict_params) == y),
+                    weights=sample_weight)
         return np.mean(self.predict(X, **predict_params) == y)
 
 
