@@ -370,10 +370,10 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         # instances incorrectly classified
         incorrect = (y_predict != y_true).astype(np.int32)
         # error fraction
-        err = np.average(incorrect, weight=sample_weight)
+        err = np.average(incorrect, weights=sample_weight)
 
         # stop if classification is perfect
-        if err = 0:
+        if err == 0:
             self.boost_weights_.append(1.)
             self.errs_.append(err)
             return None, None, None
