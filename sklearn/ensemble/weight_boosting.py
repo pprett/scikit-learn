@@ -370,13 +370,20 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         # instances incorrectly classified
         incorrect = (y_predict != y_true).astype(np.int32)
         # error fraction
-        err = (sample_weight * incorrect).sum() / sample_weight.sum()
+        err = np.average(incorrect, weight=sample_weight)
 
         # stop if classification is perfect
-        if err <= 0:
+        if err = 0:
             self.boost_weights_.append(1.)
             self.errs_.append(err)
             return None, None, None
+
+        # negative sample weights can yield an overall negative error...
+        if err < 0:
+            # use the absolute value
+            # if you have a better idea of how to handle negative sample weights
+            # let me know
+            err = abs(err)
 
         # stop if the error is at least as bad as random guessing
         if err >= 1. - (1. / self.n_classes_):
@@ -384,8 +391,11 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             return None, None, None
 
         # boost weight using multi-class AdaBoost SAMME alg
-        alpha = self.learn_rate * (math.log((1. - err) / err) +
-                             math.log(self.n_classes_ - 1.))
+        alpha = self.learn_rate * (
+                math.log((1. - err) / err) +
+                math.log(self.n_classes_ - 1.))
+
+        # only bother to boost the weights if I will fit again
         if not is_last:
             sample_weight *= np.exp(alpha * incorrect)
         return sample_weight, alpha, err
