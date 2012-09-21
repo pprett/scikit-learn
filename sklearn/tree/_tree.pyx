@@ -1298,7 +1298,10 @@ cdef class ClassificationCriterion(Criterion):
 
         for k from 0 <= k < n_outputs:
             for c from 0 <= c < n_classes[k]:
-                buffer_value[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
+                # does anyone know of a better way to handle negative sample
+                # weights here? Using absolute value for now... 
+                buffer_value[k * label_count_stride + c] = abs(
+                        label_count_init[k * label_count_stride + c])
 
 
 cdef class Gini(ClassificationCriterion):
@@ -1328,10 +1331,16 @@ cdef class Gini(ClassificationCriterion):
         cdef double n_left = <double> self.weighted_n_left
         cdef double n_right = <double> self.weighted_n_right
 
-        cdef double total = 0.0
+        cdef double total_left = 0.0
+        cdef double total_right = 0.0
         cdef double H_left
         cdef double H_right
-        cdef int k, c, count_left, count_right
+        cdef int k, c
+        cdef double count_left, count_right
+        
+        if n_samples <= 0:
+            # can happen with negative sample weights
+            return 0.
 
         for k from 0 <= k < n_outputs:
             H_left = n_left * n_left
@@ -1356,9 +1365,14 @@ cdef class Gini(ClassificationCriterion):
             else:
                 H_right /= n_right
 
-            total += (H_left + H_right)
+            total_left += H_left
+            total_right += H_right
 
-        return total / (n_samples * n_outputs)
+        if total_left < 0 or total_right < 0:
+            # can happen with negative sample weights
+            # if anyone knows a better way of handling this, let me know...
+            return 1.
+        return (total_left + total_right) / (n_samples * n_outputs)
 
 
 cdef class Entropy(ClassificationCriterion):
