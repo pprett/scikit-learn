@@ -1322,7 +1322,7 @@ cdef class Gini(ClassificationCriterion):
         if total_left < 0 or total_right < 0:
             # can happen with negative sample weights
             # if anyone knows a better way of handling this, let me know...
-            return 0.
+            return 1.
         return (total_left + total_right) / (n_samples * n_outputs)
 
 
