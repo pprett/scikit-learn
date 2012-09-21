@@ -1279,11 +1279,16 @@ cdef class Gini(ClassificationCriterion):
         cdef double n_left = self.weighted_n_left
         cdef double n_right = self.weighted_n_right
 
-        cdef double total = 0.0
+        cdef double total_left = 0.0
+        cdef double total_right = 0.0
         cdef double H_left
         cdef double H_right
         cdef int k, c
         cdef double count_left, count_right
+        
+        if n_samples <= 0:
+            # can happen with negative sample weights
+            return 0.
 
         for k from 0 <= k < n_outputs:
             H_left = n_left * n_left
@@ -1308,9 +1313,14 @@ cdef class Gini(ClassificationCriterion):
             else:
                 H_right /= n_right
 
-            total += (H_left + H_right)
+            total_left += H_left
+            total_right += H_right
 
-        return total / (n_samples * n_outputs)
+        if total_left < 0 or total_right < 0:
+            # can happen with negative sample weights
+            # if anyone knows a better way of handling this, let me know...
+            return 0.
+        return (total_left + total_right) / (n_samples * n_outputs)
 
 
 cdef class Entropy(ClassificationCriterion):
