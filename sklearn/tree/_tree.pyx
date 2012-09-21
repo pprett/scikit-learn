@@ -1244,18 +1244,15 @@ cdef class ClassificationCriterion(Criterion):
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
         cdef double* label_count_init = self.label_count_init
-        cdef double label_count
 
         cdef int k, c
 
         for k from 0 <= k < n_outputs:
             for c from 0 <= c < n_classes[k]:
-                label_count = label_count_init[k * label_count_stride + c]
-                if label_count < 0:
-                    # this can happen with negative sample weights
-                    # does anyone know of a better way to handle this? 
-                    label_count = 0.
-                buffer_value[k * label_count_stride + c] = label_count
+                # does anyone know of a better way to handle negative sample
+                # weights here? Using absolute value for now... 
+                buffer_value[k * label_count_stride + c] = abs(
+                        label_count_init[k * label_count_stride + c])
 
 
 cdef class Gini(ClassificationCriterion):
