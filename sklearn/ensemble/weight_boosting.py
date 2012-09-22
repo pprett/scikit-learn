@@ -499,6 +499,57 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         """
         return np.log(self.predict_proba(X, n_estimators=n_estimators))
 
+    def score(self, X, y, sample_weight=None, n_estimators=-1):
+        """Returns the mean accuracy on the given test data and labels.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            Training set.
+
+        y : array-like, shape = [n_samples]
+            Labels for X.
+
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights.
+
+        Returns
+        -------
+        z : float
+
+        """
+        if sample_weight is not None:
+            # weighted average
+            return np.average(
+                    (self.predict(X, n_estimators=n_estimators) == y),
+                    weights=sample_weight)
+        return np.mean(self.predict(X, n_estimators=n_estimators) == y)
+
+    def staged_score(self, X, y, sample_weight=None, n_estimators=-1):
+        """Returns the mean accuracy on the given test data and labels.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            Training set.
+
+        y : array-like, shape = [n_samples]
+            Labels for X.
+
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights.
+
+        Returns
+        -------
+        z : float
+
+        """
+        for y_pred in self.staged_predict(X, n_estimators=n_estimators):
+            if sample_weight is not None:
+                # weighted average
+                yield np.average((y_pred == y), weights=sample_weight)
+            yield np.mean(y_pred == y)
+
 
 class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
     """An AdaBoosted regressor.
