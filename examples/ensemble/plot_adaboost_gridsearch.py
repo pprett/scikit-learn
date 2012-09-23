@@ -1,12 +1,22 @@
 """
-============================================================
-Plot the decision surfaces on the Gaussian quantiles dataset
-============================================================
+================================================================
+Compare the speed of the default and boost-optimized grid search
+================================================================
 
-This plot shows the decision surfaces learned by an AdaBoosted decision tree
-classifier on the Gaussian quantiles dataset.
+This example performs a grid search of the minimum leaf size and number of
+estimators in an Adaboosted decision tree using
+`sklearn.grid_search.GridSearchCV`
+and a grid search optimized for boosted classifiers:
+`sklearn.ensemble.grid_search.BoostGridSearchCV`.
+
+The optimized grid search BoostGridSearchCV does not fit a classifier for all
+values of n_estimators, but only the maximum. This classifier can then be
+truncated to determine the scores for all number of estimators less than
+n_estimators.
 """
 print __doc__
+
+from time import time
 
 import numpy as np
 
@@ -19,34 +29,15 @@ from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.ensemble.grid_search import BoostGridSearchCV
+from sklearn.grid_search import GridSearchCV
 from sklearn.metrics import classification_report
-
-# Load data
-X, y = make_classification(n_samples=2000, n_features=5, n_classes=2,
-        n_informative=3,
-        n_redundant=2)
-
-clf = AdaBoostClassifier(DecisionTreeClassifier(), learn_rate=0.5)
-
-grid_params = {
-    'base_estimator__min_samples_leaf': range(20, 600, 20),
-}
-
-grid_clf = BoostGridSearchCV(
-        clf, grid_params,
-        max_n_estimators=200,
-        cv=StratifiedKFold(y, 3),
-        n_jobs=-1,
-        verbose=10)
-
-grid_clf.fit(X, y)
-
 
 def plot_grid_scores(
         grid_scores, best_point, params,
         label_all_bins=False,
         label_all_ticks=False,
-        n_ticks=10):
+        n_ticks=10,
+        title=None):
 
     param_names = sorted(grid_scores[0][0].keys())
     param_values = dict([(pname, []) for pname in param_names])
@@ -67,7 +58,7 @@ def plot_grid_scores(
         scores.itemset(tuple(index), score)
 
     fig = plt.figure(figsize=(7, 5), dpi=100)
-    ax = plt.axes([.1, .15, .8, .75])
+    ax = plt.axes([.12, .15, .8, .75])
     cmap = cm.get_cmap('jet', 100)
     img = ax.imshow(scores, interpolation="nearest", cmap=cmap,
             aspect='auto',
@@ -98,8 +89,10 @@ def plot_grid_scores(
         for label in xlabels:
             label.set_rotation(45)
 
-    ax.set_xlabel(params[param_names[1]], fontsize=12, position=(1., 0.), ha='right')
-    ax.set_ylabel(params[param_names[0]], fontsize=12, position=(0., 1.), va='top')
+    ax.set_xlabel(params[param_names[1]], fontsize=12,
+            position=(1., 0.), ha='right')
+    ax.set_ylabel(params[param_names[0]], fontsize=12,
+            position=(0., 1.), va='top')
 
     ax.set_frame_on(False)
     ax.xaxis.set_ticks_position('none')
@@ -119,24 +112,92 @@ def plot_grid_scores(
             if label_all_bins or decor:
                 plt.text(col, row, "%.3f" % (scores[row][col]), ha='center',
                          va='center', **decor)
+    if title:
+        plt.suptitle(title)
 
-    plt.suptitle("Classification score over parameter grid search.")
     plt.colorbar(img, fraction=.06, pad=0.03)
     plt.axis("tight")
-    plt.show()
 
-clf = grid_clf.best_estimator_
-grid_scores = grid_clf.grid_scores_
+# Load data
+X, y = make_classification(n_samples=2000, n_features=5, n_classes=2,
+        n_informative=3,
+        n_redundant=2)
+
+clf = AdaBoostClassifier(DecisionTreeClassifier(), learn_rate=0.5)
+
+grid_params_slow = {
+    'base_estimator__min_samples_leaf': range(20, 600, 20),
+    'n_estimators': range(1, 210, 10)
+}
+
+grid_params_fast = {
+    'base_estimator__min_samples_leaf': range(20, 600, 20),
+}
+
+grid_clf_slow = GridSearchCV(
+        clf, grid_params_slow,
+        cv=StratifiedKFold(y, 3),
+        n_jobs=-1,
+        verbose=10)
+
+grid_clf_fast = BoostGridSearchCV(
+        clf, grid_params_fast,
+        max_n_estimators=200,
+        cv=StratifiedKFold(y, 3),
+        n_jobs=-1,
+        verbose=10)
+
+print "=" * 30
+print "slow grid search ..."
+print "=" * 30
+
+tstart = time()
+grid_clf_slow.fit(X, y)
+slow_time = time() - tstart
+
+print "=" * 30
+print "fast grid search ..."
+print "=" * 30
+
+tstart = time()
+grid_clf_fast.fit(X, y)
+fast_time = time() - tstart
+
+print "slow grid search: %f [sec]" % slow_time
+print "fast grid search: %f [sec]" % fast_time
+
+clf_slow = grid_clf_slow.best_estimator_
+grid_scores_slow = grid_clf_slow.grid_scores_
+
+clf_fast = grid_clf_fast.best_estimator_
+grid_scores_fast = grid_clf_fast.grid_scores_
 
 plot_grid_scores(
-    grid_scores,
+    grid_scores_slow,
     best_point={
         'base_estimator__min_samples_leaf':
-        clf.base_estimator.min_samples_leaf,
+        clf_slow.base_estimator.min_samples_leaf,
         'n_estimators':
-        clf.n_estimators},
+        clf_slow.n_estimators},
     params={
         'base_estimator__min_samples_leaf':
         'minimum leaf size',
         'n_estimators':
-        'number of trees'})
+        'number of trees'},
+    title="Classification score over slow parameter grid search.")
+
+plot_grid_scores(
+    grid_scores_fast,
+    best_point={
+        'base_estimator__min_samples_leaf':
+        clf_fast.base_estimator.min_samples_leaf,
+        'n_estimators':
+        clf_fast.n_estimators},
+    params={
+        'base_estimator__min_samples_leaf':
+        'minimum leaf size',
+        'n_estimators':
+        'number of trees'},
+    title="Classification score over fast parameter grid search.")
+
+plt.show()
