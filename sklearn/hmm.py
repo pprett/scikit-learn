@@ -24,7 +24,6 @@ from .mixture import (
     GMM, log_multivariate_normal_density, sample_gaussian,
     distribute_covar_matrix_to_match_covariance_type, _validate_covars)
 from . import cluster
-from .utils import deprecated
 from . import _hmmc
 
 __all__ = ['GMMHMM',
@@ -381,11 +380,6 @@ class _BaseHMM(BaseEstimator):
                                 currstate, random_state=random_state))
 
         return np.array(obs), np.array(hidden_states, dtype=int)
-
-    @deprecated("rvs is deprecated in 0.11 will be removed in 0.13:"
-            + " use sample instead")
-    def rvs(self, n=1, random_state=None):
-        return self.sample(n, random_state)
 
     def fit(self, obs, **kwargs):
         """Estimate model parameters.

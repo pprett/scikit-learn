@@ -82,7 +82,7 @@ def fit_grid_point(X, y, sample_weight,
                                      for k, v in clf_params.iteritems()))
         print "[GridSearchCV] %s %s" % (msg, (64 - len(msg)) * '.')
 
-    X, y = check_arrays(X, y)
+    X, y = check_arrays(X, y, sparse_format="csr")
     # update parameters of the classifier after a copy of its base structure
     clf = clone(base_clf)
     clf.set_params(**clf_params)
@@ -349,10 +349,10 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
         self.pre_dispatch = pre_dispatch
 
     def _set_methods(self):
-        if hasattr(self._best_estimator_, 'predict'):
-            self.predict = self._best_estimator_.predict
-        if hasattr(self._best_estimator_, 'predict_proba'):
-            self.predict_proba = self._best_estimator_.predict_proba
+        if hasattr(self.best_estimator_, 'predict'):
+            self.predict = self.best_estimator_.predict
+        if hasattr(self.best_estimator_, 'predict_proba'):
+            self.predict_proba = self.best_estimator_.predict_proba
 
     def fit(self, X, y=None, sample_weight=None):
         """Run fit with all sets of parameters
@@ -401,7 +401,7 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
             params = next(iter(grid))
             base_clf.set_params(**params)
             base_clf.fit(X, y)
-            self._best_estimator_ = base_clf
+            self.best_estimator_ = base_clf
             self._set_methods()
             return self
 
@@ -460,7 +460,6 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
                 best_estimator.fit(X, y, sample_weight, **self.fit_params)
             else:
                 best_estimator.fit(X, y, **self.fit_params)
-            self._best_estimator_ = best_estimator
             self._set_methods()
 
         # Store the computed scores
@@ -481,14 +480,3 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
                              % self.best_estimator_)
         y_predicted = self.predict(X)
         return self.score_func(y, y_predicted)
-
-    # TODO around 0.13: remove this property, make it an attribute
-    @property
-    def best_estimator_(self):
-        if hasattr(self, '_best_estimator_'):
-            return self._best_estimator_
-        else:
-            raise RuntimeError("Grid search has to be run with 'refit=True'"
-                " to make predictions or obtain an instance  of the best "
-                " estimator. To obtain the best parameter settings, "
-                " use ``best_params_``.")

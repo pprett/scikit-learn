@@ -28,7 +28,6 @@ __all__ = ['CountVectorizer',
            'ENGLISH_STOP_WORDS',
            'TfidfTransformer',
            'TfidfVectorizer',
-           'Vectorizer',
            'strip_accents_ascii',
            'strip_accents_unicode',
            'strip_tags']
@@ -207,7 +206,7 @@ class CountVectorizer(BaseEstimator):
     def __init__(self, input='content', charset='utf-8',
                  charset_error='strict', strip_accents=None,
                  lowercase=True, preprocessor=None, tokenizer=None,
-                 stop_words=None, token_pattern=ur"\b\w\w+\b",
+                 stop_words=None, token_pattern=ur"(?u)\b\w\w+\b",
                  ngram_range=(1, 1),
                  min_n=None, max_n=None, analyzer='word',
                  max_df=1.0, min_df=2, max_features=None,
@@ -378,8 +377,8 @@ class CountVectorizer(BaseEstimator):
                 tokenize(preprocess(self.decode(doc))), stop_words)
 
         else:
-            raise ValueError('%s is not a valid tokenization scheme' %
-                             self.tokenize)
+            raise ValueError('%s is not a valid tokenization scheme/analyzer' %
+                             self.analyzer)
 
     def _term_count_dicts_to_matrix(self, term_count_dicts):
         i_indices = []
@@ -620,7 +619,6 @@ class TfidfTransformer(BaseEstimator, TransformerMixin):
         self.use_idf = use_idf
         self.smooth_idf = smooth_idf
         self.sublinear_tf = sublinear_tf
-        self.idf_ = None
 
     def fit(self, X, y=None):
         """Learn the idf vector (global term weights)
@@ -645,7 +643,10 @@ class TfidfTransformer(BaseEstimator, TransformerMixin):
             n_samples += int(self.smooth_idf)
 
             # avoid division by zeros for features that occur in all documents
-            self.idf_ = np.log(float(n_samples) / df) + 1.0
+            idf = np.log(float(n_samples) / df) + 1.0
+            idf_diag = sp.lil_matrix((n_features, n_features))
+            idf_diag.setdiag(idf)
+            self._idf_diag = sp.csc_matrix(idf_diag)
 
         return self
 
@@ -675,20 +676,25 @@ class TfidfTransformer(BaseEstimator, TransformerMixin):
             X.data += 1
 
         if self.use_idf:
-            expected_n_features = self.idf_.shape[0]
+            expected_n_features = self._idf_diag.shape[0]
             if n_features != expected_n_features:
                 raise ValueError("Input has n_features=%d while the model"
                                  " has been trained with n_features=%d" % (
                                      n_features, expected_n_features))
-            d = sp.lil_matrix((n_features, n_features))
-            d.setdiag(self.idf_)
             # *= doesn't work
-            X = X * d
+            X = X * self._idf_diag
 
         if self.norm:
             X = normalize(X, norm=self.norm, copy=False)
 
         return X
+
+    @property
+    def idf_(self):
+        if hasattr(self, "_idf_diag"):
+            return np.ravel(self._idf_diag.sum(axis=0))
+        else:
+            return None
 
 
 class TfidfVectorizer(CountVectorizer):
@@ -830,7 +836,7 @@ class TfidfVectorizer(CountVectorizer):
     def __init__(self, input='content', charset='utf-8',
             charset_error='strict', strip_accents=None, lowercase=True,
             preprocessor=None, tokenizer=None, analyzer='word',
-            stop_words=None, token_pattern=ur"\b\w\w+\b", min_n=None,
+            stop_words=None, token_pattern=ur"(?u)\b\w\w+\b", min_n=None,
             max_n=None, ngram_range=(1, 1), max_df=1.0, min_df=2,
             max_features=None, vocabulary=None, binary=False, dtype=long,
             norm='l2', use_idf=True, smooth_idf=True, sublinear_tf=False):
@@ -883,7 +889,7 @@ class TfidfVectorizer(CountVectorizer):
     def sublinear_tf(self, value):
         self._tfidf.sublinear_tf = value
 
-    def fit(self, raw_documents):
+    def fit(self, raw_documents, y=None):
         """Learn a conversion law from documents to array data"""
         X = super(TfidfVectorizer, self).fit_transform(raw_documents)
         self._tfidf.fit(X)
@@ -921,27 +927,3 @@ class TfidfVectorizer(CountVectorizer):
         """
         X = super(TfidfVectorizer, self).transform(raw_documents)
         return self._tfidf.transform(X, copy)
-
-
-class Vectorizer(TfidfVectorizer):
-    """Vectorizer is deprecated in 0.11, use TfidfVectorizer instead"""
-
-    def __init__(self, input='content', charset='utf-8',
-            charset_error='strict', strip_accents=None, lowercase=True,
-            preprocessor=None, tokenizer=None, analyzer='word',
-            stop_words=None, token_pattern=ur"\b\w\w+\b", min_n=None,
-            max_n=None, ngram_range=(1, 1), max_df=1.0, min_df=2,
-            max_features=None, vocabulary=None, binary=False, dtype=long,
-            norm='l2', use_idf=True, smooth_idf=True, sublinear_tf=False):
-        warnings.warn("Vectorizer is deprecated in 0.11 and will be removed"
-                     " in 0.13. Please use TfidfVectorizer instead.",
-                      category=DeprecationWarning, stacklevel=2)
-        super(Vectorizer, self).__init__(
-            input=input, charset=charset, charset_error=charset_error,
-            strip_accents=strip_accents, lowercase=lowercase,
-            preprocessor=preprocessor, tokenizer=tokenizer, analyzer=analyzer,
-            stop_words=stop_words, token_pattern=token_pattern, min_n=min_n,
-            max_n=max_n, max_df=max_df, min_df=min_df,
-            max_features=max_features, vocabulary=vocabulary, binary=False,
-            dtype=dtype, norm=norm, use_idf=use_idf, smooth_idf=smooth_idf,
-            sublinear_tf=sublinear_tf)

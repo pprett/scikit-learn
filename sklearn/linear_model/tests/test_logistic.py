@@ -3,7 +3,7 @@ import scipy.sparse as sp
 
 from numpy.testing import assert_array_equal
 import nose
-from nose.tools import assert_raises, raises
+from nose.tools import assert_equal, assert_raises, raises
 
 from sklearn.utils.testing import assert_greater
 
@@ -65,14 +65,15 @@ def test_predict_3_classes():
 def test_predict_iris():
     """Test logisic regression with the iris dataset"""
 
-    clf = logistic.LogisticRegression(C=len(iris.data)).fit(iris.data,
-                                                            iris.target)
+    target = iris.target_names[iris.target]
+    clf = logistic.LogisticRegression(C=len(iris.data)).fit(iris.data, target)
+    assert_equal(set(target), set(clf.classes_))
 
     pred = clf.predict(iris.data)
-    assert_greater(np.mean(pred == iris.target), .95)
+    assert_greater(np.mean(pred == target), .95)
 
-    pred = clf.predict_proba(iris.data).argmax(axis=1)
-    assert_greater(np.mean(pred == iris.target), .95)
+    pred = iris.target_names[clf.predict_proba(iris.data).argmax(axis=1)]
+    assert_greater(np.mean(pred == target), .95)
 
 
 def test_inconsistent_input():
@@ -91,6 +92,18 @@ def test_inconsistent_input():
     # Wrong dimensions for test data
     assert_raises(ValueError, clf.fit(X_, y_).predict,
             rng.random_sample((3, 12)))
+
+
+def test_write_parameters():
+    """Test that we can write to coef_ and intercept_"""
+    #rng = np.random.RandomState(0)
+    #X = rng.random_sample((5, 10))
+    #y = np.ones(X.shape[0])
+    clf = logistic.LogisticRegression()
+    clf.fit(X, Y1)
+    clf.coef_[:] = 0
+    clf.intercept_[:] = 0
+    assert_array_equal(clf.decision_function(X), 0)
 
 
 @raises(ValueError)

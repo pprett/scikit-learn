@@ -259,7 +259,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
 
             n_jobs, _, starts = _partition_features(self, self.n_features_)
 
-            all_X_argsorted = Parallel(n_jobs=n_jobs)(
+            all_X_argsorted = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
                 delayed(_parallel_X_argsort)(
                     X[:, starts[i]:starts[i + 1]])
                 for i in xrange(n_jobs))
@@ -475,7 +475,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
         n_jobs, n_trees, starts = _partition_trees(self)
 
         # Parallel loop
-        all_p = Parallel(n_jobs=n_jobs)(
+        all_p = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
             delayed(_parallel_predict_proba)(
                 self.estimators_[starts[i]:starts[i + 1]],
                 X,
@@ -582,7 +582,7 @@ class ForestRegressor(BaseForest, RegressorMixin):
         n_jobs, n_trees, starts = _partition_trees(self)
 
         # Parallel loop
-        all_y_hat = Parallel(n_jobs=n_jobs)(
+        all_y_hat = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
             delayed(_parallel_predict_regression)(
                 self.estimators_[starts[i]:starts[i + 1]], X)
             for i in xrange(n_jobs))
