@@ -28,13 +28,12 @@ X, y = make_gaussian_quantiles(n_samples=5000, n_features=3,
 clf = AdaBoostClassifier(DecisionTreeClassifier(), learn_rate=0.5)
 
 grid_params = {
-    'base_estimator__min_samples_leaf': range(10, 500, 50),
-    #'n_estimators': range(10, 800, 50)
+    'base_estimator__min_samples_leaf': range(10, 500, 10),
 }
 
 grid_clf = BoostGridSearchCV(
         clf, grid_params,
-        n_estimators_range=range(10, 800, 50),
+        max_n_estimators=500,
         cv=StratifiedKFold(y, 3),
         n_jobs=-1,
         verbose=10)
@@ -53,8 +52,11 @@ def plot_grid_scores(
         for pname in param_names:
             param_values[pname].append(pvalues[pname])
 
+    # remove duplicates
     for pname in param_names:
         param_values[pname] = np.unique(param_values[pname]).tolist()
+
+    print param_values
 
     scores = np.empty(shape=[len(param_values[pname]) for pname in param_names])
 
@@ -63,6 +65,7 @@ def plot_grid_scores(
         for pname in param_names:
             index.append(param_values[pname].index(pvalues[pname]))
         scores.itemset(tuple(index), score)
+    print scores
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -101,23 +104,20 @@ def plot_grid_scores(
     ax.xaxis.set_ticks_position('none')
     ax.yaxis.set_ticks_position('none')
 
-    if label_all_bins:
-        for row in range(scores.shape[0]):
-            for col in range(scores.shape[1]):
-                decor={}
-                if ((param_values[param_names[0]].index(best_point[param_names[0]])
-                     == row) and
-                    (param_values[param_names[1]].index(best_point[param_names[1]])
-                     == col)):
-                    decor = dict(weight='bold',
-                                 bbox=dict(boxstyle="round,pad=0.5",
-                                           ec='black',
-                                           fill=False))
+    for row in range(scores.shape[0]):
+        for col in range(scores.shape[1]):
+            decor={}
+            if ((param_values[param_names[0]].index(best_point[param_names[0]])
+                 == row) and
+                (param_values[param_names[1]].index(best_point[param_names[1]])
+                 == col)):
+                decor = dict(weight='bold',
+                             bbox=dict(boxstyle="round,pad=0.5",
+                                       ec='black',
+                                       fill=False))
+            if label_all_bins or decor:
                 plt.text(col, row, "%.3f" % (scores[row][col]), ha='center',
                          va='center', **decor)
-    else:
-        # circle the best bin and label the parameters
-        pass
 
     plt.suptitle("Classification accuracy over parameter grid search.")
     plt.colorbar(img)
@@ -126,9 +126,6 @@ def plot_grid_scores(
 
 clf = grid_clf.best_estimator_
 grid_scores = grid_clf.grid_scores_
-
-y_pred = clf.predict(X)
-print classification_report(y, y_pred)
 
 plot_grid_scores(
     grid_scores,
