@@ -544,11 +544,13 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         z : float
 
         """
-        for y_pred in self.staged_predict(X, n_estimators=n_estimators):
-            if sample_weight is not None:
+        if sample_weight is not None:
+            for y_pred in self.staged_predict(X, n_estimators=n_estimators):
                 # weighted average
                 yield np.average((y_pred == y), weights=sample_weight)
-            yield np.mean(y_pred == y)
+        else:
+            for y_pred in self.staged_predict(X, n_estimators=n_estimators):
+                yield np.mean(y_pred == y)
 
 
 class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
