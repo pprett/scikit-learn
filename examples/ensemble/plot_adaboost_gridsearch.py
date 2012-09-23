@@ -30,7 +30,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.cross_validation import StratifiedKFold
 from sklearn.ensemble.grid_search import BoostGridSearchCV
 from sklearn.grid_search import GridSearchCV
-from sklearn.metrics import classification_report
 
 def plot_grid_scores(
         grid_scores, best_point, params,
