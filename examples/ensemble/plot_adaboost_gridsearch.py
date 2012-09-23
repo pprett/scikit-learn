@@ -14,7 +14,7 @@ from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.ticker import IndexLocator, FuncFormatter
 
-from sklearn.datasets import make_gaussian_quantiles
+from sklearn.datasets import make_classification
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.cross_validation import StratifiedKFold
@@ -22,18 +22,19 @@ from sklearn.ensemble.grid_search import BoostGridSearchCV
 from sklearn.metrics import classification_report
 
 # Load data
-X, y = make_gaussian_quantiles(n_samples=5000, n_features=3,
-                               n_classes=3)
+X, y = make_classification(n_samples=1000, n_features=5, n_classes=2,
+        n_informative=3,
+        n_redundant=2)
 
 clf = AdaBoostClassifier(DecisionTreeClassifier(), learn_rate=0.5)
 
 grid_params = {
-    'base_estimator__min_samples_leaf': range(10, 500, 10),
+    'base_estimator__min_samples_leaf': range(20, 500, 20),
 }
 
 grid_clf = BoostGridSearchCV(
         clf, grid_params,
-        max_n_estimators=500,
+        max_n_estimators=200,
         cv=StratifiedKFold(y, 3),
         n_jobs=-1,
         verbose=10)
@@ -56,8 +57,6 @@ def plot_grid_scores(
     for pname in param_names:
         param_values[pname] = np.unique(param_values[pname]).tolist()
 
-    print param_values
-
     scores = np.empty(shape=[len(param_values[pname]) for pname in param_names])
 
     for pvalues, score, cv_scores in grid_scores:
@@ -65,7 +64,6 @@ def plot_grid_scores(
         for pname in param_names:
             index.append(param_values[pname].index(pvalues[pname]))
         scores.itemset(tuple(index), score)
-    print scores
 
     fig = plt.figure()
     ax = fig.add_subplot(111)

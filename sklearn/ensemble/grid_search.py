@@ -175,6 +175,17 @@ def score_each_boost(X, y, sample_weight, clf, clf_params,
                 all_clf_params.append(clf_para)
                 n_test_samples.append(this_n_test_samples)
 
+    # boosting may have stopped early
+    if len(all_scores) < clf.n_estimators:
+        last_score = all_scores[-1]
+        last_clf_params = all_clf_params[-1]
+        for i in range(len(all_scores), clf.n_estimators):
+            all_scores.append(last_score)
+            clf_para = copy(last_clf_params)
+            clf_para['n_estimators'] = i + 1
+            all_clf_params.append(clf_para)
+            n_test_samples.append(this_n_test_samples)
+
     if verbose > 1:
         end_msg = "%s -%s" % (msg,
                               logger.short_format_time(time.time() -
@@ -245,6 +256,8 @@ class BoostGridSearchCV(GridSearchCV):
                 self.verbose, **self.fit_params)
                     for clf_params in grid
                     for train, test in cv)
+        print len(clfs)
+
         # now use the already fitted ensembles but trancate to N estimators for
         # N from 1 to n_estimators_max - 1 (inclusive)
         out = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
