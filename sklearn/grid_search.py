@@ -460,6 +460,7 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
                 best_estimator.fit(X, y, sample_weight, **self.fit_params)
             else:
                 best_estimator.fit(X, y, **self.fit_params)
+            self.best_estimator_ = best_estimator
             self._set_methods()
 
         # Store the computed scores
