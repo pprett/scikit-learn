@@ -67,10 +67,11 @@ class IterGrid(object):
                 yield params
 
 
-def fit_grid_point(X, y, sample_weight, base_clf,
-                   clf_params, train, test, loss_func,
-                   score_func, verbose, remember_clf,
-                   **fit_params):
+def fit_grid_point(X, y, sample_weight,
+                   base_clf, clf_params,
+                   train, test,
+                   loss_func, score_func,
+                   verbose, **fit_params):
     """Run fit on one set of parameters
 
     Returns the score and the instance of the classifier
@@ -154,10 +155,7 @@ def fit_grid_point(X, y, sample_weight, base_clf,
                               logger.short_format_time(time.time() -
                                                        start_time))
         print "[GridSearchCV] %s %s" % ((64 - len(end_msg)) * '.', end_msg)
-    if remember_clf:
-        return this_score, clf, this_n_test_samples
-    else:
-        return this_score, clf_params, this_n_test_samples
+    return this_score, clf_params, this_n_test_samples
 
 
 def _check_param_grid(param_grid):
@@ -412,7 +410,7 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
                 pre_dispatch=pre_dispatch)(
             delayed(fit_grid_point)(
                 X, y, sample_weight, base_clf, clf_params, train, test,
-                self.loss_func, self.score_func, self.verbose, False,
+                self.loss_func, self.score_func, self.verbose,
                 **self.fit_params)
                     for clf_params in grid for train, test in cv)
 
