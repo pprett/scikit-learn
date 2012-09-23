@@ -256,7 +256,6 @@ class BoostGridSearchCV(GridSearchCV):
                 self.verbose, **self.fit_params)
                     for clf_params in grid
                     for train, test in cv)
-        print len(clfs)
 
         # now use the already fitted ensembles but trancate to N estimators for
         # N from 1 to n_estimators_max - 1 (inclusive)
