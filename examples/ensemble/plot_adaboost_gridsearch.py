@@ -22,7 +22,7 @@ import numpy as np
 
 from matplotlib import cm
 from matplotlib import pyplot as plt
-from matplotlib.ticker import IndexLocator, FuncFormatter
+from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 from sklearn.datasets import make_classification
 from sklearn.ensemble import AdaBoostClassifier
@@ -35,7 +35,7 @@ def plot_grid_scores(
         grid_scores, best_point, params,
         label_all_bins=False,
         label_all_ticks=False,
-        n_ticks=10,
+        n_ticks=11,
         title=None):
 
     param_names = sorted(grid_scores[0][0].keys())
@@ -71,19 +71,22 @@ def plot_grid_scores(
     else:
         trees = param_values[param_names[1]]
         def tree_formatter(x, pos):
+            if x >= len(trees) or x < 0:
+                return ''
             return str(trees[int(x)])
 
         leaves = param_values[param_names[0]]
         def leaf_formatter(x, pos):
+            if x >= len(leaves) or x < 0:
+                return ''
             return str(leaves[int(x)])
-
-        x_base = scores.shape[1] / n_ticks
-        y_base = scores.shape[0] / n_ticks
 
         ax.xaxis.set_major_formatter(FuncFormatter(tree_formatter))
         ax.yaxis.set_major_formatter(FuncFormatter(leaf_formatter))
-        ax.xaxis.set_major_locator(IndexLocator(max(1, x_base), 0))
-        ax.yaxis.set_major_locator(IndexLocator(max(1, y_base), 0))
+        ax.xaxis.set_major_locator(MaxNLocator(n_ticks, integer=True,
+            prune='lower', steps=[1, 5, 10]))
+        ax.yaxis.set_major_locator(MaxNLocator(n_ticks, integer=True,
+            steps=[1, 5, 10]))
         xlabels = ax.get_xticklabels()
         for label in xlabels:
             label.set_rotation(45)
@@ -125,12 +128,12 @@ X, y = make_classification(n_samples=2000, n_features=5, n_classes=2,
 clf = AdaBoostClassifier(DecisionTreeClassifier(), learn_rate=0.5)
 
 grid_params_slow = {
-    'base_estimator__min_samples_leaf': range(20, 600, 20),
-    'n_estimators': range(1, 210, 10)
+    'base_estimator__min_samples_leaf': range(1, 600, 50),
+    'n_estimators': range(1, 1001, 100)
 }
 
 grid_params_fast = {
-    'base_estimator__min_samples_leaf': range(20, 600, 20),
+    'base_estimator__min_samples_leaf': range(1, 600, 20),
 }
 
 grid_clf_slow = GridSearchCV(
@@ -141,7 +144,7 @@ grid_clf_slow = GridSearchCV(
 
 grid_clf_fast = BoostGridSearchCV(
         clf, grid_params_fast,
-        max_n_estimators=200,
+        max_n_estimators=1000,
         cv=StratifiedKFold(y, 3),
         n_jobs=-1,
         verbose=10)
