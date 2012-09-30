@@ -84,7 +84,9 @@ def fit_grid_point(X, y, sample_weight, base_clf,
         print "[BoostGridSearchCV] %s %s" % ((64 - len(end_msg)) * '.', end_msg)
     return clf, clf_params, train, test
 
-def score_each_boost(X, y, sample_weight, clf, clf_params,
+def score_each_boost(X, y, sample_weight,
+                     clf, clf_params,
+                     min_n_estimators,
                      train, test, loss_func,
                      score_func, verbose):
     """Run fit on one set of parameters
@@ -147,6 +149,8 @@ def score_each_boost(X, y, sample_weight, clf, clf_params,
     # TODO: include support for sample_weight in score functions
     if loss_func is not None or score_func is not None:
         for i, y_pred in enumerate(clf.staged_predict(X_test)):
+            if i + 1 < min_n_estimators:
+                continue
             if loss_func is not None:
                 score = -loss_func(y_test, y_pred)
             elif score_func is not None:
@@ -161,6 +165,8 @@ def score_each_boost(X, y, sample_weight, clf, clf_params,
         if sample_weight_test is not None:
             for i, score in enumerate(clf.staged_score(X_test, y_test,
                 sample_weight=sample_weight_test)):
+                if i + 1 < min_n_estimators:
+                    continue
                 all_scores.append(score)
                 clf_para = copy(clf_params)
                 clf_para['n_estimators'] = i + 1
@@ -169,6 +175,8 @@ def score_each_boost(X, y, sample_weight, clf, clf_params,
 
         else:
             for i, score in enumerate(clf.staged_score(X_test, y_test)):
+                if i + 1 < min_n_estimators:
+                    continue
                 all_scores.append(score)
                 clf_para = copy(clf_params)
                 clf_para['n_estimators'] = i + 1
@@ -176,10 +184,11 @@ def score_each_boost(X, y, sample_weight, clf, clf_params,
                 n_test_samples.append(this_n_test_samples)
 
     # boosting may have stopped early
-    if len(all_scores) < clf.n_estimators:
+    if len(all_scores) < clf.n_estimators - min_n_estimators + 1:
         last_score = all_scores[-1]
         last_clf_params = all_clf_params[-1]
-        for i in range(len(all_scores), clf.n_estimators):
+        for i in range(len(all_scores),
+                clf.n_estimators - min_n_estimators + 1):
             all_scores.append(last_score)
             clf_para = copy(last_clf_params)
             clf_para['n_estimators'] = i + 1
@@ -196,11 +205,21 @@ def score_each_boost(X, y, sample_weight, clf, clf_params,
 
 class BoostGridSearchCV(GridSearchCV):
 
-    def __init__(self, estimator, param_grid, max_n_estimators,
+    def __init__(self, estimator, param_grid,
+            max_n_estimators,
+            min_n_estimators=1,
             **kwargs):
 
-        assert 'n_estimators' not in param_grid
+        if 'n_estimators' in param_grid:
+            raise ValueError(
+                    'do not include n_estimators in param_grid when '
+                    'using BoostGridSearchCV')
+        if min_n_estimators < 1 or min_n_estimators >= max_n_estimators:
+            raise ValueError(
+                    'min_n_estimators must be 1 or greater and less than '
+                    'max_n_estimators')
         self.max_n_estimators = max_n_estimators
+        self.min_n_estimators = min_n_estimators
         super(BoostGridSearchCV, self).__init__(
                 estimator=estimator,
                 param_grid=param_grid,
@@ -262,28 +281,32 @@ class BoostGridSearchCV(GridSearchCV):
         out = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                 pre_dispatch=pre_dispatch)(
             delayed(score_each_boost)(
-                X, y, sample_weight, clf, clf_params, train, test,
+                X, y, sample_weight,
+                clf, clf_params,
+                self.min_n_estimators,
+                train, test,
                 self.loss_func, self.score_func, self.verbose)
                     for clf, clf_params, train, test in clfs)
 
         out = reduce(operator.add, [zip(*stage) for stage in out])
         # out is now a list of triplet: score, estimator_params, n_test_samples
 
-        n_grid_points = len(list(grid)) * self.max_n_estimators
+        n_estimators_points = self.max_n_estimators - self.min_n_estimators + 1
+        n_grid_points = len(list(grid)) * n_estimators_points
         n_fits = len(out)
         n_folds = n_fits // n_grid_points
 
         scores = list()
         cv_scores = list()
-        for block in range(0, n_fits, n_folds * self.max_n_estimators):
-            for grid_start in range(block, block + self.max_n_estimators):
+        for block in range(0, n_fits, n_folds * n_estimators_points):
+            for grid_start in range(block, block + n_estimators_points):
                 n_test_samples = 0
                 score = 0
                 these_points = list()
                 for this_score, clf_params, this_n_test_samples in \
                         out[grid_start:
-                            grid_start + n_folds * self.max_n_estimators:
-                            self.max_n_estimators]:
+                            grid_start + n_folds * n_estimators_points:
+                            n_estimators_points]:
                     these_points.append(this_score)
                     if self.iid:
                         this_score *= this_n_test_samples
