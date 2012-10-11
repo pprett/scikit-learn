@@ -198,7 +198,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self.compute_importances = compute_importances
         self.oob_score = oob_score
         self.n_jobs = n_jobs
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
         self.n_features_ = None
         self.n_outputs_ = None
@@ -225,6 +225,8 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         self : object
             Returns self.
         """
+        self.random_state = check_random_state(self.random_state)
+
         # Precompute some data
         X, y = check_arrays(X, y, sparse_format="dense")
         if getattr(X, "dtype", None) != DTYPE or \
@@ -246,7 +248,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
 
             n_jobs, _, starts = _partition_features(self, self.n_features_)
 
-            all_X_argsorted = Parallel(n_jobs=n_jobs)(
+            all_X_argsorted = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
                 delayed(_parallel_X_argsort)(
                     X[:, starts[i]:starts[i + 1]])
                 for i in xrange(n_jobs))
@@ -461,7 +463,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
         n_jobs, n_trees, starts = _partition_trees(self)
 
         # Parallel loop
-        all_p = Parallel(n_jobs=n_jobs)(
+        all_p = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
             delayed(_parallel_predict_proba)(
                 self.estimators_[starts[i]:starts[i + 1]],
                 X,
@@ -472,7 +474,7 @@ class ForestClassifier(BaseForest, ClassifierMixin):
         # Reduce
         p = all_p[0]
 
-        for j in xrange(1, self.n_jobs):
+        for j in xrange(1, len(all_p)):
             for k in xrange(self.n_outputs_):
                 p[k] += all_p[j][k]
 
@@ -568,7 +570,7 @@ class ForestRegressor(BaseForest, RegressorMixin):
         n_jobs, n_trees, starts = _partition_trees(self)
 
         # Parallel loop
-        all_y_hat = Parallel(n_jobs=n_jobs)(
+        all_y_hat = Parallel(n_jobs=n_jobs, verbose=self.verbose)(
             delayed(_parallel_predict_regression)(
                 self.estimators_[starts[i]:starts[i + 1]], X)
             for i in xrange(n_jobs))

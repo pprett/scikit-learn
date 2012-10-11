@@ -16,7 +16,7 @@ import warnings
 import numpy as np
 import scipy.sparse as sp
 
-from ..base import BaseEstimator
+from ..base import BaseEstimator, ClusterMixin
 from ..metrics.pairwise import euclidean_distances
 from ..utils.sparsefuncs import mean_variance_axis0
 from ..utils import check_arrays
@@ -232,8 +232,9 @@ def k_means(X, n_clusters, init='k-means++', precompute_distances=True,
 
     if not k is None:
         n_clusters = k
-        warnings.warn("Parameter k was renamed to n_clusters",
-                DeprecationWarning)
+        warnings.warn("Parameter k has been renamed by 'n_clusters'"
+                " and will be removed in release 0.14.",
+                DeprecationWarning, stacklevel=2)
 
     best_inertia = np.infty
     X = as_float_array(X, copy=copy_x)
@@ -573,7 +574,7 @@ def _init_centroids(X, k, init, random_state=None, x_squared_norms=None,
         n_samples = X.shape[0]
     elif n_samples < k:
             raise ValueError(
-                "n_samples=%d should be larger than k=%d" % (init_size, k))
+                "n_samples=%d should be larger than k=%d" % (n_samples, k))
 
     if init == 'k-means++':
         centers = _k_init(X, k,
@@ -596,7 +597,7 @@ def _init_centroids(X, k, init, random_state=None, x_squared_norms=None,
     return centers
 
 
-class KMeans(BaseEstimator):
+class KMeans(BaseEstimator, ClusterMixin):
     """K-Means clustering
 
     Parameters
@@ -740,7 +741,8 @@ class KMeans(BaseEstimator):
 
         if not self.k is None:
             n_clusters = self.k
-            warnings.warn("Parameter k was renamed to n_clusters",
+            warnings.warn("Parameter k has been renamed by 'n_clusters'"
+                    " and will be removed in release 0.14.",
                     DeprecationWarning, stacklevel=2)
             self.n_clusters = n_clusters
         else:
@@ -1048,18 +1050,13 @@ class MiniBatchKMeans(KMeans):
     def __init__(self, n_clusters=8, init='k-means++', max_iter=100,
                  batch_size=100, verbose=0, compute_labels=True,
                  random_state=None, tol=0.0, max_no_improvement=10,
-                 init_size=None, n_init=3, chunk_size=None, k=None):
+                 init_size=None, n_init=3, k=None):
 
         super(MiniBatchKMeans, self).__init__(n_clusters=n_clusters, init=init,
               max_iter=max_iter, verbose=verbose, random_state=random_state,
               tol=tol, n_init=n_init, k=k)
 
         self.max_no_improvement = max_no_improvement
-        if chunk_size is not None:
-            warnings.warn(
-                "chunk_size is deprecated in 0.10, use batch_size instead",
-                PendingDeprecationWarning, stacklevel=2)
-            batch_size = chunk_size
         self.batch_size = batch_size
         self.compute_labels = compute_labels
         self.init_size = init_size
@@ -1073,6 +1070,11 @@ class MiniBatchKMeans(KMeans):
             Coordinates of the data points to cluster
         """
         self.random_state = check_random_state(self.random_state)
+        if self.k is not None:
+            warnings.warn("Parameter k has been replaced by 'n_clusters'"
+                " and will be removed in release 0.14.",
+                DeprecationWarning, stacklevel=2)
+            self.n_clusters = self.k
         X = check_arrays(X, sparse_format="csr", copy=False,
                          check_ccontiguous=True, dtype=np.float64)[0]
         n_samples, n_features = X.shape

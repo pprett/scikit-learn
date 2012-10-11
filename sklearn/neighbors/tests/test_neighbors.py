@@ -1,6 +1,6 @@
 import warnings
 
-from nose.tools import assert_equal
+from nose.tools import assert_equal, assert_true
 
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_array_equal
@@ -189,6 +189,23 @@ def test_kneighbors_classifier(n_samples=40,
             assert_array_equal(y_pred, y[:n_test_pts])
 
 
+def test_kneighbors_classifier_float_labels(n_samples=40,
+                               n_features=5,
+                               n_test_pts=10,
+                               n_neighbors=5,
+                               random_state=0):
+    """Test k-neighbors classification"""
+    rng = np.random.RandomState(random_state)
+    X = 2 * rng.rand(n_samples, n_features) - 1
+    y = ((X ** 2).sum(axis=1) < .5).astype(np.int)
+
+    knn = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)
+    knn.fit(X, y.astype(np.float))
+    epsilon = 1e-5 * (2 * rng.rand(1, n_features) - 1)
+    y_pred = knn.predict(X[:n_test_pts] + epsilon)
+    assert_array_equal(y_pred, y[:n_test_pts])
+
+
 def test_kneighbors_classifier_predict_proba():
     """Test KNeighborsClassifier.predict_proba() method"""
     X = np.array([[0, 2, 0],
@@ -350,7 +367,7 @@ def test_kneighbors_regressor(n_samples=40,
             knn.fit(X, y)
             epsilon = 1E-5 * (2 * rng.rand(1, n_features) - 1)
             y_pred = knn.predict(X[:n_test_pts] + epsilon)
-            assert np.all(abs(y_pred - y_target) < 0.3)
+            assert_true(np.all(abs(y_pred - y_target) < 0.3))
 
 
 def test_radius_neighbors_regressor(n_samples=40,
@@ -376,7 +393,7 @@ def test_radius_neighbors_regressor(n_samples=40,
             neigh.fit(X, y)
             epsilon = 1E-5 * (2 * rng.rand(1, n_features) - 1)
             y_pred = neigh.predict(X[:n_test_pts] + epsilon)
-            assert np.all(abs(y_pred - y_target) < radius / 2)
+            assert_true(np.all(abs(y_pred - y_target) < radius / 2))
 
 
 def test_kneighbors_regressor_sparse(n_samples=40,
@@ -398,8 +415,7 @@ def test_kneighbors_regressor_sparse(n_samples=40,
         knn.fit(sparsemat(X), y)
         for sparsev in SPARSE_OR_DENSE:
             X2 = sparsev(X)
-            assert (np.mean(knn.predict(X2).round() == y)
-                    > 0.95)
+            assert_true(np.mean(knn.predict(X2).round() == y) > 0.95)
 
 
 def test_neighbors_iris():
@@ -417,13 +433,13 @@ def test_neighbors_iris():
 
         clf.set_params(n_neighbors=9, algorithm=algorithm)
         clf.fit(iris.data, iris.target)
-        assert np.mean(clf.predict(iris.data) == iris.target) > 0.95
+        assert_true(np.mean(clf.predict(iris.data) == iris.target) > 0.95)
 
         rgs = neighbors.KNeighborsRegressor(n_neighbors=5, algorithm=algorithm,
                 warn_on_equidistant=False)
         rgs.fit(iris.data, iris.target)
-        assert np.mean(
-            rgs.predict(iris.data).round() == iris.target) > 0.95
+        assert_true(np.mean(rgs.predict(iris.data).round() == iris.target)
+                    > 0.95)
 
 
 def test_neighbors_digits():
@@ -446,7 +462,7 @@ def test_neighbors_digits():
     score_uint8 = clf.fit(X_train, Y_train).score(X_test, Y_test)
     score_float = clf.fit(X_train.astype(float), Y_train).score(
         X_test.astype(float), Y_test)
-    assert score_uint8 == score_float
+    assert_equal(score_uint8, score_float)
 
 
 def test_kneighbors_graph():

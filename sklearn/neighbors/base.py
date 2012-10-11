@@ -8,6 +8,7 @@
 import warnings
 
 import numpy as np
+from abc import ABCMeta, abstractmethod
 from scipy.sparse import csr_matrix, issparse
 from scipy.spatial.ckdtree import cKDTree
 
@@ -15,6 +16,7 @@ from .ball_tree import BallTree
 from ..base import BaseEstimator
 from ..metrics import pairwise_distances
 from ..utils import safe_asarray, atleast2d_or_csr, check_arrays
+from ..utils.fixes import unique
 
 
 class NeighborsWarning(UserWarning):
@@ -71,6 +73,12 @@ def _get_weights(dist, weights):
 
 class NeighborsBase(BaseEstimator):
     """Base class for nearest neighbors estimators."""
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __init__(self):
+        pass
+
     #FIXME: include float parameter p for using different distance metrics.
     # this can be passed directly to BallTree and cKDTree.  Brute-force will
     # rely on soon-to-be-updated functionality in the pairwise module.
@@ -569,8 +577,7 @@ class SupervisedIntegerMixin(object):
             Target values, array of integer values.
         """
         X, y = check_arrays(X, y, sparse_format="csr")
-        self._y = y
-        self._classes = np.sort(np.unique(y))
+        self.classes_, self._y = unique(y, return_inverse=True)
         return self._fit(X)
 
 

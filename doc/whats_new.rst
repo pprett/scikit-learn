@@ -1,5 +1,103 @@
 .. currentmodule:: sklearn
 
+.. _changes_0_13:
+
+0.13
+====
+
+Changelog
+---------
+
+   - The table of contents has now been made expandible (on the
+     index page) - by Jaques Grobler.
+
+   - :class:`feature_selection.SelectPercentile` now breaks ties
+     deterministically instead of returning all equally ranked features.
+
+   - Ridge regression and ridge classification fitting with ``sparse_cg`` solver
+     no longer has quadratic memory complexity, by `Lars Buitinck`_ and
+     `Fabian Pedregosa`_.
+
+   - Ridge regression and ridge classification now support a new fast solver
+     called ``lsqr``, by `Mathieu Blondel`_.
+
+   - Speed up of :func:`metrics.precision_recall_curve` by Conrad Lee.
+
+   - Added support for reading/writing svmlight files with pairwise
+     preference attribute (qid in svmlight file format) in
+     :func:`datasets.dump_svmlight_file` and
+     :func:`datasets.load_svmlight_file` by `Fabian Pedregosa`_.
+
+   - New estimator :ref:`FeatureUnion <feature_union>` that concatenates results
+     of several transformers by `Andreas Müller`_.
+
+
+API changes summary
+-------------------
+
+   - The module ``sklearn.linear_model.sparse`` is gone. Sparse matrix support
+     was already integrated into the "regular" linear models.
+
+   - ``sklearn.metrics.mean_square_error``, which incorrectly returned the
+     cumulated error, was removed. Use ``mean_squared_error`` instead.
+
+   - Passing ``class_weight`` parameters to ``fit`` methods is no longer
+     supported. Pass them to estimator constuctors instead.
+
+   - GMMs no longer have ``decode`` and ``rvs`` methods. Use the ``score``,
+     ``predict`` or ``sample`` methods instead.
+
+   - The ``solver`` fit option in Ridge regression and classification is now
+     deprecated and will be removed in v0.14. Use the constructor option
+     instead.
+
+   - :class:`DictVectorizer` now returns sparse matrices in the CSR format,
+     instead of COO.
+
+.. _changes_0_12.1:
+
+0.12.1
+=======
+
+The 0.12.1 release is a bug-fix release with no additional feature, but a
+set of bug fixed
+
+Changelog
+----------
+
+ - Improved numerical stability in spectral embedding by `Gael
+   Varoquaux`_
+
+ - Doctest under windows 64bit by `Gael Varoquaux`_
+
+ - Documentation fixes for elastic net by `Andreas Mueller`_ and
+ `Alexandre Gramfort`_
+
+ - Proper behavior with fortran-ordered numpy arrays by `Gael Varoquaux`_
+
+ - Make GridSearchCV work with non-CSR sparse matrix by `Lars Buitinck`_
+
+ - Fix parallel computing in MDS by `Gael Varoquaux`_
+
+ - Fix unicode support in count vectorizer by `Andreas Mueller`_
+
+ - Fix MinCovDet breaking with X.shape = (3, 1) by `Virgile Fritsch`_
+
+ - Fix clone of SGD objects by `Peter Prettenhofer`_
+
+ - Stabilize GMM by `Virgile Fritsch`_
+
+People
+------
+
+ *  14  `Peter Prettenhofer`_
+ *  10  `Andreas Mueller`_
+ *  10  `Gael Varoquaux`_
+ *   5  `Lars Buitinck`_
+ *   3  `Virgile Fritsch`_
+ *   1  `Alexandre Gramfort`_
+ *   1  `Gilles Louppe`_
+ *   1  `Mathieu Blondel`_
 
 .. _changes_0_12:
 
@@ -64,13 +162,25 @@ Changelog
    - Fixed bug in spectral clustering that led to single point clusters
      by `Andreas Müller`_.
 
+   - In :class:`feature_extraction.text.CountVectorizer`, added an option to
+     infrequent words, ``min_df`` by  `Andreas Müller`_.
+
+   - Add support for multiple targets in some linear models (ElasticNet, Lasso
+     and OrthogonalMatchingPursuit) by `Vlad Niculae`_ and
+     `Alexandre Gramfort`_.
+
+   - Fixes in :class:`decomposition.ProbabilisticPCA` score function by Wei Li.
+
+   - Fixed feature importance computation in
+     :ref:`gradient_boosting`.
+
 API changes summary
 -------------------
 
    - The old ``scikits.learn`` package has disappeared; all code should import
      from ``sklearn`` instead, which was introduced in 0.9.
 
-   - In :class:`metrics.roc_curve`, the ``thresholds`` array is now returned
+   - In :func:`metrics.roc_curve`, the ``thresholds`` array is now returned
      with it's order reversed, in order to keep it consistent with the order
      of the returned ``fpr`` and ``tpr``.
 
@@ -93,6 +203,94 @@ API changes summary
    - In :class:`feature_extraction.text.CountVectorizer` the parameters
      ``min_n`` and ``max_n`` were joined to the parameter ``n_gram_range`` to
      enable grid-searching both at once.
+
+   - In :class:`feature_extraction.text.CountVectorizer`, words that appear
+     only in one document are now ignored by default. To reproduce
+     the previous behavior, set ``min_df=1``.
+
+   - Fixed API inconsistency: :meth:`linear_model.SGDClassifier.predict_proba` now
+     returns 2d array when fit on two classes.
+
+   - Fixed API inconsistency: :meth:`qda.QDA.decision_function` and
+     :meth:`lda.LDA.decision_function` now return 1d arrays when fit on two
+     classes.
+
+   - Grid of alphas used for fitting :class:`linear_model.LassoCV` and
+     :class:`linear_model.ElasticNetCV` is now stored
+     in the attribute `alphas_` rather than overriding the init parameter
+     `alphas`.
+
+   - Linear models when alpha is estimated by cross-validation store
+     the estimated value in the `alpha_` attribute rather than just
+     `alpha` or `best_alpha`.
+
+   - :class:`ensemble.GradientBoostingClassifier` now supports
+     :meth:`ensemble.GradientBoostingClassifier.staged_predict_proba`, and
+     :meth:`ensemble.GradientBoostingClassifier.staged_predict`.
+
+   - :class:`svm.sparse.SVC` and other sparse SVM classes are now deprecated.
+     The all classes in the :ref:`svm` module now automatically select the
+     sparse or dense representation base on the input.
+
+   - All clustering algorithms now interpret the array ``X`` given to ``fit`` as
+     input data, in particular :class:`cluster.SpectralClustering` and
+     :class:`cluster.AffinityPropagation` which previously expected affinity matrices.
+
+   - For clustering algorithms that take the desired number of clusters as a parameter,
+     this parameter is now called ``n_clusters``.
+
+
+People
+------
+ * 267  `Andreas Müller`_
+ *  94  `Gilles Louppe`_
+ *  89  `Gael Varoquaux`_
+ *  79  `Peter Prettenhofer`_
+ *  60  `Mathieu Blondel`_
+ *  57  `Alexandre Gramfort`_
+ *  52  `Vlad Niculae`_
+ *  45  `Lars Buitinck`_
+ *  44  Nelle Varoquaux
+ *  37  `Jaques Grobler`_
+ *  30  Alexis Mignon
+ *  30  Immanuel Bayer
+ *  27  `Olivier Grisel`_
+ *  16  Subhodeep Moitra
+ *  13  Yannick Schwartz
+ *  12  `@kernc`_
+ *  11  `Virgile Fritsch`_
+ *   9  Daniel Duckworth
+ *   9  `Fabian Pedregosa`_
+ *   9  `Robert Layton`_
+ *   8  John Benediktsson
+ *   7  Marko Burjek
+ *   5  `Nicolas Pinto`_
+ *   4  Alexandre Abraham
+ *   4  Jake VanderPlas
+ *   3  `Brian Holt`_
+ *   3  `Edouard Duchesnay`_
+ *   3  Florian Hoenig
+ *   3  flyingimmidev
+ *   2  Francois Savard
+ *   2  Hannes Schulz
+ *   2  Peter Welinder
+ *   2  `Yaroslav Halchenko`_
+ *   2  Wei Li
+ *   1  Alex Companioni
+ *   1  Brandyn A. White
+ *   1  Bussonnier Matthias
+ *   1  Charles-Pierre Astolfi
+ *   1  Dan O'Huiginn
+ *   1  David Cournapeau
+ *   1  Keith Goodman
+ *   1  Ludwig Schwardt
+ *   1  Olivier Hervieu
+ *   1  Sergio Medina
+ *   1  Shiqiao Du
+ *   1  Tim Sheerman-Chase
+ *   1  buguen
+
+
 
 .. _changes_0_11:
 
@@ -132,7 +330,7 @@ Highlights
 
    - Added :class:`sklearn.cross_validation.StratifiedShuffleSplit`, which is
      a :class:`sklearn.cross_validation.ShuffleSplit` with balanced splits,
-     by `Yannick Schwartz`.
+     by Yannick Schwartz.
 
    - :class:`sklearn.neighbors.NearestCentroid` classifier added, along with a
      ``shrink_threshold`` parameter, which implements **shrunken centroid
@@ -315,7 +513,7 @@ People
    *   1  Carlos Scheidegger
    *   1  Claire Revillet
    *   1  Conrad Lee
-   *   1  Edouard Duchesnay
+   *   1  `Edouard Duchesnay`_
    *   1  Jan Hendrik Metzen
    *   1  Meng Xinfan
    *   1  Rob Zinkov
@@ -361,7 +559,7 @@ Changelog
 
    - Minor refactoring in :ref:`sgd` module; consolidated dense and sparse
      predict methods; Enhanced test time performance by converting model
-     paramters to fortran-style arrays after fitting (only multi-class).
+     parameters to fortran-style arrays after fitting (only multi-class).
 
    - Adjusted Mutual Information metric added as
      :func:`sklearn.metrics.adjusted_mutual_info_score` by Robert Layton.
@@ -928,7 +1126,7 @@ People that made this release possible preceeded by number of commits:
     - 14  Dan Yamins
     - 13  `Olivier Grisel`_
     - 12  `Gael Varoquaux`_
-    - 4  Edouard Duchesnay
+    - 4  `Edouard Duchesnay`_
     - 4  `Ron Weiss`_
     - 2  Satrajit Ghosh
     - 2  Vincent Dubourg

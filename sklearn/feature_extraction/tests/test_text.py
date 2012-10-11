@@ -7,8 +7,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from sklearn.utils.testing import assert_less, assert_greater
-
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.svm import LinearSVC
@@ -20,6 +18,7 @@ from nose.tools import assert_equal, assert_equals, \
 from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_raises
+from sklearn.utils.testing import assert_in, assert_less, assert_greater
 
 from collections import defaultdict, Mapping
 from functools import partial
@@ -237,6 +236,22 @@ def test_countvectorizer_custom_vocabulary_pipeline():
     assert_equal(X.shape[1], len(what_we_like))
 
 
+def test_countvectorizer_empty_vocabulary():
+    try:
+        CountVectorizer(vocabulary=[])
+        assert False, "we shouldn't get here"
+    except ValueError as e:
+        assert_in("empty vocabulary", str(e))
+
+    try:
+        v = CountVectorizer(min_df=1, max_df=1.0, stop_words="english")
+        # fit on stopwords only
+        v.fit(["to be or not to be", "and me too", "and so do you"])
+        assert False, "we shouldn't get here"
+    except ValueError as e:
+        assert_in("empty vocabulary", str(e))
+
+
 def test_fit_countvectorizer_twice():
     cv = CountVectorizer()
     X1 = cv.fit_transform(ALL_FOOD_DOCS[:5])
@@ -317,7 +332,7 @@ def test_vectorizer():
     n_train = len(ALL_FOOD_DOCS) - 1
 
     # test without vocabulary
-    v1 = CountVectorizer(max_df=0.5)
+    v1 = CountVectorizer(max_df=0.5, min_df=1)
     counts_train = v1.fit_transform(train_data)
     if hasattr(counts_train, 'tocsr'):
         counts_train = counts_train.tocsr()
@@ -373,7 +388,7 @@ def test_vectorizer():
     # test the direct tfidf vectorizer
     # (equivalent to term count vectorizer + tfidf transformer)
     train_data = iter(ALL_FOOD_DOCS[:-1])
-    tv = TfidfVectorizer(norm='l1')
+    tv = TfidfVectorizer(norm='l1', min_df=1)
     assert_false(tv.fixed_vocabulary)
 
     tv.max_df = v1.max_df
@@ -390,7 +405,7 @@ def test_vectorizer():
 
 
 def test_feature_names():
-    cv = CountVectorizer(max_df=0.5)
+    cv = CountVectorizer(max_df=0.5, min_df=1)
     X = cv.fit_transform(ALL_FOOD_DOCS)
 
     n_samples, n_features = X.shape
@@ -423,7 +438,7 @@ def test_vectorizer_max_features():
 
 def test_vectorizer_max_df():
     test_data = [u'abc', u'dea']  # the letter a occurs in both strings
-    vect = CountVectorizer(analyzer='char', max_df=1.0)
+    vect = CountVectorizer(analyzer='char', max_df=1.0, min_df=1)
     vect.fit(test_data)
     assert_true(u'a' in vect.vocabulary_.keys())
     assert_equals(len(vect.vocabulary_.keys()), 5)
@@ -433,11 +448,35 @@ def test_vectorizer_max_df():
     assert_true(u'a' not in vect.vocabulary_.keys())  # 'a' is ignored
     assert_equals(len(vect.vocabulary_.keys()), 4)  # the others remain
 
+    # absolute count: if in more than one
+    vect.max_df = 1
+    vect.fit(test_data)
+    assert_true(u'a' not in vect.vocabulary_.keys())  # 'a' is ignored
+    assert_equals(len(vect.vocabulary_.keys()), 4)  # the others remain
+
+
+def test_vectorizer_min_df():
+    test_data = [u'abc', u'dea', u'eat']  # the letter a occurs in both strings
+    vect = CountVectorizer(analyzer='char', max_df=1.0, min_df=1)
+    vect.fit(test_data)
+    assert_true(u'a' in vect.vocabulary_.keys())
+    assert_equals(len(vect.vocabulary_.keys()), 6)
+
+    vect.min_df = 2
+    vect.fit(test_data)
+    assert_true(u'c' not in vect.vocabulary_.keys())  # 'c' is ignored
+    assert_equals(len(vect.vocabulary_.keys()), 2)  # only e, a remain
+
+    vect.min_df = .5
+    vect.fit(test_data)
+    assert_true(u'c' not in vect.vocabulary_.keys())  # 'c' is ignored
+    assert_equals(len(vect.vocabulary_.keys()), 2)  # only e, a remain
+
 
 def test_binary_occurrences():
     # by default multiple occurrences are counted as longs
     test_data = [u'aaabc', u'abbde']
-    vect = CountVectorizer(analyzer='char', max_df=1.0)
+    vect = CountVectorizer(analyzer='char', max_df=1.0, min_df=1)
     X = vect.fit_transform(test_data).toarray()
     assert_array_equal(['a', 'b', 'c', 'd', 'e'], vect.get_feature_names())
     assert_array_equal([[3, 1, 1, 0, 0],
@@ -446,7 +485,7 @@ def test_binary_occurrences():
     # using boolean features, we can fetch the binary occurrence info
     # instead.
     vect = CountVectorizer(analyzer='char', max_df=1.0,
-                           binary=True)
+                           binary=True, min_df=1)
     X = vect.fit_transform(test_data).toarray()
     assert_array_equal([[1, 1, 1, 0, 0],
                         [1, 1, 0, 1, 1]], X)
@@ -461,7 +500,7 @@ def test_binary_occurrences():
 def test_vectorizer_inverse_transform():
     # raw documents
     data = ALL_FOOD_DOCS
-    for vectorizer in (TfidfVectorizer(), CountVectorizer()):
+    for vectorizer in (TfidfVectorizer(min_df=1), CountVectorizer(min_df=1)):
         transformed_data = vectorizer.fit_transform(data)
         inversed_data = vectorizer.inverse_transform(transformed_data)
         analyze = vectorizer.build_analyzer()
@@ -490,7 +529,7 @@ def test_count_vectorizer_pipeline_grid_selection():
     y_train = y[1:-1]
     y_test = np.array([y[0], y[-1]])
 
-    pipeline = Pipeline([('vect', CountVectorizer()),
+    pipeline = Pipeline([('vect', CountVectorizer(min_df=1)),
                          ('svc', LinearSVC())])
 
     parameters = {
@@ -528,7 +567,7 @@ def test_vectorizer_pipeline_grid_selection():
     y_train = y[1:-1]
     y_test = np.array([y[0], y[-1]])
 
-    pipeline = Pipeline([('vect', TfidfVectorizer()),
+    pipeline = Pipeline([('vect', TfidfVectorizer(min_df=1)),
                          ('svc', LinearSVC())])
 
     parameters = {
@@ -554,6 +593,28 @@ def test_vectorizer_pipeline_grid_selection():
     assert_equal(best_vectorizer.ngram_range, (1, 1))
     assert_equal(best_vectorizer.norm, 'l2')
     assert_false(best_vectorizer.fixed_vocabulary)
+
+
+def test_count_vectorizer_unicode():
+    # tests that the count vectorizer works with cyrillic.
+    document = (u"\xd0\x9c\xd0\xb0\xd1\x88\xd0\xb8\xd0\xbd\xd0\xbd\xd0\xbe\xd0"
+        u"\xb5 \xd0\xbe\xd0\xb1\xd1\x83\xd1\x87\xd0\xb5\xd0\xbd\xd0\xb8\xd0"
+        u"\xb5 \xe2\x80\x94 \xd0\xbe\xd0\xb1\xd1\x88\xd0\xb8\xd1\x80\xd0\xbd"
+        u"\xd1\x8b\xd0\xb9 \xd0\xbf\xd0\xbe\xd0\xb4\xd1\x80\xd0\xb0\xd0\xb7"
+        u"\xd0\xb4\xd0\xb5\xd0\xbb \xd0\xb8\xd1\x81\xd0\xba\xd1\x83\xd1\x81"
+        u"\xd1\x81\xd1\x82\xd0\xb2\xd0\xb5\xd0\xbd\xd0\xbd\xd0\xbe\xd0\xb3"
+        u"\xd0\xbe \xd0\xb8\xd0\xbd\xd1\x82\xd0\xb5\xd0\xbb\xd0\xbb\xd0"
+        u"\xb5\xd0\xba\xd1\x82\xd0\xb0, \xd0\xb8\xd0\xb7\xd1\x83\xd1\x87"
+        u"\xd0\xb0\xd1\x8e\xd1\x89\xd0\xb8\xd0\xb9 \xd0\xbc\xd0\xb5\xd1\x82"
+        u"\xd0\xbe\xd0\xb4\xd1\x8b \xd0\xbf\xd0\xbe\xd1\x81\xd1\x82\xd1\x80"
+        u"\xd0\xbe\xd0\xb5\xd0\xbd\xd0\xb8\xd1\x8f \xd0\xb0\xd0\xbb\xd0\xb3"
+        u"\xd0\xbe\xd1\x80\xd0\xb8\xd1\x82\xd0\xbc\xd0\xbe\xd0\xb2, \xd1\x81"
+        u"\xd0\xbf\xd0\xbe\xd1\x81\xd0\xbe\xd0\xb1\xd0\xbd\xd1\x8b\xd1\x85 "
+        u"\xd0\xbe\xd0\xb1\xd1\x83\xd1\x87\xd0\xb0\xd1\x82\xd1\x8c\xd1\x81\xd1"
+        u"\x8f.")
+    vect = CountVectorizer(min_df=1)
+    X = vect.fit_transform([document])
+    assert_equal(X.shape, (1, 15))
 
 
 def test_tfidf_vectorizer_with_fixed_vocabulary():

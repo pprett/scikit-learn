@@ -101,8 +101,9 @@ its `coef\_` member::
 
     >>> from sklearn import linear_model
     >>> clf = linear_model.Ridge (alpha = .5)
-    >>> clf.fit ([[0, 0], [0, 0], [1, 1]], [0, .1, 1])
-    Ridge(alpha=0.5, copy_X=True, fit_intercept=True, normalize=False, tol=0.001)
+    >>> clf.fit ([[0, 0], [0, 0], [1, 1]], [0, .1, 1]) # doctest: +NORMALIZE_WHITESPACE
+    Ridge(alpha=0.5, copy_X=True, fit_intercept=True, max_iter=None,
+          normalize=False, solver='auto', tol=0.001)
     >>> clf.coef_
     array([ 0.34545455,  0.34545455])
     >>> clf.intercept_ #doctest: +ELLIPSIS
@@ -140,7 +141,7 @@ as GridSearchCV except that it defaults to Generalized Cross-Validation
     >>> clf.fit([[0, 0], [0, 0], [1, 1]], [0, .1, 1])       # doctest: +SKIP
     RidgeCV(alphas=[0.1, 1.0, 10.0], cv=None, fit_intercept=True, loss_func=None,
         normalize=False, score_func=None)
-    >>> clf.best_alpha                                      # doctest: +SKIP
+    >>> clf.alpha_                                      # doctest: +SKIP
     0.1
 
 .. topic:: References
@@ -201,6 +202,11 @@ computes the coefficients along the full path of possible values.
       As the Lasso regression yields sparse models, it can
       thus be used to perform feature selection, as detailed in
       :ref:`l1_feature_selection`.
+
+.. note:: **Randomized sparsity**
+
+      For feature selection or sparse recovery, it may be interesting to
+      use :ref:`randomized_l1`.
 
 
 Setting regularization parameter
@@ -391,9 +397,10 @@ function of the norm of its coefficients.
 
    >>> from sklearn import linear_model
    >>> clf = linear_model.LassoLars(alpha=.1)
-   >>> clf.fit([[0, 0], [1, 1]], [0, 1])                # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+   >>> clf.fit([[0, 0], [1, 1]], [0, 1])  # doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
    LassoLars(alpha=0.1, copy_X=True, eps=..., fit_intercept=True,
-        max_iter=500, normalize=True, precompute='auto', verbose=False)
+        fit_path=True, max_iter=500, normalize=True, precompute='auto',
+        verbose=False)
    >>> clf.coef_    # doctest: +ELLIPSIS
    array([ 0.717157...,  0.        ])
 
@@ -588,7 +595,7 @@ Automatic Relevance Determination - ARD
 :class:`ARDRegression` is very similar to `Bayesian Ridge Regression`_,
 but can lead to sparser weights :math:`w` [1]_.
 :class:`ARDRegression` poses a different prior over :math:`w`, by dropping the
-assuption of the Gaussian being spherical.
+assumption of the Gaussian being spherical.
 
 Instead, the distribution over :math:`w` is assumed to be an axis-parallel,
 elliptical Gaussian distribution.
@@ -682,3 +689,21 @@ The last characteristic implies that the Perceptron is slightly faster to
 train than SGD with the hinge loss and that the resulting models are
 sparser.
 
+Isotonic regression
+====================
+
+The :class:`IsotonicRegression` fits a non-decreasing function to the data.
+It solves the following problem:
+
+  minimize :math:`\sum_i w_i (y_i - \hat{y}_i)^2`
+
+  subject to :math:`\hat{y}_{min} = \hat{y}_1 \le \hat{y}_2 ... \le \hat{y}_n = \hat{y}_{max}`
+
+where each :math:`w_i` is strictly positive and each :math:`y_i` is an
+arbitrary real number. It yields the vector which is composed of non-decreasing
+elements the closest in terms of mean squared error. In practice this list
+of elements forms a function that is piecewise linear.
+
+.. figure:: ../auto_examples/linear_model/images/plot_isotonic_regression_1.png
+   :target: ../auto_examples/linear_model/images/plot_isotonic_regression.html
+   :align: center

@@ -24,6 +24,14 @@ from ..preprocessing import normalize
 from ..utils.fixes import Counter
 from .stop_words import ENGLISH_STOP_WORDS
 
+__all__ = ['CountVectorizer',
+           'ENGLISH_STOP_WORDS',
+           'TfidfTransformer',
+           'TfidfVectorizer',
+           'strip_accents_ascii',
+           'strip_accents_unicode',
+           'strip_tags']
+
 
 def strip_accents_unicode(s):
     """Transform accentuated unicode symbols into their simple counterpart
@@ -158,10 +166,19 @@ class CountVectorizer(BaseEstimator):
         or more letters characters (punctuation is completely ignored
         and always treated as a token separator).
 
-    max_df : float in range [0.0, 1.0], optional, 1.0 by default
+    max_df : float in range [0.0, 1.0] or int, optional, 1.0 by default
         When building the vocabulary ignore terms that have a term frequency
         strictly higher than the given threshold (corpus specific stop words).
+        If float, the parameter represents a proportion of documents, integer
+        absolute counts.
+        This parameter is ignored if vocabulary is not None.
 
+    min_df : float in range [0.0, 1.0] or int, optional, 2 by default
+        When building the vocabulary ignore terms that have a term frequency
+        strictly lower than the given threshold. This value is also called
+        cut-off in the literature.
+        If float, the parameter represents a proportion of documents, integer
+        absolute counts.
         This parameter is ignored if vocabulary is not None.
 
     max_features : optional, None by default
@@ -189,10 +206,10 @@ class CountVectorizer(BaseEstimator):
     def __init__(self, input='content', charset='utf-8',
                  charset_error='strict', strip_accents=None,
                  lowercase=True, preprocessor=None, tokenizer=None,
-                 stop_words=None, token_pattern=ur"\b\w\w+\b",
+                 stop_words=None, token_pattern=ur"(?u)\b\w\w+\b",
                  ngram_range=(1, 1),
                  min_n=None, max_n=None, analyzer='word',
-                 max_df=1.0, max_features=None,
+                 max_df=1.0, min_df=2, max_features=None,
                  vocabulary=None, binary=False, dtype=long):
         self.input = input
         self.charset = charset
@@ -205,10 +222,12 @@ class CountVectorizer(BaseEstimator):
         self.token_pattern = token_pattern
         self.stop_words = stop_words
         self.max_df = max_df
+        self.min_df = min_df
         self.max_features = max_features
         if not (max_n is None) or not (min_n is None):
             warnings.warn('Parameters max_n and min_n are deprecated. Use '
-                'ngram_range instead.')
+                          'ngram_range instead. This will be removed in 0.14.',
+                          DeprecationWarning, stacklevel=2)
             if min_n is None:
                 min_n = 1
             if max_n is None:
@@ -216,9 +235,11 @@ class CountVectorizer(BaseEstimator):
             ngram_range = (min_n, max_n)
         self.ngram_range = ngram_range
         if vocabulary is not None:
-            self.fixed_vocabulary = True
             if not isinstance(vocabulary, Mapping):
                 vocabulary = dict((t, i) for i, t in enumerate(vocabulary))
+            if not vocabulary:
+                raise ValueError("empty vocabulary passed to fit")
+            self.fixed_vocabulary = True
             self.vocabulary_ = vocabulary
         else:
             self.fixed_vocabulary = False
@@ -358,8 +379,8 @@ class CountVectorizer(BaseEstimator):
                 tokenize(preprocess(self.decode(doc))), stop_words)
 
         else:
-            raise ValueError('%s is not a valid tokenization scheme' %
-                             self.tokenize)
+            raise ValueError('%s is not a valid tokenization scheme/analyzer' %
+                             self.analyzer)
 
     def _term_count_dicts_to_matrix(self, term_count_dicts):
         i_indices = []
@@ -432,9 +453,6 @@ class CountVectorizer(BaseEstimator):
         # document)
         document_counts = Counter()
 
-        max_df = self.max_df
-        max_features = self.max_features
-
         analyze = self.build_analyzer()
 
         # TODO: parallelize the following loop with joblib?
@@ -443,18 +461,24 @@ class CountVectorizer(BaseEstimator):
             term_count_current = Counter(analyze(doc))
             term_counts.update(term_count_current)
 
-            if max_df < 1.0:
-                document_counts.update(term_count_current.iterkeys())
+            document_counts.update(term_count_current.iterkeys())
 
             term_counts_per_doc.append(term_count_current)
 
         n_doc = len(term_counts_per_doc)
+        max_features = self.max_features
+        max_df = self.max_df
+        min_df = self.min_df
+
+        max_doc_count = (max_df if isinstance(max_df, (int, np.integer))
+                                else max_df * n_doc)
+        min_doc_count = (min_df if isinstance(min_df,  (int, np.integer))
+                                else min_df * n_doc)
 
         # filter out stop words: terms that occur in almost all documents
-        if max_df < 1.0:
-            max_document_count = max_df * n_doc
+        if max_doc_count < n_doc or min_doc_count > 1:
             stop_words = set(t for t, dc in document_counts.iteritems()
-                               if dc > max_document_count)
+                               if dc > max_doc_count or dc < min_doc_count)
         else:
             stop_words = set()
 
@@ -479,7 +503,11 @@ class CountVectorizer(BaseEstimator):
         # the mapping from feature name to indices might depend on the memory
         # layout of the machine. Furthermore sorted terms might make it
         # possible to perform binary search in the feature names array.
-        self.vocabulary_ = dict(((t, i) for i, t in enumerate(sorted(terms))))
+        vocab = dict(((t, i) for i, t in enumerate(sorted(terms))))
+        if not vocab:
+            raise ValueError("empty vocabulary; training set may have"
+                             " contained only stop words")
+        self.vocabulary_ = vocab
 
         # the term_counts and document_counts might be useful statistics, are
         # we really sure want we want to drop them? They take some memory but
@@ -597,7 +625,6 @@ class TfidfTransformer(BaseEstimator, TransformerMixin):
         self.use_idf = use_idf
         self.smooth_idf = smooth_idf
         self.sublinear_tf = sublinear_tf
-        self.idf_ = None
 
     def fit(self, X, y=None):
         """Learn the idf vector (global term weights)
@@ -622,7 +649,10 @@ class TfidfTransformer(BaseEstimator, TransformerMixin):
             n_samples += int(self.smooth_idf)
 
             # avoid division by zeros for features that occur in all documents
-            self.idf_ = np.log(float(n_samples) / df) + 1.0
+            idf = np.log(float(n_samples) / df) + 1.0
+            idf_diag = sp.lil_matrix((n_features, n_features))
+            idf_diag.setdiag(idf)
+            self._idf_diag = sp.csc_matrix(idf_diag)
 
         return self
 
@@ -652,20 +682,25 @@ class TfidfTransformer(BaseEstimator, TransformerMixin):
             X.data += 1
 
         if self.use_idf:
-            expected_n_features = self.idf_.shape[0]
+            expected_n_features = self._idf_diag.shape[0]
             if n_features != expected_n_features:
                 raise ValueError("Input has n_features=%d while the model"
                                  " has been trained with n_features=%d" % (
                                      n_features, expected_n_features))
-            d = sp.lil_matrix((n_features, n_features))
-            d.setdiag(self.idf_)
             # *= doesn't work
-            X = X * d
+            X = X * self._idf_diag
 
         if self.norm:
             X = normalize(X, norm=self.norm, copy=False)
 
         return X
+
+    @property
+    def idf_(self):
+        if hasattr(self, "_idf_diag"):
+            return np.ravel(self._idf_diag.sum(axis=0))
+        else:
+            return None
 
 
 class TfidfVectorizer(CountVectorizer):
@@ -744,10 +779,19 @@ class TfidfVectorizer(CountVectorizer):
         or more letters characters (punctuation is completely ignored
         and always treated as a token separator).
 
-    max_df : float in range [0.0, 1.0], optional, 1.0 by default
+    max_df : float in range [0.0, 1.0] or int, optional, 1.0 by default
         When building the vocabulary ignore terms that have a term frequency
         strictly higher than the given threshold (corpus specific stop words).
+        If float, the parameter represents a proportion of documents, integer
+        absolute counts.
+        This parameter is ignored if vocabulary is not None.
 
+    min_df : float in range [0.0, 1.0] or int, optional, 2 by default
+        When building the vocabulary ignore terms that have a term frequency
+        strictly lower than the given threshold.
+        This value is also called cut-off in the literature.
+        If float, the parameter represents a proportion of documents, integer
+        absolute counts.
         This parameter is ignored if vocabulary is not None.
 
     max_features : optional, None by default
@@ -796,19 +840,19 @@ class TfidfVectorizer(CountVectorizer):
     """
 
     def __init__(self, input='content', charset='utf-8',
-                 charset_error='strict', strip_accents=None, lowercase=True,
-                 preprocessor=None, tokenizer=None, analyzer='word',
-                 stop_words=None, token_pattern=ur"\b\w\w+\b", min_n=None,
-                 max_n=None, ngram_range=(1, 1), max_df=1.0, max_features=None,
-                 vocabulary=None, binary=False, dtype=long, norm='l2',
-                 use_idf=True, smooth_idf=True, sublinear_tf=False):
+            charset_error='strict', strip_accents=None, lowercase=True,
+            preprocessor=None, tokenizer=None, analyzer='word',
+            stop_words=None, token_pattern=ur"(?u)\b\w\w+\b", min_n=None,
+            max_n=None, ngram_range=(1, 1), max_df=1.0, min_df=2,
+            max_features=None, vocabulary=None, binary=False, dtype=long,
+            norm='l2', use_idf=True, smooth_idf=True, sublinear_tf=False):
 
         super(TfidfVectorizer, self).__init__(
             input=input, charset=charset, charset_error=charset_error,
             strip_accents=strip_accents, lowercase=lowercase,
             preprocessor=preprocessor, tokenizer=tokenizer, analyzer=analyzer,
             stop_words=stop_words, token_pattern=token_pattern, min_n=min_n,
-            max_n=max_n, ngram_range=ngram_range, max_df=max_df,
+            max_n=max_n, ngram_range=ngram_range, max_df=max_df, min_df=min_df,
             max_features=max_features, vocabulary=vocabulary, binary=False,
             dtype=dtype)
 
@@ -851,7 +895,7 @@ class TfidfVectorizer(CountVectorizer):
     def sublinear_tf(self, value):
         self._tfidf.sublinear_tf = value
 
-    def fit(self, raw_documents):
+    def fit(self, raw_documents, y=None):
         """Learn a conversion law from documents to array data"""
         X = super(TfidfVectorizer, self).fit_transform(raw_documents)
         self._tfidf.fit(X)
@@ -889,27 +933,3 @@ class TfidfVectorizer(CountVectorizer):
         """
         X = super(TfidfVectorizer, self).transform(raw_documents)
         return self._tfidf.transform(X, copy)
-
-
-class Vectorizer(TfidfVectorizer):
-    """Vectorizer is deprecated in 0.11, use TfidfVectorizer instead"""
-
-    def __init__(self, input='content', charset='utf-8',
-                charset_error='strict', strip_accents=None, lowercase=True,
-                preprocessor=None, tokenizer=None, analyzer='word',
-                stop_words=None, token_pattern=ur"\b\w\w+\b", min_n=None,
-                max_n=None, ngram_range=(1, 1), max_df=1.0, max_features=None,
-                vocabulary=None, binary=False, dtype=long, norm='l2',
-                use_idf=True, smooth_idf=True, sublinear_tf=False):
-        warnings.warn("Vectorizer is deprecated in 0.11 and will be removed"
-                     " in 0.13. Please use TfidfVectorizer instead.",
-                      category=DeprecationWarning)
-        super(Vectorizer, self).__init__(
-            input=input, charset=charset, charset_error=charset_error,
-            strip_accents=strip_accents, lowercase=lowercase,
-            preprocessor=preprocessor, tokenizer=tokenizer, analyzer=analyzer,
-            stop_words=stop_words, token_pattern=token_pattern, min_n=min_n,
-            max_n=max_n, max_df=max_df, max_features=max_features,
-            vocabulary=vocabulary, binary=False, dtype=dtype,
-            norm=norm, use_idf=use_idf, smooth_idf=smooth_idf,
-            sublinear_tf=sublinear_tf)

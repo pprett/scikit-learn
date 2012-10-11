@@ -65,7 +65,7 @@ word of interest.
 For example, suppose that we have a first algorithm that extracts Part of
 Speech (PoS) tags that we want to use as complementary tags for training
 a sequence classifier (e.g. a chunker). The following dict could be
-such a window of feature extracted around the word 'sat' in the sentence
+such a window of features extracted around the word 'sat' in the sentence
 'The cat sat on the mat.'::
 
   >>> pos_window = [
@@ -88,7 +88,7 @@ suitable for feeding into a classifier (maybe after being piped into a
   >>> pos_vectorized = vec.fit_transform(pos_window)
   >>> pos_vectorized                     # doctest: +NORMALIZE_WHITESPACE
   <1x6 sparse matrix of type '<type 'numpy.float64'>'
-      with 6 stored elements in COOrdinate format>
+      with 6 stored elements in Compressed Sparse Row format>
   >>> pos_vectorized.toarray()
   array([[ 1.,  1.,  1.,  1.,  1.,  1.]])
   >>> vec.get_feature_names()
@@ -148,10 +148,6 @@ or "Bag of n-grams" representation. Documents are described by word
 occurrences while completely ignoring the relative position information
 of the words in the document.
 
-When combined with :ref:`tfidf`, the bag of words encoding is also known
-as the `Vector Space Model
-<https://en.wikipedia.org/wiki/Vector_space_model>`_.
-
 
 Sparsity
 --------
@@ -182,13 +178,13 @@ This model has many parameters, however the default values are quite
 reasonable (please see  the :ref:`reference documentation
 <text_feature_extraction_ref>` for the details)::
 
-  >>> vectorizer = CountVectorizer()
-  >>> vectorizer
+  >>> vectorizer = CountVectorizer(min_df=1)
+  >>> vectorizer                            # doctest: +NORMALIZE_WHITESPACE
   CountVectorizer(analyzer='word', binary=False, charset='utf-8',
           charset_error='strict', dtype=<type 'long'>, input='content',
-          lowercase=True, max_df=1.0, max_features=None, max_n=None,
+          lowercase=True, max_df=1.0, max_features=None, max_n=None, min_df=1,
           min_n=None, ngram_range=(1, 1), preprocessor=None, stop_words=None,
-          strip_accents=None, token_pattern=u'\\b\\w\\w+\\b', tokenizer=None,
+          strip_accents=None, token_pattern=u'(?u)\\b\\w\\w+\\b', tokenizer=None,
           vocabulary=None)
 
 Let's use it to tokenize and count the word occurrences of a minimalistic
@@ -246,7 +242,7 @@ preserve some of the local ordering information we can extract 2-grams
 of words in addition to the 1-grams (the word themselvs)::
 
   >>> bigram_vectorizer = CountVectorizer(ngram_range=(1, 2),
-  ...                                     token_pattern=ur'\b\w+\b')
+  ...                                     token_pattern=ur'\b\w+\b', min_df=1)
   >>> analyze = bigram_vectorizer.build_analyzer()
   >>> analyze('Bi-grams are cool!')
   [u'bi', u'grams', u'are', u'cool', u'bi grams', u'grams are', u'are cool']
@@ -273,8 +269,8 @@ last document::
 
 .. _tfidf:
 
-TF-IDF normalization
---------------------
+Tf–idf term weighting
+---------------------
 
 In a large text corpus, some words will be very present (e.g. "the", "a",
 "is" in English) hence carrying very little meaningul information about
@@ -341,7 +337,7 @@ class called :class:`TfidfVectorizer` that combines all the option of
 :class:`CountVectorizer` and :class:`TfidfTransformer` in a single model::
 
   >>> from sklearn.feature_extraction.text import TfidfVectorizer
-  >>> vectorizer = TfidfVectorizer()
+  >>> vectorizer = TfidfVectorizer(min_df=1)
   >>> vectorizer.fit_transform(corpus)
   ...                                       # doctest: +NORMALIZE_WHITESPACE
   <4x9 sparse matrix of type '<type 'numpy.float64'>'
@@ -352,7 +348,7 @@ be cases where the binary occurrence markers might offer better
 features. This can be achieved by using the ``binary`` parameter
 of :class:`CountVectorizer`. In particular, some estimators such as
 :ref:`bernoulli_naive_bayes` explicitly model discrete boolean random
-variables. Also very short text are likely to have noisy tf–idf values
+variables. Also, very short text are likely to have noisy tf–idf values
 while the binary occurrence info is more stable.
 
 As usual the only way how to best adjust the feature extraction parameters
@@ -410,7 +406,7 @@ A character 2-gram representation, however, would find the documents
 matching in 4 out of 8 features, which may help the preferred classifier
 decide better::
 
-  >>> ngram_vectorizer = CountVectorizer(analyzer='char_wb', ngram_range=(2, 2))
+  >>> ngram_vectorizer = CountVectorizer(analyzer='char_wb', ngram_range=(2, 2), min_df=1)
   >>> counts = ngram_vectorizer.fit_transform(['words', 'wprds'])
   >>> ngram_vectorizer.get_feature_names()
   [u' w', u'ds', u'or', u'pr', u'rd', u's ', u'wo', u'wp']
@@ -423,7 +419,7 @@ only from characters inside word boundaries (padded with space on each
 side). The ``'char'`` analyzer, alternatively, creates n-grams that
 span across words::
 
-  >>> ngram_vectorizer = CountVectorizer(analyzer='char_wb', ngram_range=(5, 5))
+  >>> ngram_vectorizer = CountVectorizer(analyzer='char_wb', ngram_range=(5, 5), min_df=1)
   >>> ngram_vectorizer.fit_transform(['jumpy fox'])
   ...                                         # doctest: +NORMALIZE_WHITESPACE
   <1x4 sparse matrix of type '<type 'numpy.int64'>'
@@ -431,7 +427,7 @@ span across words::
   >>> ngram_vectorizer.get_feature_names()
   [u' fox ', u' jump', u'jumpy', u'umpy ']
 
-  >>> ngram_vectorizer = CountVectorizer(analyzer='char', ngram_range=(5, 5))
+  >>> ngram_vectorizer = CountVectorizer(analyzer='char', ngram_range=(5, 5), min_df=1)
   >>> ngram_vectorizer.fit_transform(['jumpy fox'])
   ...                                         # doctest: +NORMALIZE_WHITESPACE
   <1x5 sparse matrix of type '<type 'numpy.int64'>'
@@ -461,8 +457,8 @@ problems which are currently outside of the scope of scikit-learn.
 Customizing the vectorizer classes
 -----------------------------------
 
-It is possible to customize the behavior by passing some callable as
-parameters of the vectorizer::
+It is possible to customize the behavior by passing a callable
+to the vectorizer constructor::
 
   >>> def my_tokenizer(s):
   ...     return s.split()
@@ -490,8 +486,7 @@ parameters it is possible to derive from the class and override the
 factory method instead.
 
 Customizing the vectorizer can be very useful to handle Asian languages
-that do not use an explicit word separator such as the whitespace for
-instance.
+that do not use an explicit word separator such as whitespace.
 
 
 Image feature extraction

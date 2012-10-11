@@ -100,17 +100,20 @@ def safe_mask(X, mask):
 
     Parameters
     ----------
-        X : {array-like, sparse matrix}
-            Data on which to apply mask.
+    X : {array-like, sparse matrix}
+        Data on which to apply mask.
 
-        mask: array
-            Mask to be used on X.
+    mask: array
+        Mask to be used on X.
 
     Returns
     -------
         mask
     """
     mask = np.asanyarray(mask)
+    if np.issubdtype(mask.dtype, np.int):
+        return mask
+
     if hasattr(X, "toarray"):
         ind = np.arange(mask.shape[0])
         mask = ind[mask]

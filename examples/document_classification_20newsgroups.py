@@ -142,7 +142,7 @@ def trim(s):
 
 
 # mapping from integer feature name to original token string
-feature_names = vectorizer.get_feature_names()
+feature_names = np.asarray(vectorizer.get_feature_names())
 
 
 ###############################################################################
@@ -191,7 +191,7 @@ def benchmark(clf):
 
 
 results = []
-for clf, name in ((RidgeClassifier(tol=1e-1), "Ridge Classifier"),
+for clf, name in ((RidgeClassifier(tol=1e-2, solver="lsqr"), "Ridge Classifier"),
                   (Perceptron(n_iter=50), "Perceptron"),
                   (KNeighborsClassifier(n_neighbors=10), "kNN")):
     print 80 * '='

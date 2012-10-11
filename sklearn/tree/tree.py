@@ -160,7 +160,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         self.min_density = min_density
         self.max_features = max_features
         self.compute_importances = compute_importances
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
         self.n_features_ = None
         self.n_outputs_ = None
@@ -191,6 +191,8 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         self : object
             Returns self.
         """
+        self.random_state = check_random_state(self.random_state)
+
         # set min_samples_split sensibly
         self.min_samples_split = max(self.min_samples_split,
                                      2 * self.min_samples_leaf)
@@ -381,7 +383,7 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         `max_features=log2(n_features)`. If None, then
         `max_features=n_features`.
 
-    compute_importances : boolean, optional (default=True)
+    compute_importances : boolean, optional (default=False)
         Whether feature importances are computed and stored into the
         ``feature_importances_`` attribute when calling fit.
 
