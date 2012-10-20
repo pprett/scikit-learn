@@ -26,6 +26,8 @@ import numpy as np
 from .base import BaseEnsemble
 from ..base import ClassifierMixin, RegressorMixin
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
+from ..tree._tree import DTYPE
+from ..utils import array2d, check_arrays
 
 
 __all__ = [
@@ -108,8 +110,9 @@ class BaseWeightBoosting(BaseEnsemble):
         self : object
             Returns self.
         """
-        X = np.atleast_2d(X)
-        y = np.atleast_1d(y)
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+        y = np.ravel(y, order='C')
 
         if sample_weight is None:
             # initialize weights to 1/N
@@ -202,7 +205,7 @@ class BaseWeightBoosting(BaseEnsemble):
         if not self.estimators_:
             raise Exception("AdaBoost not initialized. Perform a fit first")
 
-        X = np.atleast_2d(X)
+        X = array2d(X)
         n_samples, n_features = X.shape
 
         P = None
@@ -276,7 +279,7 @@ class BaseWeightBoosting(BaseEnsemble):
         if not self.estimators_:
             raise Exception("AdaBoost not initialized. Perform a fit first")
 
-        X = np.atleast_2d(X)
+        X = array2d(X)
         n_samples, n_features = X.shape
 
         P = None
