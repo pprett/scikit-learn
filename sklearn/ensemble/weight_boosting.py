@@ -26,6 +26,8 @@ import numpy as np
 from .base import BaseEnsemble
 from ..base import ClassifierMixin, RegressorMixin
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
+from ..tree._tree import DTYPE
+from ..utils import array2d, check_arrays
 
 
 __all__ = [
@@ -50,9 +52,9 @@ class BaseWeightBoosting(BaseEnsemble):
         `learn_rate`. There is a trade-off between learn_rate and n_estimators.
     """
     def __init__(self, base_estimator=None,
-                       n_estimators=10,
-                       learn_rate=.5,
-                       compute_importances=False):
+                 n_estimators=10,
+                 learn_rate=.5,
+                 compute_importances=False):
 
         if base_estimator is None:
             if isinstance(self, ClassifierMixin):
@@ -81,9 +83,9 @@ class BaseWeightBoosting(BaseEnsemble):
                 base_estimator.compute_importances = True
             except AttributeError:
                 raise AttributeError(
-                        "Unable to compute feature importances "
-                        "since base_estimator does not have a "
-                        "compute_importances attribute")
+                    "Unable to compute feature importances "
+                    "since base_estimator does not have a "
+                    "compute_importances attribute")
         super(BaseWeightBoosting, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators)
@@ -108,8 +110,9 @@ class BaseWeightBoosting(BaseEnsemble):
         self : object
             Returns self.
         """
-        X = np.atleast_2d(X)
-        y = np.atleast_1d(y)
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+        y = np.ravel(y, order='C')
 
         if sample_weight is None:
             # initialize weights to 1/N
@@ -130,23 +133,16 @@ class BaseWeightBoosting(BaseEnsemble):
                 # optim for estimators that are able to save redundant
                 # computations when calling fit + predict
                 # on the same input X
-                p = estimator.fit_predict(X, y,
-                        sample_weight=sample_weight)
+                p = estimator.fit_predict(X, y, sample_weight=sample_weight)
             else:
-                p = estimator.fit(X, y,
-                        sample_weight=sample_weight).predict(X)
-
+                p = estimator.fit(X, y, sample_weight=sample_weight).predict(X)
             if iboost == 0:
-                self.classes_ = estimator.classes_
-                self.n_classes_ = estimator.n_classes_
-                # this is a HACK!
-                if isinstance(self.n_classes_, list):
-                    self.n_classes_ = max(self.n_classes_)
+                if hasattr(estimator, 'classes_'):
+                    self.classes_ = estimator.classes_
+                    self.n_classes_ = estimator.n_classes_
+                else:
+                    self.n_classes_ = 1
                 self.n_outputs_ = getattr(estimator, 'n_outputs_', 1)
-                # this is a HACK!
-                if self.n_outputs_ == 1 and isinstance(self.classes_, list):
-                    self.classes_ = self.classes_[0]
-
             sample_weight, alpha, err = self.boost(sample_weight, p, y,
                     iboost == self.n_estimators - 1)
             # early termination
@@ -202,7 +198,7 @@ class BaseWeightBoosting(BaseEnsemble):
         if not self.estimators_:
             raise Exception("AdaBoost not initialized. Perform a fit first")
 
-        X = np.atleast_2d(X)
+        X = array2d(X)
         n_samples, n_features = X.shape
 
         P = None
@@ -242,7 +238,11 @@ class BaseWeightBoosting(BaseEnsemble):
                     predictions[:, k] = self.classes_[k].take(
                             np.argmax(P[k], axis=1), axis=0)
             else:
-                predictions = self.classes_.take(
+                if isinstance(self.classes_, list):
+                    classes = self.classes_[0]
+                else:
+                    classes = self.classes_
+                predictions = classes.take(
                         np.argmax(P, axis=1), axis=0)
 
             return predictions
@@ -276,7 +276,7 @@ class BaseWeightBoosting(BaseEnsemble):
         if not self.estimators_:
             raise Exception("AdaBoost not initialized. Perform a fit first")
 
-        X = np.atleast_2d(X)
+        X = array2d(X)
         n_samples, n_features = X.shape
 
         P = None
@@ -316,7 +316,11 @@ class BaseWeightBoosting(BaseEnsemble):
                         predictions[:, k] = self.classes_[k].take(
                                 np.argmax(P_local[k], axis=1), axis=0)
                 else:
-                    predictions = self.classes_.take(
+                    if isinstance(self.classes_, list):
+                        classes = self.classes_[0]
+                    else:
+                        classes = self.classes_
+                    predictions = classes.take(
                             np.argmax(P_local, axis=1), axis=0)
 
                 yield predictions
@@ -345,7 +349,6 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
     .. [2] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie.
            "Multi-class AdaBoost" 2009
     """
-
     def boost(self, sample_weight, y_predict, y_true, is_last):
         """Implement a single boost
 
@@ -381,19 +384,24 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         # negative sample weights can yield an overall negative error...
         if err < 0:
             # use the absolute value
-            # if you have a better idea of how to handle negative sample weights
-            # let me know
+            # if you have a better idea of how to handle negative
+            # sample weights let me know
             err = abs(err)
 
+        if isinstance(self.n_classes_, list):
+            n_classes = max(self.n_classes_)
+        else:
+            n_classes = self.n_classes_
+
         # stop if the error is at least as bad as random guessing
-        if err >= 1. - (1. / self.n_classes_):
+        if err >= 1. - (1. / n_classes):
             self.estimators_.pop(-1)
             return None, None, None
 
         # boost weight using multi-class AdaBoost SAMME alg
         alpha = self.learn_rate * (
                 math.log((1. - err) / err) +
-                math.log(self.n_classes_ - 1.))
+                math.log(n_classes - 1.))
 
         # only bother to boost the weights if I will fit again
         if not is_last:
@@ -574,7 +582,7 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
     .. [2] Drucker. AdaBoost.R2, 1997
     """
     def boost(self, sample_weight, y_predict, y_true, is_last):
-        """Implement a single boost
+        """Implement a single boost for regression
 
         Perform a single boost according to the AdaBoost.R2 algorithm and
         return the updated sample weights.
