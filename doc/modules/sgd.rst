@@ -63,9 +63,9 @@ for the training samples::
     >>> clf = SGDClassifier(loss="hinge", penalty="l2")
     >>> clf.fit(X, y)
     SGDClassifier(alpha=0.0001, class_weight=None, epsilon=0.1, eta0=0.0,
-           fit_intercept=True, learning_rate='optimal', loss='hinge', n_iter=5,
-           n_jobs=1, penalty='l2', power_t=0.5, rho=0.85, seed=0,
-           shuffle=False, verbose=0, warm_start=False)
+           fit_intercept=True, l1_ratio=0.15, learning_rate='optimal',
+           loss='hinge', n_iter=5, n_jobs=1, penalty='l2', power_t=0.5,
+           rho=None, seed=0, shuffle=False, verbose=0, warm_start=False)
 
 
 After being fitted, the model can then be used to predict new values::
@@ -229,10 +229,10 @@ Tips on Practical Use
     attribute on the input vector X to [0,1] or [-1,+1], or standardize
     it to have mean 0 and variance 1. Note that the *same* scaling
     must be applied to the test vector to obtain meaningful
-    results. This can be easily done using :class:`Scaler`::
+    results. This can be easily done using :class:`StandardScaler`::
 
-      from sklearn.preprocessing import Scaler
-      scaler = Scaler()
+      from sklearn.preprocessing import StandardScaler
+      scaler = StandardScaler()
       scaler.fit(X_train)  # Don't cheat - fit only on training data
       X_train = scaler.transform(X_train)
       X_test = scaler.transform(X_test)  # apply same transformation to test data

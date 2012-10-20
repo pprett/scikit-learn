@@ -18,7 +18,7 @@ from sklearn.utils.testing import assert_greater
 from sklearn.base import clone, ClassifierMixin, RegressorMixin, \
         TransformerMixin, ClusterMixin
 from sklearn.utils import shuffle
-from sklearn.preprocessing import Scaler
+from sklearn.preprocessing import StandardScaler, Scaler
 #from sklearn.cross_validation import train_test_split
 from sklearn.datasets import load_iris, load_boston, make_blobs
 from sklearn.metrics import zero_one_score, adjusted_rand_score
@@ -28,7 +28,7 @@ from sklearn.svm.base import BaseLibSVM
 # import "special" estimators
 from sklearn.grid_search import GridSearchCV
 from sklearn.decomposition import SparseCoder
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.pls import _PLS, PLSCanonical, PLSRegression, CCA, PLSSVD
 from sklearn.ensemble import BaseEnsemble
 from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier,\
@@ -45,9 +45,9 @@ from sklearn.cluster import WardAgglomeration, AffinityPropagation, \
         SpectralClustering
 from sklearn.linear_model import IsotonicRegression
 
-dont_test = [Pipeline, GridSearchCV, SparseCoder, EllipticEnvelope,
-        EllipticEnvelop, DictVectorizer, LabelBinarizer, LabelEncoder,
-        TfidfTransformer, IsotonicRegression]
+dont_test = [Pipeline, FeatureUnion, GridSearchCV, SparseCoder,
+        EllipticEnvelope, EllipticEnvelop, DictVectorizer, LabelBinarizer,
+        LabelEncoder, TfidfTransformer, IsotonicRegression]
 meta_estimators = [BaseEnsemble, OneVsOneClassifier, OutputCodeClassifier,
         OneVsRestClassifier, RFE, RFECV]
 
@@ -117,7 +117,7 @@ def test_transformers():
     X, y = make_blobs(n_samples=30, centers=[[0, 0, 0], [1, 1, 1]],
             random_state=0, n_features=2, cluster_std=0.1)
     n_samples, n_features = X.shape
-    X = Scaler().fit_transform(X)
+    X = StandardScaler().fit_transform(X)
     X -= X.min()
 
     succeeded = True
@@ -196,7 +196,7 @@ def test_transformers_sparse_data():
             continue
         # catch deprecation warnings
         with warnings.catch_warnings(record=True):
-            if Trans is Scaler:
+            if Trans in [Scaler, StandardScaler]:
                 trans = Trans(with_mean=False)
             else:
                 trans = Trans()
@@ -267,7 +267,7 @@ def test_clustering():
     X, y = iris.data, iris.target
     X, y = shuffle(X, y, random_state=7)
     n_samples, n_features = X.shape
-    X = Scaler().fit_transform(X)
+    X = StandardScaler().fit_transform(X)
     for name, Alg in clustering:
         if Alg is WardAgglomeration:
             # this is clustering on the features
@@ -308,13 +308,14 @@ def test_classifiers_train():
     iris = load_iris()
     X_m, y_m = iris.data, iris.target
     X_m, y_m = shuffle(X_m, y_m, random_state=7)
-    X_m = Scaler().fit_transform(X_m)
+    X_m = StandardScaler().fit_transform(X_m)
     # generate binary problem from multi-class one
     y_b = y_m[y_m != 2]
     X_b = X_m[y_m != 2]
     for (X, y) in [(X_m, y_m), (X_b, y_b)]:
         # do it once with binary, once with multiclass
-        n_labels = len(np.unique(y))
+        classes = np.unique(y)
+        n_classes = len(classes)
         n_samples, n_features = X.shape
         for name, Clf in classifiers:
             if Clf in dont_test or Clf in meta_estimators:
@@ -341,13 +342,13 @@ def test_classifiers_train():
                 try:
                     # decision_function agrees with predict:
                     decision = clf.decision_function(X)
-                    if n_labels is 2:
+                    if n_classes is 2:
                         assert_equal(decision.ravel().shape, (n_samples,))
                         dec_pred = (decision.ravel() > 0).astype(np.int)
                         assert_array_equal(dec_pred, y_pred)
-                    if n_labels is 3 and not isinstance(clf, BaseLibSVM):
+                    if n_classes is 3 and not isinstance(clf, BaseLibSVM):
                         # 1on1 of LibSVM works differently
-                        assert_equal(decision.shape, (n_samples, n_labels))
+                        assert_equal(decision.shape, (n_samples, n_classes))
                         assert_array_equal(np.argmax(decision, axis=1), y_pred)
 
                     # raises error on malformed input
@@ -360,14 +361,29 @@ def test_classifiers_train():
                 try:
                     # predict_proba agrees with predict:
                     y_prob = clf.predict_proba(X)
-                    assert_equal(y_prob.shape, (n_samples, n_labels))
+                    assert_equal(y_prob.shape, (n_samples, n_classes))
+                    assert_array_equal(np.argmax(y_prob, axis=1), y_pred)
+                    # check that probas for all classes sum to one
+                    assert_array_almost_equal(
+                        np.sum(y_prob, axis=1), np.ones(n_samples))
                     # raises error on malformed input
                     assert_raises(ValueError, clf.predict_proba, X.T)
-                    assert_array_equal(np.argmax(y_prob, axis=1), y_pred)
                     # raises error on malformed input for predict_proba
                     assert_raises(ValueError, clf.predict_proba, X.T)
                 except NotImplementedError:
                     pass
+
+            if hasattr(clf, "classes_"):
+                if hasattr(clf, "n_outputs_"):
+                    assert_equal(clf.n_outputs_, 1)
+                    assert_array_equal(
+                        clf.classes_, [classes],
+                        "Unexpected classes_ attribute for %r" % clf)
+                else:
+                    # flat classes array: XXX inconsistent
+                    assert_array_equal(
+                        clf.classes_, classes,
+                        "Unexpected classes_ attribute for %r" % clf)
 
 
 def test_classifiers_classes():
@@ -378,7 +394,7 @@ def test_classifiers_classes():
     iris = load_iris()
     X, y = iris.data, iris.target
     X, y = shuffle(X, y, random_state=7)
-    X = Scaler().fit_transform(X)
+    X = StandardScaler().fit_transform(X)
     y = 2 * y + 1
     # TODO: make work with next line :)
     #y = y.astype(np.str)
@@ -409,7 +425,7 @@ def test_regressors_int():
     boston = load_boston()
     X, y = boston.data, boston.target
     X, y = shuffle(X, y, random_state=0)
-    X = Scaler().fit_transform(X)
+    X = StandardScaler().fit_transform(X)
     y = np.random.randint(2, size=X.shape[0])
     for name, Reg in regressors:
         if Reg in dont_test or Reg in meta_estimators or Reg in (CCA,):
@@ -449,8 +465,8 @@ def test_regressors_train():
     X, y = shuffle(X, y, random_state=0)
     # TODO: test with intercept
     # TODO: test with multiple responses
-    X = Scaler().fit_transform(X)
-    y = Scaler().fit_transform(y)
+    X = StandardScaler().fit_transform(X)
+    y = StandardScaler().fit_transform(y)
     succeeded = True
     for name, Reg in regressors:
         if Reg in dont_test or Reg in meta_estimators:

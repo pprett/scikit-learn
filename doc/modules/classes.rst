@@ -213,6 +213,7 @@ Samples generator
    decomposition.ProjectedGradientNMF
    decomposition.RandomizedPCA
    decomposition.KernelPCA
+   decomposition.FactorAnalysis
    decomposition.FastICA
    decomposition.NMF
    decomposition.SparsePCA
@@ -817,6 +818,7 @@ Pairwise metrics
    :template: class.rst
 
    pipeline.Pipeline
+   pipeline.FeatureUnion
 
 
 .. _preprocessing_ref:
@@ -836,12 +838,13 @@ Pairwise metrics
    :toctree: generated/
    :template: class.rst
 
-   preprocessing.Scaler
-   preprocessing.Normalizer
    preprocessing.Binarizer
+   preprocessing.KernelCenterer
    preprocessing.LabelBinarizer
    preprocessing.LabelEncoder
-   preprocessing.KernelCenterer
+   preprocessing.MinMaxScaler
+   preprocessing.Normalizer
+   preprocessing.StandardScaler
 
 .. autosummary::
    :toctree: generated/
