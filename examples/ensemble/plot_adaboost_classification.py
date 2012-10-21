@@ -1,11 +1,10 @@
 """
-========================================
-Testing and Training Error with Boosting
-========================================
+==============================
+Adaboosted Class Probabilities
+==============================
 
-This examples shows the use of boosting to improve prediction accuracy.
-The error on the test and training sets after each boost is plotted on
-the left. The boost weights and error of each tree are also shown.
+This example fits an Adaboosted decision tree on a classification dataset and
+plots the decision surfaces and class probabilities.
 """
 print __doc__
 
