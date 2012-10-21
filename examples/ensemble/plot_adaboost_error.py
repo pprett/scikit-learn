@@ -3,7 +3,7 @@
 Testing and Training Error with Boosting
 ========================================
 
-This examples shows the use of boosting to improve prediction accuracy.
+This example shows the use of boosting to improve prediction accuracy.
 The error on the test and training sets after each boost is plotted on
 the left. The boost weights and error of each tree are also shown.
 """
