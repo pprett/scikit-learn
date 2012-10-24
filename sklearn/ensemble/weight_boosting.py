@@ -13,7 +13,7 @@ The module structure is the following:
   classification problems.
 
 - ``AdaBoostRegressor`` implements adaptive boosting (AdaBoost.R2) for
-  classification problems.
+  regression problems.
 """
 
 # Authors: Noel Dawe
@@ -255,7 +255,7 @@ class BaseWeightBoosting(BaseEnsemble):
         The predicted class of an input sample is computed as the weighted
         mean prediction of the classifiers in the ensemble.
         This method allows monitoring (i.e. determine error on testing set)
-        after each boost. See examples/ensemble/plot_boost_error.py
+        after each boost. See examples/ensemble/plot_adaboost_error.py
 
         Parameters
         ----------
@@ -452,7 +452,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         the weighted mean predicted class probabilities
         of the classifiers in the ensemble.
         This method allows monitoring (i.e. determine error on testing set)
-        after each boost. See examples/ensemble/plot_boost_error.py
+        after each boost. See examples/ensemble/plot_adaboost_error.py
 
         Parameters
         ----------
