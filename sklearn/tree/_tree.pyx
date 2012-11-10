@@ -1060,7 +1060,7 @@ cdef class Criterion:
         """Reset the criterion for a new feature index."""
         pass
 
-    cdef int update(self, int a, int b,
+    cdef tuple update(self, int a, int b,
                     DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
@@ -1265,7 +1265,7 @@ cdef class ClassificationCriterion(Criterion):
                 # Reset right label counts to the initial counts
                 label_count_right[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
                     BOOL_t* sample_mask):
@@ -1683,7 +1683,7 @@ cdef class RegressionCriterion(Criterion):
             var_right[k] = (sq_sum_right[k] - 
                     weighted_n_samples * (mean_right[k] * mean_right[k]))
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
                     BOOL_t* sample_mask):
