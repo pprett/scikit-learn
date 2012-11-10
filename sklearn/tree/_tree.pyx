@@ -749,18 +749,24 @@ cdef class Tree:
             while True:
                 # Find the following larger sample
                 b = _smallest_sample_larger_than(a, X_i, X_argsorted_i,
-                                                 sample_mask_ptr, n_total_samples)
+                        sample_mask_ptr, n_total_samples)
                 if b == -1:
                     break
 
                 # Better split than the best so far?
-                n_left = criterion.update(a, b, y_ptr, y_stride,
-                                          X_argsorted_i,
-                                          sample_weight_ptr,
-                                          sample_mask_ptr)
+                n_left, weighted_n_left = criterion.update(
+                        a, b, y_ptr, y_stride,
+                        X_argsorted_i,
+                        sample_weight_ptr,
+                        sample_mask_ptr)
 
                 # Only consider splits that respect min_leaf
-                if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
+                # and that do not create nodes with a net negative or zero
+                # weight
+                if (n_left < min_samples_leaf or
+                    (n_node_samples - n_left) < min_samples_leaf or
+                    weighted_n_left <= 0 or
+                    (weighted_n_node_samples - weighted_n_left) <= 0):
                     a = b
                     continue
 
@@ -896,15 +902,23 @@ cdef class Tree:
                 c += 1
 
             # Better than the best so far?
-            n_left = criterion.update(0, c, y_ptr, y_stride,
-                                      X_argsorted_i,
-                                      sample_weight_ptr,
-                                      sample_mask_ptr)
-            error = criterion.eval()
-
-            if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
+            n_left, weighted_n_left = criterion.update(
+                    0, c, y_ptr, y_stride,
+                    X_argsorted_i,
+                    sample_weight_ptr,
+                    sample_mask_ptr)
+            
+            # Only consider splits that respect min_leaf
+            # and that do not create nodes with a net negative or zero
+            # weight
+            if (n_left < min_samples_leaf or
+                (n_node_samples - n_left) < min_samples_leaf or
+                weighted_n_left <= 0 or
+                (weighted_n_node_samples - weighted_n_left) <= 0):
                 continue
 
+            error = criterion.eval()
+            
             if error < best_error:
                 best_i = i
                 best_t = t
@@ -1293,7 +1307,7 @@ cdef class ClassificationCriterion(Criterion):
         self.weighted_n_left = weighted_n_left
         self.weighted_n_right = weighted_n_right
 
-        return n_left
+        return n_left, weighted_n_left
 
     cdef double eval(self):
         """Evaluate the criteria (aka the split error)."""
@@ -1729,7 +1743,7 @@ cdef class RegressionCriterion(Criterion):
                 var_left[k] = sq_sum_left[k] - weighted_n_left * (mean_left[k] * mean_left[k])
                 var_right[k] = sq_sum_right[k] - weighted_n_right * (mean_right[k] * mean_right[k])
 
-        return n_left
+        return n_left, weighted_n_left
 
     cdef double eval(self):
         """Evaluate the criteria (aka the split error)."""
