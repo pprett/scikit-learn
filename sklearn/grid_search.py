@@ -113,21 +113,45 @@ def fit_grid_point(X, y, sample_weight,
     if y is not None:
         y_test = y[safe_mask(y, test)]
         y_train = y[safe_mask(y, train)]
-        clf.fit(X_train, y_train, **fit_params)
-        if loss_func is not None:
-            y_pred = clf.predict(X_test)
-            this_score = -loss_func(y_test, y_pred)
-        elif score_func is not None:
-            y_pred = clf.predict(X_test)
-            this_score = score_func(y_test, y_pred)
+        if sample_weight is not None:
+            clf.fit(X_train, y_train,
+                    sample_weight=sample_weight_train,
+                    **fit_params)
         else:
-            this_score = clf.score(X_test, y_test)
+            clf.fit(X_train, y_train, **fit_params)
+
+        if sample_weight is not None:
+            # loss_func, score_func and clf.score must support weighted samples
+            if loss_func is not None:
+                y_pred = clf.predict(X_test)
+                this_score = -loss_func(y_test, y_pred, sample_weight_test)
+            elif score_func is not None:
+                y_pred = clf.predict(X_test)
+                this_score = score_func(y_test, y_pred, sample_weight_test)
+            else:
+                this_score = clf.score(X_test, y_test, sample_weight_test)
+
+        else:
+            if loss_func is not None:
+                y_pred = clf.predict(X_test)
+                this_score = -loss_func(y_test, y_pred)
+            elif score_func is not None:
+                y_pred = clf.predict(X_test)
+                this_score = score_func(y_test, y_pred)
+            else:
+                this_score = clf.score(X_test, y_test)
+
         if hasattr(y, 'shape'):
             this_n_test_samples = y.shape[0]
         else:
             this_n_test_samples = len(y)
     else:
-        clf.fit(X_train, **fit_params)
+        if sample_weight is not None:
+            clf.fit(X_train,
+                    sample_weight=sample_weight,
+                    **fit_params)
+        else:
+            clf.fit(X_train, **fit_params)
         this_score = clf.score(X_test)
         if hasattr(X, 'shape'):
             this_n_test_samples = X.shape[0]
