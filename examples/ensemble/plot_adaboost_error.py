@@ -18,7 +18,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.datasets.samples_generator import make_gaussian_quantiles
 
 X, y = make_gaussian_quantiles(n_samples=13000, n_features=10,
-                               n_classes=3)
+                               n_classes=2)
 
 n_split = 3000
 
@@ -29,7 +29,7 @@ test_errors = []
 train_errors = []
 
 bdt = AdaBoostClassifier(DecisionTreeClassifier(min_samples_leaf=100),
-                         n_estimators=300, learn_rate=.05)
+                         n_estimators=300, learn_rate=.1)
 
 bdt.fit(X_train, y_train)
 
