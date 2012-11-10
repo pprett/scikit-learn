@@ -207,6 +207,8 @@ class BaseWeightBoosting(BaseEnsemble):
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
+            if alpha == 0:
+                continue
             if isinstance(self, ClassifierMixin):
                 if self.n_outputs_ > 1:
                     p = [out * alpha for out in estimator.predict_proba(X)]
@@ -285,6 +287,8 @@ class BaseWeightBoosting(BaseEnsemble):
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
+            if alpha == 0:
+                continue
             if isinstance(self, ClassifierMixin):
                 if self.n_outputs_ > 1:
                     p = [out * alpha for out in estimator.predict_proba(X)]
@@ -437,6 +441,8 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
+            if alpha == 0:
+                continue
             current_probs = estimator.predict_proba(X) * alpha
             if probs is None:
                 probs = current_probs
@@ -476,12 +482,14 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
+            norm += alpha
+            if alpha == 0 or norm == 0:
+                continue
             current_probs = estimator.predict_proba(X) * alpha
             if probs is None:
                 probs = current_probs
             else:
                 probs += current_probs
-            norm += alpha
             yield probs / norm
 
     def predict_log_proba(self, X, n_estimators=-1):
