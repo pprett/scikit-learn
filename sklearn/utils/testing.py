@@ -21,10 +21,14 @@ from nose.tools import assert_equal
 from nose.tools import assert_true
 from nose.tools import assert_false
 from nose.tools import assert_raises
+from nose.tools import raises
+from nose import SkipTest
+from nose import with_setup
 
 from numpy.testing import assert_almost_equal
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_less
 
 
 try:
@@ -163,3 +167,8 @@ def all_estimators():
     estimators = [c for c in estimators if not is_abstract(c[1])]
     # We sort in order to have reproducible test failures
     return sorted(estimators)
+
+
+def set_random_state(estimator, random_state=0):
+    if "random_state" in estimator.get_params().keys():
+        estimator.set_params(random_state=random_state)

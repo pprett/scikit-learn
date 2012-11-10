@@ -7,6 +7,9 @@
 
 Changelog
 ---------
+   - New estimators :class: `linear_model.PassiveAggressiveClassifier` and
+     `linear_model.PassiverAggressiveRegressor` by `Rob Zinkov` and
+     `Mathieu Blondel`_.
 
    - The table of contents has now been made expandible (on the
      index page) - by Jaques Grobler.
@@ -43,9 +46,32 @@ Changelog
    - New estimator :class:`decomposition.FactorAnalysis` by
      `Christian Osendorfer`_ and `Alexandre Gramfort`_
 
+   - :func:`datasets.make_circles` now has the same number of inner and outer points.
+
+   - :func:`cross_validation.cross_val_score` now works with precomputed kernels
+     and affinity matrices, by `Andreas Müller`_.
+
+   - LARS algorithm made more numerically stable with heuristics to drop
+     regressors too correlated as well as to stop the path when
+     numerical noise becomes predominant, by `Gael Varoquaux`_.
+
 
 API changes summary
 -------------------
+   - Renamed all occurences of ``n_atoms`` to ``n_components`` for consistency.
+     This applies to :class:`dic_learning.DictionaryLearning`,
+     :class:`dic_learning.MiniBatchDictionaryLearning`,
+     :func:'dic_learning.dict_learning', :func:'dic_learning.dict_learning_online'
+
+   - Renamed all occurences of ``max_iters`` to ``max_iter`` for consistency.
+     This applies to :class:`label_propagation.BaseLabelPropagation`,
+     'label_propagation.LabelSpreading'
+
+   - Renamed all occurences of ``learn_rate`` to ``learning_rate`` for consistency.
+     This applies to :class:`gradient_boosting.LossFunction`,
+     :class:`gradient_boosting.LeastSquaresError`,
+     :class:'gradient_boosting.BaseGradientBoosting',
+     :class:'gradient_boosting.GradientBoostingRegressor'
 
    - The module ``sklearn.linear_model.sparse`` is gone. Sparse matrix support
      was already integrated into the "regular" linear models.
@@ -75,13 +101,16 @@ API changes summary
      :class:`cross_validation.StratifiedShuffleSplit`,
      :func:`utils.randomized_range_finder` and :func:`utils.randomized_svd`.
 
-   - Replaced `rho` in :class:`linear_model.ElasticNet` and
-     :class:`linear_model.SGDClassifier` by ``l1_ratio``. The `rho` parameter
+   - Replaced ``rho`` in :class:`linear_model.ElasticNet` and
+     :class:`linear_model.SGDClassifier` by ``l1_ratio``. The ``rho`` parameter
      had different meanings; ``l1_ratio`` was introduced to avoid confusion.
-     It has the same meaning as previously rho in
+     It has the same meaning as previously ``rho`` in
      :class:`linear_model.ElasticNet` and ``(1-rho)`` in
      :class:`linear_model.SGDClassifier`,
 
+   - :class:`linear_model.LassoLars` and :class:`linear_model.Lars` now
+     store a list of paths in the case of multiple targets, rather than
+     an array of paths.
 
 .. _changes_0_12.1:
 
@@ -192,7 +221,7 @@ Changelog
      by `Andreas Müller`_.
 
    - In :class:`feature_extraction.text.CountVectorizer`, added an option to
-     infrequent words, ``min_df`` by  `Andreas Müller`_.
+     ignore infrequent words, ``min_df`` by  `Andreas Müller`_.
 
    - Add support for multiple targets in some linear models (ElasticNet, Lasso
      and OrthogonalMatchingPursuit) by `Vlad Niculae`_ and

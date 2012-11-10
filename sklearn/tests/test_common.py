@@ -8,12 +8,15 @@ import traceback
 
 import numpy as np
 from scipy import sparse
-from nose.tools import assert_raises, assert_equal, assert_true
-from numpy.testing import assert_array_equal, \
-        assert_array_almost_equal
+
+from sklearn.utils.testing import assert_raises
+from sklearn.utils.testing import assert_equal
+from sklearn.utils.testing import assert_true
+from sklearn.utils.testing import assert_array_equal
+from sklearn.utils.testing import assert_array_almost_equal
 
 import sklearn
-from sklearn.utils.testing import all_estimators
+from sklearn.utils.testing import all_estimators, set_random_state
 from sklearn.utils.testing import assert_greater
 from sklearn.base import clone, ClassifierMixin, RegressorMixin, \
         TransformerMixin, ClusterMixin
@@ -131,7 +134,7 @@ def test_transformers():
         # catch deprecation warnings
         with warnings.catch_warnings(record=True):
             trans = Trans()
-
+        set_random_state(trans)
         if hasattr(trans, 'compute_importances'):
             trans.compute_importances = True
 
@@ -161,6 +164,7 @@ def test_transformers():
             print e
             print
             succeeded = False
+            continue
 
         if hasattr(trans, 'transform'):
             if Trans in (_PLS, PLSCanonical, PLSRegression, CCA, PLSSVD):
@@ -436,8 +440,8 @@ def test_regressors_int():
             reg1 = Reg()
             reg2 = Reg()
         if hasattr(reg1, 'alpha'):
-            reg1.set_params(alpha=0.01)
-            reg2.set_params(alpha=0.01)
+            reg1.alpha = 0.01
+            reg2.alpha = 0.01
         if hasattr(reg1, 'random_state'):
             reg1.set_params(random_state=0)
             reg2.set_params(random_state=0)
@@ -475,7 +479,7 @@ def test_regressors_train():
         with warnings.catch_warnings(record=True):
             reg = Reg()
         if hasattr(reg, 'alpha'):
-            reg.set_params(alpha=0.01)
+            reg.alpha = 0.01
 
         # raises error on malformed input for fit
         assert_raises(ValueError, reg.fit, X, y[:-1])

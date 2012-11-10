@@ -1,18 +1,22 @@
+import unittest
+
 import numpy as np
 import scipy.sparse as sp
 
-from numpy.testing import assert_array_equal, assert_approx_equal
-from numpy.testing import assert_almost_equal, assert_array_almost_equal
+from sklearn.utils.testing import assert_array_equal
+from sklearn.utils.testing import assert_almost_equal
+from sklearn.utils.testing import assert_array_almost_equal
+from sklearn.utils.testing import assert_greater
+from sklearn.utils.testing import assert_less
+from sklearn.utils.testing import raises
+from sklearn.utils.testing import assert_raises
+from sklearn.utils.testing import assert_true
+from sklearn.utils.testing import assert_equal
 
 from sklearn import linear_model, datasets, metrics
 from sklearn import preprocessing
 from sklearn.linear_model import SGDClassifier, SGDRegressor
-from sklearn.utils.testing import assert_greater, assert_less
 from sklearn.base import clone
-
-import unittest
-from nose.tools import raises
-from nose.tools import assert_raises, assert_true, assert_equal
 
 
 class SparseSGDClassifier(SGDClassifier):
@@ -174,11 +178,12 @@ class DenseSGDClassifierTestCase(unittest.TestCase, CommonTest):
     def test_sgd(self):
         """Check that SGD gives any results :-)"""
 
-        clf = self.factory(penalty='l2', alpha=0.01, fit_intercept=True,
-                      n_iter=10, shuffle=True)
-        clf.fit(X, Y)
-        #assert_almost_equal(clf.coef_[0], clf.coef_[1], decimal=7)
-        assert_array_equal(clf.predict(T), true_result)
+        for loss in ("hinge", "squared_hinge", "log", "modified_huber"):
+            clf = self.factory(penalty='l2', alpha=0.01, fit_intercept=True,
+                               loss=loss, n_iter=10, shuffle=True)
+            clf.fit(X, Y)
+            #assert_almost_equal(clf.coef_[0], clf.coef_[1], decimal=7)
+            assert_array_equal(clf.predict(T), true_result)
 
     @raises(ValueError)
     def test_sgd_bad_penalty(self):
@@ -381,12 +386,14 @@ class DenseSGDClassifierTestCase(unittest.TestCase, CommonTest):
         y = y[idx]
         clf = self.factory(alpha=0.0001, n_iter=1000,
                            class_weight=None).fit(X, y)
-        assert_approx_equal(metrics.f1_score(y, clf.predict(X)), 0.96, 2)
+        assert_almost_equal(metrics.f1_score(y, clf.predict(X)), 0.96,
+                            decimal=1)
 
         # make the same prediction using automated class_weight
         clf_auto = self.factory(alpha=0.0001, n_iter=1000,
                                 class_weight="auto").fit(X, y)
-        assert_approx_equal(metrics.f1_score(y, clf_auto.predict(X)), 0.96, 2)
+        assert_almost_equal(metrics.f1_score(y, clf_auto.predict(X)), 0.96,
+                            decimal=1)
 
         # Make sure that in the balanced case it does not change anything
         # to use "auto"
@@ -512,6 +519,11 @@ class DenseSGDClassifierTestCase(unittest.TestCase, CommonTest):
     def test_regression_losses(self):
         clf = self.factory(alpha=0.01, learning_rate="constant",
                            eta0=0.1, loss="epsilon_insensitive")
+        clf.fit(X, Y)
+        assert_equal(1.0, np.mean(clf.predict(X) == Y))
+
+        clf = self.factory(alpha=0.01, learning_rate="constant",
+                           eta0=0.1, loss="squared_epsilon_insensitive")
         clf.fit(X, Y)
         assert_equal(1.0, np.mean(clf.predict(X) == Y))
 

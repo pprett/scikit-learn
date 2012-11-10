@@ -4,12 +4,13 @@
 
 import numpy as np
 import scipy.sparse as sp
-from numpy.testing import assert_array_equal
 
-from nose.tools import assert_true
-from nose.tools import assert_false
-from nose.tools import assert_equal
-from nose.tools import assert_raises
+from sklearn.utils.testing import assert_array_equal
+from sklearn.utils.testing import assert_true
+from sklearn.utils.testing import assert_false
+from sklearn.utils.testing import assert_equal
+from sklearn.utils.testing import assert_raises
+
 from sklearn.base import BaseEstimator, clone, is_classifier
 from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
@@ -68,7 +69,7 @@ def test_clone():
     """Tests that clone creates a correct deep copy.
 
     We create an estimator, make a copy of its original state
-    (which, in this case, is the current state of the setimator),
+    (which, in this case, is the current state of the estimator),
     and check that the obtained copy is a correct deep copy.
 
     """
