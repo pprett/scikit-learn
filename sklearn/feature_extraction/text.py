@@ -15,6 +15,7 @@ from operator import itemgetter
 import re
 import unicodedata
 import warnings
+import numbers
 
 import numpy as np
 import scipy.sparse as sp
@@ -199,6 +200,16 @@ class CountVectorizer(BaseEstimator):
 
     dtype: type, optional
         Type of the matrix returned by fit_transform() or transform().
+
+    Attributes
+    ----------
+    `vocabulary_`: dict
+        A mapping of terms to feature indices.
+
+    `stop_words_`: set
+        Terms that were ignored because they occurred in either too
+        many (`max_df`) or in too few (`min_df`) documents.  This is
+        only available if no vocabulary was given.
     """
 
     _white_spaces = re.compile(ur"\s\s+")
@@ -252,7 +263,8 @@ class CountVectorizer(BaseEstimator):
         The decoding strategy depends on the vectorizer parameters.
         """
         if self.input == 'filename':
-            doc = open(doc, 'rb').read()
+            with open(doc, 'rb') as fh:
+                doc = fh.read()
 
         elif self.input == 'file':
             doc = doc.read()
@@ -398,7 +410,7 @@ class CountVectorizer(BaseEstimator):
             # free memory as we go
             term_count_dict.clear()
 
-        shape = (len(term_count_dicts), max(vocabulary.itervalues()) + 1)
+        shape = (i + 1, max(vocabulary.itervalues()) + 1)
         spmatrix = sp.coo_matrix((values, (i_indices, j_indices)),
                                  shape=shape, dtype=self.dtype)
         if self.binary:
@@ -440,8 +452,8 @@ class CountVectorizer(BaseEstimator):
             # fit_transform overridable without unwanted side effects in
             # TfidfVectorizer
             analyze = self.build_analyzer()
-            term_counts_per_doc = [Counter(analyze(doc))
-                                   for doc in raw_documents]
+            term_counts_per_doc = (Counter(analyze(doc))
+                                   for doc in raw_documents)
             return self._term_count_dicts_to_matrix(term_counts_per_doc)
 
         self.vocabulary_ = {}
@@ -470,9 +482,9 @@ class CountVectorizer(BaseEstimator):
         max_df = self.max_df
         min_df = self.min_df
 
-        max_doc_count = (max_df if isinstance(max_df, (int, np.integer))
+        max_doc_count = (max_df if isinstance(max_df, numbers.Integral)
                                 else max_df * n_doc)
-        min_doc_count = (min_df if isinstance(min_df,  (int, np.integer))
+        min_doc_count = (min_df if isinstance(min_df, numbers.Integral)
                                 else min_df * n_doc)
 
         # filter out stop words: terms that occur in almost all documents
@@ -496,7 +508,7 @@ class CountVectorizer(BaseEstimator):
 
         # store the learned stop words to make it easier to debug the value of
         # max_df
-        self.max_df_stop_words_ = stop_words
+        self.stop_words_ = stop_words
 
         # store map from term name to feature integer index: we sort the term
         # to have reproducible outcome for the vocabulary structure: otherwise
@@ -536,7 +548,7 @@ class CountVectorizer(BaseEstimator):
         # XXX @larsmans tried to parallelize the following loop with joblib.
         # The result was some 20% slower than the serial version.
         analyze = self.build_analyzer()
-        term_counts_per_doc = [Counter(analyze(doc)) for doc in raw_documents]
+        term_counts_per_doc = (Counter(analyze(doc)) for doc in raw_documents)
         return self._term_count_dicts_to_matrix(term_counts_per_doc)
 
     def inverse_transform(self, X):
@@ -573,6 +585,13 @@ class CountVectorizer(BaseEstimator):
 
         return [t for t, i in sorted(self.vocabulary_.iteritems(),
                                      key=itemgetter(1))]
+
+    @property
+    def max_df_stop_words_(self):
+        warnings.warn(
+            "The 'stop_words_ attribute was renamed to 'max_df_stop_words'. "
+            "The old attribute will be removed in 0.15.", DeprecationWarning)
+        return self.stop_words_
 
 
 class TfidfTransformer(BaseEstimator, TransformerMixin):
