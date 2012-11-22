@@ -169,7 +169,6 @@ cdef class ArrayDataset(SequentialDataset):
                                     self.sample_weight_data[sample_idx])
 
         self.current_index = current_index
-        #return <void*>(self.feature_vector)
 
     cdef void shuffle(self, seed):
         np.random.RandomState(seed).shuffle(self.index)

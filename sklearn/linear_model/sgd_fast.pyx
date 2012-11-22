@@ -346,7 +346,6 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
 
     # helper variable
     cdef FeatureVector f_vec = dataset.get_feature_vector()
-    dataset.next()  # FIXME
     cdef FVElem fv_elem
     cdef double eta = 0.0
     cdef double p = 0.0
@@ -380,7 +379,7 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
             dataset.shuffle(seed)
 
         for i in range(n_samples):
-            #dataset.next()
+            dataset.next()
             y = f_vec.y
 
             ## print("__________")
@@ -624,7 +623,7 @@ cdef void l1penalty(WeightVector w, DOUBLE *q_data_ptr,
 
     f_vec.reset_iter()
     while f_vec.next(&fv_elem) == 1:
-        idx = fv_elem.index[0]
+        idx = (fv_elem.index)[0]
         z = w_data_ptr[idx]
         if (wscale * w_data_ptr[idx]) > 0.0:
             w_data_ptr[idx] = max(
