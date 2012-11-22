@@ -44,24 +44,19 @@ cdef class WeightVector(object):
         self.n_features = w.shape[0]
         self.sq_norm = np.dot(w, w)
 
-    cdef void add(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr,
-                  int xnnz, double c):
+    cdef void add(self, FeatureVector f_vec, double c):
         """Scales example x by constant c and adds it to the weight vector.
 
         This operation updates ``sq_norm``.
 
         Parameters
         ----------
-        x_data_ptr : double*
-            The array which holds the feature values of ``x``.
-        x_ind_ptr : np.int32*
-            The array which holds the feature indices of ``x``.
-        xnnz : int
-            The number of non-zero features of ``x``.
+        f_vec : FeatureVector
+            The feature vector of example x.
         c : double
             The scaling constant for the example.
         """
-        cdef int j
+        cdef FVElem *fv_elem
         cdef int idx
         cdef double val
         cdef double innerprod = 0.0
@@ -71,70 +66,72 @@ cdef class WeightVector(object):
         cdef double wscale = self.wscale
         cdef DOUBLE* w_data_ptr = self.w_data_ptr
 
-        for j in range(xnnz):
-            idx = x_ind_ptr[j]
-            val = x_data_ptr[j]
+        f_vec.reset_iter()
+        while f_vec.has_next() == 1:
+            fv_elem = f_vec.next()
+            idx = fv_elem.index
+            val = fv_elem.value
             innerprod += (w_data_ptr[idx] * val)
             xsqnorm += (val * val)
             w_data_ptr[idx] += val * (c / wscale)
 
         self.sq_norm += (xsqnorm * c * c) + (2.0 * innerprod * wscale * c)
 
-    cdef double dot(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int xnnz):
+    cdef double dot(self, FeatureVector f_vec):
         """Computes the dot product of a sample x and the weight vector.
 
         Parameters
         ----------
-        x_data_ptr : double*
-            The array which holds the feature values of ``x``.
-        x_ind_ptr : np.int32*
-            The array which holds the feature indices of ``x``.
-        xnnz : int
-            The number of non-zero features of ``x``.
+        f_vec : FeatureVector
+            The feature vector of example x.
 
         Returns
         -------
         innerprod : double
             The inner product of ``x`` and ``w``.
         """
-        cdef int j
+        cdef FVElem *fv_elem
         cdef int idx
         cdef double innerprod = 0.0
         cdef DOUBLE* w_data_ptr = self.w_data_ptr
-        for j in range(xnnz):
-            idx = x_ind_ptr[j]
-            innerprod += w_data_ptr[idx] * x_data_ptr[j]
+
+        f_vec.reset_iter()
+        while f_vec.has_next() == 1:
+            fv_elem = f_vec.next()
+            idx = fv_elem.index
+            innerprod += w_data_ptr[idx] * fv_elem.value
+
         innerprod *= self.wscale
         return innerprod
 
-    cdef double dot_on_difference(self, DOUBLE *a_data_ptr, 
-                                  DOUBLE *b_data_ptr, INTEGER *x_ind_ptr,
-                                  int xnnz_a, int xnnz_b):
-        """Computes the dot product of the weight vector and the difference
-           between samples a and b with disagreeing labels.
+    ## cdef double dot_on_difference(self, DOUBLE *a_data_ptr,
+    ##                               DOUBLE *b_data_ptr, INTEGER *x_ind_ptr,
+    ##                               int xnnz_a, int xnnz_b):
+    ##     """Computes the dot product of the weight vector and the difference
+    ##        between samples a and b with disagreeing labels.
 
-        Parameters
-        ----------
-        a_data_ptr : double*
-            The array which holds the feature values of the first example
-            in the pair.
-        b_data_ptr : double*
-            The array which holds the feature values of the second example
-            in the pair.
+    ##     Parameters
+    ##     ----------
+    ##     a_data_ptr : double*
+    ##         The array which holds the feature values of the first example
+    ##         in the pair.
+    ##     b_data_ptr : double*
+    ##         The array which holds the feature values of the second example
+    ##         in the pair.
 
-        Returns
-        -------
-        innerprod_on_difference : double
-            The inner product of ``w`` and the difference between
-            ``a`` and ``b``.
-        """
-        # <(a - b), w> = <a, w> + <-1.0 * b, w>
-        cdef double innerprod_on_difference = 0.0
-        innerprod_on_difference += self.dot(a_data_ptr, x_ind_ptr,
-                                            xnnz_a)
-        innerprod_on_difference += self.dot(b_data_ptr, x_ind_ptr,
-                                            xnnz_b) * -1.0
-        return innerprod_on_difference
+    ##     Returns
+    ##     -------
+    ##     innerprod_on_difference : double
+    ##         The inner product of ``w`` and the difference between
+    ##         ``a`` and ``b``.
+    ##     """
+    ##     # <(a - b), w> = <a, w> + <-1.0 * b, w>
+    ##     cdef double innerprod_on_difference = 0.0
+    ##     innerprod_on_difference += self.dot(a_data_ptr, x_ind_ptr,
+    ##                                         xnnz_a)
+    ##     innerprod_on_difference += self.dot(b_data_ptr, x_ind_ptr,
+    ##                                         xnnz_b) * -1.0
+    ##     return innerprod_on_difference
 
     cdef void scale(self, double c):
         """Scales the weight vector by a constant ``c``.

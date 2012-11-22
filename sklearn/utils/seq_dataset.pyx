@@ -13,37 +13,83 @@ cimport numpy as np
 cimport cython
 
 
-cdef struct s_FVElem:
-    INTEGER    index
-    DOUBLE     value
-
-
-ctypedef s_FVElem FVElem
-
-
 cdef class FeatureVector:
     """A vector that supports iteration over non-zero elements. """
 
-    cdef public DOUBLE y
-    cdef public DOUBLE sample_weight
+    cdef FVElem* next(self):
+        raise NotImplementedError()
 
-    cdef FVElem next(self):
-        pass
+    cdef int has_next(self):
+        raise NotImplementedError()
+
+    cdef void reset_iter(self):
+        self.iter_pos = 0
 
 
-cdef class PairwiseFeatureVector(FeatureVector):
-    """A vector that supports iteration over non-zero elements. """
+cdef class ArrayFeatureVector(FeatureVector):
+    """Feature vector backed by a row in a numpy array. """
 
-    cdef FVElem next(self):
-        pass
+    def __cinit__(self, Py_ssize_t n_features):
+        self.n_features = n_features
+        self.iter_pos = 2 ** 31 - 1  # max int32
+
+    cdef void set_row(self, DOUBLE *x_data_ptr, DOUBLE y, DOUBLE sample_weight):
+        self.x_data_ptr = x_data_ptr
+        self.y = y
+        self.sample_weight = sample_weight
+        self.reset_iter()
+
+    cdef FVElem* next(self):
+        self.out.index = self.iter_pos
+        self.out.value = self.x_data_ptr[self.iter_pos]
+        self.iter_pos += 1
+        return &(self.out)
+
+    cdef int has_next(self):
+        if self.iter_pos < self.n_features:
+            return 1
+        else:
+            return 0
+
+
+cdef class CSRFeatureVector(FeatureVector):
+    """Feature vector backed by a row in a CSR matrix. """
+
+    def __cinit__(self, Py_ssize_t n_features):
+        self.n_features = n_features
+
+    cdef void set_row(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int nnz,
+                      DOUBLE y, DOUBLE sample_weight):
+        self.x_data_ptr = x_data_ptr
+        self.x_ind_ptr = x_ind_ptr
+        self.nnz = nnz
+        self.iter_pos = 0
+
+    cdef FVElem* next(self):
+        self.out.index = self.x_ind_ptr[self.iter_pos]
+        self.out.value = self.x_data_ptr[self.iter_pos]
+        self.iter_pos += 1
+        return &(self.out)
+
+    cdef int has_next(self):
+        if self.iter_pos < (self.nnz - 1):
+            return 1
+        else:
+            return 0
+
+
+## cdef class PairwiseFeatureVector(FeatureVector):
+##     """A vector that supports iteration over non-zero elements. """
+
+##     cdef FVElem next(self):
+##         pass
 
 
 
 cdef class SequentialDataset:
     """Base class for datasets with sequential data access. """
 
-    cdef void next(self, DOUBLE **x_data_ptr, INTEGER **x_ind_ptr,
-                   int *nnz, DOUBLE *y, DOUBLE *sample_weight):
+    cdef void next(self):
         """Get the next example ``x`` from the dataset.
 
         Parameters
@@ -66,6 +112,9 @@ cdef class SequentialDataset:
 
     cdef void shuffle(self, seed):
         """Permutes the ordering of examples.  """
+        raise NotImplementedError()
+
+    cdef FeatureVector get_feature_vector(self):
         raise NotImplementedError()
 
 
@@ -95,11 +144,7 @@ cdef class ArrayDataset(SequentialDataset):
         """
         self.n_samples = X.shape[0]
         self.n_features = X.shape[1]
-        cdef np.ndarray[INTEGER, ndim=1,
-                        mode='c'] feature_indices = np.arange(0, self.n_features,
-                                                              dtype=np.int32)
-        self.feature_indices = feature_indices
-        self.feature_indices_ptr = <INTEGER *> feature_indices.data
+
         self.current_index = -1
         self.stride = X.strides[0] / X.strides[1]
         self.X_data_ptr = <DOUBLE *>X.data
@@ -113,8 +158,10 @@ cdef class ArrayDataset(SequentialDataset):
         self.index = index
         self.index_data_ptr = <INTEGER *> index.data
 
-    cdef void next(self, DOUBLE **x_data_ptr, INTEGER **x_ind_ptr,
-                   int *nnz, DOUBLE *y, DOUBLE *sample_weight):
+        # the feature vector for this dataset
+        self.feature_vector = ArrayFeatureVector(self.n_features)
+
+    cdef void next(self):
         cdef int current_index = self.current_index
         if current_index >= (self.n_samples - 1):
             current_index = -1
@@ -123,16 +170,19 @@ cdef class ArrayDataset(SequentialDataset):
         cdef int sample_idx = self.index_data_ptr[current_index]
         cdef int offset = sample_idx * self.stride
 
-        y[0] = self.Y_data_ptr[sample_idx]
-        x_data_ptr[0] = self.X_data_ptr + offset
-        x_ind_ptr[0] = self.feature_indices_ptr
-        nnz[0] = self.n_features
-        sample_weight[0] = self.sample_weight_data[sample_idx]
+        self.feature_vector.set_row(self.X_data_ptr + offset,
+                                    self.Y_data_ptr[sample_idx],
+                                    self.sample_weight_data[sample_idx])
 
         self.current_index = current_index
+        #return <void*>(self.feature_vector)
 
     cdef void shuffle(self, seed):
         np.random.RandomState(seed).shuffle(self.index)
+
+    cdef FeatureVector get_feature_vector(self):
+        return self.feature_vector
+
 
 cdef class CSRDataset(SequentialDataset):
     """A ``SequentialDataset`` backed by a scipy sparse CSR matrix. """
@@ -180,8 +230,9 @@ cdef class CSRDataset(SequentialDataset):
         self.index = index
         self.index_data_ptr = <INTEGER *> index.data
 
-    cdef void next(self, DOUBLE **x_data_ptr, INTEGER **x_ind_ptr,
-                   int *nnz, DOUBLE *y, DOUBLE *sample_weight):
+        self.feature_vector = CSRFeatureVector()
+
+    cdef void next(self):
         cdef int current_index = self.current_index
         if current_index >= (self.n_samples - 1):
             current_index = -1
@@ -189,92 +240,97 @@ cdef class CSRDataset(SequentialDataset):
         current_index += 1
         cdef int sample_idx = self.index_data_ptr[current_index]
         cdef int offset = self.X_indptr_ptr[sample_idx]
-        y[0] = self.Y_data_ptr[sample_idx]
-        x_data_ptr[0] = self.X_data_ptr + offset
-        x_ind_ptr[0] = self.X_indices_ptr + offset
-        nnz[0] = self.X_indptr_ptr[sample_idx + 1] - offset
-        sample_weight[0] = self.sample_weight_data[sample_idx]
+
+        self.feature_vector.set_row(self.X_data_ptr + offset,
+                                    self.X_indices_ptr + offset,
+                                    self.X_indptr_ptr[sample_idx + 1] - offset,
+                                    self.Y_data_ptr[sample_idx],
+                                    self.sample_weight_data[sample_idx])
 
         self.current_index = current_index
+        #return <void*>(self.feature_vector)
 
     cdef void shuffle(self, seed):
         np.random.RandomState(seed).shuffle(self.index)
 
+    cdef FeatureVector get_feature_vector(self):
+        return self.feature_vector
 
-cdef class PairwiseArrayDataset:
-    """Dataset backed by a two-dimensional numpy array. Calling next() returns a random pair of examples with disagreeing labels.
 
-    The dtype of the numpy array is expected to be ``np.float64``
-    and C-style memory layout.
-    """
-    def __cinit__(self, np.ndarray[DOUBLE, ndim=2, mode='c'] X,
-                  np.ndarray[DOUBLE, ndim=1, mode='c'] Y):
-        """A ``PairwiseArrayDataset`` backed by a two-dimensional numpy array.
+## cdef class PairwiseArrayDataset:
+##     """Dataset backed by a two-dimensional numpy array. Calling next() returns a random pair of examples with disagreeing labels.
 
-        Parameters
-        ---------
-        X : ndarray, dtype=np.float64, ndim=2, mode='c'
-            The samples; a two-dimensional c-continuous numpy array of
-            dtype np.float64.
-        Y : ndarray, dtype=np.float64, ndim=1, mode='c'
-            The target values; a one-dimensional c-continuous numpy array of
-            dtype np.float64.
-        sample_weights : ndarray, dtype=np.float64, ndim=1, mode='c'
-            The weight of each sample; a one-dimensional c-continuous numpy
-            array of dtype np.float64.
-        """
-        self.n_samples = X.shape[0]
-        self.n_features = X.shape[1]
-        cdef np.ndarray[INTEGER, ndim=1,
-                        mode='c'] feature_indices = np.arange(0, self.n_features,
-                                                              dtype=np.int32)
-        self.feature_indices = feature_indices
-        self.feature_indices_ptr = <INTEGER *> feature_indices.data
-        self.stride = X.strides[0] / X.strides[1]
-        self.X_data_ptr = <DOUBLE *>X.data
-        self.Y_data_ptr = <DOUBLE *>Y.data
+##     The dtype of the numpy array is expected to be ``np.float64``
+##     and C-style memory layout.
+##     """
+##     def __cinit__(self, np.ndarray[DOUBLE, ndim=2, mode='c'] X,
+##                   np.ndarray[DOUBLE, ndim=1, mode='c'] Y):
+##         """A ``PairwiseArrayDataset`` backed by a two-dimensional numpy array.
 
-        # Create an index of positives and negatives for fast sampling
-        # of disagreeing pairs
-        positives = []
-        negatives = []
-        cdef Py_ssize_t i
-        for i in range(self.n_samples):
-            if Y[i] > 0:
-                positives.append(i)
-            else:
-                negatives.append(i)
-        cdef np.ndarray[INTEGER, ndim=1,
-                        mode='c'] pos_index = np.array(positives, dtype=np.int32)
-        cdef np.ndarray[INTEGER, ndim=1,
-                        mode='c'] neg_index = np.array(negatives, dtype=np.int32)
-        self.pos_index = pos_index
-        self.neg_index = neg_index
-        self.pos_index_data_ptr = <INTEGER *> pos_index.data
-        self.neg_index_data_ptr = <INTEGER *> neg_index.data
-        self.n_pos_samples = len(pos_index)
-        self.n_neg_samples = len(neg_index)
+##         Parameters
+##         ---------
+##         X : ndarray, dtype=np.float64, ndim=2, mode='c'
+##             The samples; a two-dimensional c-continuous numpy array of
+##             dtype np.float64.
+##         Y : ndarray, dtype=np.float64, ndim=1, mode='c'
+##             The target values; a one-dimensional c-continuous numpy array of
+##             dtype np.float64.
+##         sample_weights : ndarray, dtype=np.float64, ndim=1, mode='c'
+##             The weight of each sample; a one-dimensional c-continuous numpy
+##             array of dtype np.float64.
+##         """
+##         self.n_samples = X.shape[0]
+##         self.n_features = X.shape[1]
+##         cdef np.ndarray[INTEGER, ndim=1,
+##                         mode='c'] feature_indices = np.arange(0, self.n_features,
+##                                                               dtype=np.int32)
+##         self.feature_indices = feature_indices
+##         self.feature_indices_ptr = <INTEGER *> feature_indices.data
+##         self.stride = X.strides[0] / X.strides[1]
+##         self.X_data_ptr = <DOUBLE *>X.data
+##         self.Y_data_ptr = <DOUBLE *>Y.data
 
-    cdef void next(self, DOUBLE **a_data_ptr, DOUBLE **b_data_ptr,
-                   INTEGER **x_ind_ptr, int *nnz_a, int *nnz_b,
-                   DOUBLE *y_a, DOUBLE *y_b):
+##         # Create an index of positives and negatives for fast sampling
+##         # of disagreeing pairs
+##         positives = []
+##         negatives = []
+##         cdef Py_ssize_t i
+##         for i in range(self.n_samples):
+##             if Y[i] > 0:
+##                 positives.append(i)
+##             else:
+##                 negatives.append(i)
+##         cdef np.ndarray[INTEGER, ndim=1,
+##                         mode='c'] pos_index = np.array(positives, dtype=np.int32)
+##         cdef np.ndarray[INTEGER, ndim=1,
+##                         mode='c'] neg_index = np.array(negatives, dtype=np.int32)
+##         self.pos_index = pos_index
+##         self.neg_index = neg_index
+##         self.pos_index_data_ptr = <INTEGER *> pos_index.data
+##         self.neg_index_data_ptr = <INTEGER *> neg_index.data
+##         self.n_pos_samples = len(pos_index)
+##         self.n_neg_samples = len(neg_index)
 
-        current_pos_index = np.random.randint(self.n_pos_samples)
-        current_neg_index = np.random.randint(self.n_neg_samples)
+##     cdef void next(self, DOUBLE **a_data_ptr, DOUBLE **b_data_ptr,
+##                    INTEGER **x_ind_ptr, int *nnz_a, int *nnz_b,
+##                    DOUBLE *y_a, DOUBLE *y_b):
 
-        # For each step, randomly sample one positive and one negative
-        cdef int sample_pos_idx = self.pos_index_data_ptr[current_pos_index]
-        cdef int sample_neg_idx = self.neg_index_data_ptr[current_neg_index]
-        cdef int pos_offset = sample_pos_idx * self.stride
-        cdef int neg_offset = sample_neg_idx * self.stride
+##         current_pos_index = np.random.randint(self.n_pos_samples)
+##         current_neg_index = np.random.randint(self.n_neg_samples)
 
-        y_a[0] = self.Y_data_ptr[sample_pos_idx]
-        y_b[0] = self.Y_data_ptr[sample_neg_idx]
-        a_data_ptr[0] = self.X_data_ptr + pos_offset
-        b_data_ptr[0] = self.X_data_ptr + neg_offset
-        x_ind_ptr[0] = self.feature_indices_ptr
-        nnz_a[0] = self.n_features
-        nnz_b[0] = self.n_features
+##         # For each step, randomly sample one positive and one negative
+##         cdef int sample_pos_idx = self.pos_index_data_ptr[current_pos_index]
+##         cdef int sample_neg_idx = self.neg_index_data_ptr[current_neg_index]
+##         cdef int pos_offset = sample_pos_idx * self.stride
+##         cdef int neg_offset = sample_neg_idx * self.stride
 
-    cdef void shuffle(self, seed):
-        np.random.RandomState(seed).shuffle(self.index)
+##         y_a[0] = self.Y_data_ptr[sample_pos_idx]
+##         y_b[0] = self.Y_data_ptr[sample_neg_idx]
+##         a_data_ptr[0] = self.X_data_ptr + pos_offset
+##         b_data_ptr[0] = self.X_data_ptr + neg_offset
+##         x_ind_ptr[0] = self.feature_indices_ptr
+##         nnz_a[0] = self.n_features
+##         nnz_b[0] = self.n_features
+
+##     cdef void shuffle(self, seed):
+##         np.random.RandomState(seed).shuffle(self.index)

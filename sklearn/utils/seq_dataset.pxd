@@ -2,16 +2,57 @@
 
 cimport numpy as np
 
+from cpython cimport bool
+
 ctypedef np.float64_t DOUBLE
 ctypedef np.int32_t INTEGER
+
+cdef struct s_FVElem:
+    INTEGER    index
+    DOUBLE     value
+
+
+ctypedef s_FVElem FVElem
+
+
+cdef class FeatureVector:
+    cdef public DOUBLE y
+    cdef public DOUBLE sample_weight
+
+    cdef Py_ssize_t n_features
+    cdef INTEGER iter_pos
+    cdef FVElem out
+
+    cdef FVElem* next(self)
+    cdef int has_next(self)
+    cdef void reset_iter(self)
+
+cdef class ArrayFeatureVector(FeatureVector):
+    cdef DOUBLE *x_data_ptr
+
+    cdef void set_row(self, DOUBLE *x_data_ptr, DOUBLE y, DOUBLE sample_weight)
+    cdef FVElem* next(self)
+    cdef int has_next(self)
+
+
+cdef class CSRFeatureVector(FeatureVector):
+    cdef DOUBLE *x_data_ptr
+    cdef INTEGER *x_ind_ptr
+    cdef int nnz
+
+    cdef void set_row(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int nnz,
+                      DOUBLE y, DOUBLE sample_weight)
+    cdef FVElem* next(self)
+    cdef int has_next(self)
 
 
 cdef class SequentialDataset:
     cdef Py_ssize_t n_samples
+    #cdef FeatureVector feature_vector
 
-    cdef void next(self, DOUBLE **x_data_ptr, INTEGER **x_ind_ptr,
-                   int *nnz, DOUBLE *y, DOUBLE *sample_weight)
+    cdef void next(self)
     cdef void shuffle(self, seed)
+    cdef FeatureVector get_feature_vector(self)
 
 
 cdef class ArrayDataset(SequentialDataset):
@@ -20,15 +61,14 @@ cdef class ArrayDataset(SequentialDataset):
     cdef int stride
     cdef DOUBLE *X_data_ptr
     cdef DOUBLE *Y_data_ptr
-    cdef np.ndarray feature_indices
-    cdef INTEGER *feature_indices_ptr
     cdef np.ndarray index
     cdef INTEGER *index_data_ptr
     cdef DOUBLE *sample_weight_data
+    cdef ArrayFeatureVector feature_vector
 
-    cdef void next(self, DOUBLE **x_data_ptr, INTEGER **x_ind_ptr,
-                   int *nnz, DOUBLE *y, DOUBLE *sample_weight)
+    cdef void next(self)
     cdef void shuffle(self, seed)
+    cdef FeatureVector get_feature_vector(self)
 
 
 cdef class CSRDataset(SequentialDataset):
@@ -43,29 +83,30 @@ cdef class CSRDataset(SequentialDataset):
     cdef np.ndarray index
     cdef INTEGER *index_data_ptr
     cdef DOUBLE *sample_weight_data
+    cdef CSRFeatureVector feature_vector
 
-    cdef void next(self, DOUBLE **x_data_ptr, INTEGER **x_ind_ptr,
-                   int *nnz, DOUBLE *y, DOUBLE *sample_weight)
+    cdef void next(self)
     cdef void shuffle(self, seed)
+    cdef FeatureVector get_feature_vector(self)
 
-cdef class PairwiseArrayDataset:
-    cdef Py_ssize_t n_samples
-    cdef Py_ssize_t n_features
-    cdef int current_index
-    cdef int stride
-    cdef DOUBLE *X_data_ptr
-    cdef DOUBLE *Y_data_ptr
-    cdef np.ndarray feature_indices
-    cdef INTEGER *feature_indices_ptr
-    cdef np.ndarray pos_index
-    cdef np.ndarray neg_index
-    cdef INTEGER *pos_index_data_ptr
-    cdef INTEGER *neg_index_data_ptr
-    cdef int n_pos_samples
-    cdef int n_neg_samples
+## cdef class PairwiseArrayDataset:
+##     cdef Py_ssize_t n_samples
+##     cdef Py_ssize_t n_features
+##     cdef int current_index
+##     cdef int stride
+##     cdef DOUBLE *X_data_ptr
+##     cdef DOUBLE *Y_data_ptr
+##     cdef np.ndarray feature_indices
+##     cdef INTEGER *feature_indices_ptr
+##     cdef np.ndarray pos_index
+##     cdef np.ndarray neg_index
+##     cdef INTEGER *pos_index_data_ptr
+##     cdef INTEGER *neg_index_data_ptr
+##     cdef int n_pos_samples
+##     cdef int n_neg_samples
 
 
-    cdef void next(self, DOUBLE **a_data_ptr, DOUBLE **b_data_ptr, 
-                   INTEGER **x_ind_ptr, int *nnz_a, int *nnz_b, 
-                   DOUBLE *y_a, DOUBLE *y_b)
-    cdef void shuffle(self, seed)    
+##     cdef void next(self, DOUBLE **a_data_ptr, DOUBLE **b_data_ptr,
+##                    INTEGER **x_ind_ptr, int *nnz_a, int *nnz_b,
+##                    DOUBLE *y_a, DOUBLE *y_b)
+##     cdef void shuffle(self, seed)

@@ -16,7 +16,10 @@ cimport numpy as np
 cimport cython
 
 from sklearn.utils.weight_vector cimport WeightVector
-from sklearn.utils.seq_dataset cimport SequentialDataset, PairwiseArrayDataset
+from sklearn.utils.seq_dataset cimport SequentialDataset
+from sklearn.utils.seq_dataset cimport FeatureVector
+from sklearn.utils.seq_dataset cimport FVElem
+#from sklearn.utils.seq_dataset cimport PairwiseArrayDataset
 
 
 cdef extern from "math.h":
@@ -342,13 +345,13 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
     cdef INTEGER *x_ind_ptr = NULL
 
     # helper variable
-    cdef int xnnz
+    cdef FeatureVector f_vec = dataset.get_feature_vector()
+    cdef FVElem *fv_elem
     cdef double eta = 0.0
     cdef double p = 0.0
     cdef double update = 0.0
     cdef double sumloss = 0.0
     cdef DOUBLE y = 0.0
-    cdef DOUBLE sample_weight
     cdef double class_weight = 1.0
     cdef unsigned int count = 0
     cdef unsigned int epoch = 0
@@ -376,14 +379,20 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
             dataset.shuffle(seed)
 
         for i in range(n_samples):
-            dataset.next(&x_data_ptr, &x_ind_ptr, &xnnz, &y,
-                         &sample_weight)
+            dataset.next()
+            y = f_vec.y
+
+            ## f_vec.reset_iter()
+            ## print("y:%.2f sample_weight:%.2f" % (y, f_vec.sample_weight))
+            ## while f_vec.has_next():
+            ##     fv_elem = f_vec.next()
+            ##     print("%d:%.4f" % (fv_elem.index, fv_elem.value))
 
             if learning_rate == OPTIMAL:
                 eta = 1.0 / (alpha * t)
             elif learning_rate == INVSCALING:
                 eta = eta0 / pow(t, power_t)
-            p = w.dot(x_data_ptr, x_ind_ptr, xnnz) + intercept
+            #p = w.dot(f_vec) + intercept
             if verbose > 0:
                 sumloss += loss.loss(p, y)
 
@@ -392,9 +401,9 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
             else:
                 class_weight = weight_neg
 
-            update = eta * loss.dloss(p, y) * class_weight * sample_weight
+            update = eta * loss.dloss(p, y) * class_weight * f_vec.sample_weight
             if update != 0.0:
-                w.add(x_data_ptr, x_ind_ptr, xnnz, -update)
+                #w.add(f_vec, -update)
                 if fit_intercept == 1:
                     intercept -= update * intercept_decay
             if penalty_type >= L2:
@@ -402,7 +411,7 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
 
             if penalty_type == L1 or penalty_type == ELASTICNET:
                 u += ((1.0 - rho) * eta * alpha)
-                l1penalty(w, q_data_ptr, x_ind_ptr, xnnz, u)
+                l1penalty(w, q_data_ptr, f_vec, u)
             t += 1
             count += 1
 
@@ -429,164 +438,165 @@ def ranking_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
               LossFunction loss,
               int penalty_type,
               double alpha, double rho,
-              PairwiseArrayDataset dataset,
+              SequentialDataset dataset, ##FIXME PairwiseArrayDataset dataset,
               int n_iter, int fit_intercept,
               int verbose, int shuffle, int seed,
               int learning_rate, double eta0,
               double power_t,
               double t=1.0,
               double intercept_decay=1.0):
-    """SGD minimizing ROC-SVM pairwise ranking loss.
+    pass
+##     """SGD minimizing ROC-SVM pairwise ranking loss.
 
-    Parameters
-    ----------
-    weights : ndarray[double, ndim=1]
-        The allocated coef_ vector.
-    intercept : double
-        The initial intercept.
-    loss : LossFunction
-        A concrete ``LossFunction`` object.
-    penalty_type : int
-        The penalty 2 for L2, 1 for L1, and 3 for Elastic-Net.
-    alpha : float
-        The regularization parameter.
-    rho : float
-        The elastic net hyperparameter.
-    dataset : SequentialDataset
-        A concrete ``SequentialDataset`` object.
-    n_iter : int
-        The number of iterations (epochs).
-    fit_intercept : int
-        Whether or not to fit the intercept (1 or 0).
-    verbose : int
-        Print verbose output; 0 for quite.
-    shuffle : int
-        Whether to shuffle the training data before each epoch.
-    weight_pos : float
-        The weight of the positive class.
-    weight_neg : float
-        The weight of the negative class.
-    seed : int
-        The seed of the pseudo random number generator to use when
-        shuffling the data
-    learning_rate : int
-        The learning rate:
-        (1) constant, eta = eta0
-        (2) optimal, eta = 1.0/(t+t0)
-        (3) inverse scaling, eta = eta0 / pow(t, power_t)
-    eta0 : double
-        The initial learning rate.
-    power_t : double
-        The exponent for inverse scaling learning rate.
-    t : double
-        Initial state of the learning rate. This value is equal to the
-        iteration count except when the learning rate is set to `optimal`.
-        Default: 1.0.
+##     Parameters
+##     ----------
+##     weights : ndarray[double, ndim=1]
+##         The allocated coef_ vector.
+##     intercept : double
+##         The initial intercept.
+##     loss : LossFunction
+##         A concrete ``LossFunction`` object.
+##     penalty_type : int
+##         The penalty 2 for L2, 1 for L1, and 3 for Elastic-Net.
+##     alpha : float
+##         The regularization parameter.
+##     rho : float
+##         The elastic net hyperparameter.
+##     dataset : SequentialDataset
+##         A concrete ``SequentialDataset`` object.
+##     n_iter : int
+##         The number of iterations (epochs).
+##     fit_intercept : int
+##         Whether or not to fit the intercept (1 or 0).
+##     verbose : int
+##         Print verbose output; 0 for quite.
+##     shuffle : int
+##         Whether to shuffle the training data before each epoch.
+##     weight_pos : float
+##         The weight of the positive class.
+##     weight_neg : float
+##         The weight of the negative class.
+##     seed : int
+##         The seed of the pseudo random number generator to use when
+##         shuffling the data
+##     learning_rate : int
+##         The learning rate:
+##         (1) constant, eta = eta0
+##         (2) optimal, eta = 1.0/(t+t0)
+##         (3) inverse scaling, eta = eta0 / pow(t, power_t)
+##     eta0 : double
+##         The initial learning rate.
+##     power_t : double
+##         The exponent for inverse scaling learning rate.
+##     t : double
+##         Initial state of the learning rate. This value is equal to the
+##         iteration count except when the learning rate is set to `optimal`.
+##         Default: 1.0.
 
-    Returns
-    -------
-    weights : array, shape=[n_features]
-        The fitted weight vector.
-    intercept : float
-        The fitted intercept term.
+##     Returns
+##     -------
+##     weights : array, shape=[n_features]
+##         The fitted weight vector.
+##     intercept : float
+##         The fitted intercept term.
 
-    """
-    # get the data information into easy vars
-    cdef Py_ssize_t n_samples = dataset.n_samples
-    cdef Py_ssize_t n_features = weights.shape[0]
+##     """
+##     # get the data information into easy vars
+##     cdef Py_ssize_t n_samples = dataset.n_samples
+##     cdef Py_ssize_t n_features = weights.shape[0]
 
-    cdef WeightVector w = WeightVector(weights)
+##     cdef WeightVector w = WeightVector(weights)
 
-    cdef DOUBLE *a_data_ptr = NULL
-    cdef DOUBLE *b_data_ptr = NULL
-    cdef INTEGER *x_ind_ptr = NULL
+##     cdef DOUBLE *a_data_ptr = NULL
+##     cdef DOUBLE *b_data_ptr = NULL
+##     cdef INTEGER *x_ind_ptr = NULL
 
-    # helper variable
-    cdef int xnnz_a
-    cdef int xnnz_b
-    cdef double eta = 0.0
-    cdef double p = 0.0
-    cdef double update = 0.0
-    cdef double sumloss = 0.0
-    cdef DOUBLE y_a = 0.0
-    cdef DOUBLE y_b = 0.0
-    cdef DOUBLE y = 0.0
-    cdef double class_weight = 1.0
-    cdef unsigned int count = 0
-    cdef unsigned int epoch = 0
-    cdef unsigned int i = 0
+##     # helper variable
+##     cdef int xnnz_a
+##     cdef int xnnz_b
+##     cdef double eta = 0.0
+##     cdef double p = 0.0
+##     cdef double update = 0.0
+##     cdef double sumloss = 0.0
+##     cdef DOUBLE y_a = 0.0
+##     cdef DOUBLE y_b = 0.0
+##     cdef DOUBLE y = 0.0
+##     cdef double class_weight = 1.0
+##     cdef unsigned int count = 0
+##     cdef unsigned int epoch = 0
+##     cdef unsigned int i = 0
 
-    # q vector is only used for L1 regularization
-    cdef np.ndarray[DOUBLE, ndim=1, mode="c"] q = None
-    cdef DOUBLE *q_data_ptr = NULL
-    if penalty_type == L1 or penalty_type == ELASTICNET:
-        q = np.zeros((n_features,), dtype=np.float64, order="c")
-        q_data_ptr = <DOUBLE *> q.data
-    cdef double u = 0.0
+##     # q vector is only used for L1 regularization
+##     cdef np.ndarray[DOUBLE, ndim=1, mode="c"] q = None
+##     cdef DOUBLE *q_data_ptr = NULL
+##     if penalty_type == L1 or penalty_type == ELASTICNET:
+##         q = np.zeros((n_features,), dtype=np.float64, order="c")
+##         q_data_ptr = <DOUBLE *> q.data
+##     cdef double u = 0.0
 
-    if penalty_type == L2:
-        rho = 1.0
-    elif penalty_type == L1:
-        rho = 0.0
+##     if penalty_type == L2:
+##         rho = 1.0
+##     elif penalty_type == L1:
+##         rho = 0.0
 
-    eta = eta0
+##     eta = eta0
 
-    t_start = time()
-    for epoch in range(n_iter):
-        if verbose > 0:
-            print("-- Epoch %d" % (epoch + 1))
-        if shuffle:
-            dataset.shuffle(seed)
-        for i in range(n_samples):
-            dataset.next(&a_data_ptr, &b_data_ptr, &x_ind_ptr,
-                         &xnnz_a, &xnnz_b, &y_a, &y_b)
+##     t_start = time()
+##     for epoch in range(n_iter):
+##         if verbose > 0:
+##             print("-- Epoch %d" % (epoch + 1))
+##         if shuffle:
+##             dataset.shuffle(seed)
+##         for i in range(n_samples):
+##             dataset.next(&a_data_ptr, &b_data_ptr, &x_ind_ptr,
+##                          &xnnz_a, &xnnz_b, &y_a, &y_b)
 
-            if learning_rate == OPTIMAL:
-                eta = 1.0 / (alpha * t)
-            elif learning_rate == INVSCALING:
-                eta = eta0 / pow(t, power_t)
+##             if learning_rate == OPTIMAL:
+##                 eta = 1.0 / (alpha * t)
+##             elif learning_rate == INVSCALING:
+##                 eta = eta0 / pow(t, power_t)
 
-            # Computes sign(y_a - y_b)
-            if y_a > y_b:
-                y = 1.0
-            elif y_b > y_a:
-                y = -1.0
-            else:
-                y = 0.0
+##             # Computes sign(y_a - y_b)
+##             if y_a > y_b:
+##                 y = 1.0
+##             elif y_b > y_a:
+##                 y = -1.0
+##             else:
+##                 y = 0.0
 
-            p = y * w.dot_on_difference(a_data_ptr, b_data_ptr, 
-                                        x_ind_ptr, xnnz_a, xnnz_b)
+##             p = y * w.dot_on_difference(a_data_ptr, b_data_ptr,
+##                                         x_ind_ptr, xnnz_a, xnnz_b)
 
-            if verbose > 0:
-                sumloss += loss.loss(p, y)
+##             if verbose > 0:
+##                 sumloss += loss.loss(p, y)
 
-            # L2 Regularization
-            w.scale(1.0 - (rho * eta * alpha))
+##             # L2 Regularization
+##             w.scale(1.0 - (rho * eta * alpha))
 
-            # If (a - b) has non-zero loss, perform gradient step.
-            if (p < 1.0) & (y != 0.0):
-                w.add(a_data_ptr, x_ind_ptr, xnnz_a, (eta * y))
-                w.add(b_data_ptr, x_ind_ptr, xnnz_b, (-1.0 * eta * y))
-            t += 1
-            count += 1
-                    
-        # report epoch information
-        if verbose > 0:
-            print("Norm: %.2f, NNZs: %d, "\
-            "Bias: %.6f, T: %d, Avg. loss: %.6f" % (w.norm(),
-                                                    weights.nonzero()[0].shape[0],
-                                                    intercept, count,
-                                                    sumloss / count))
-            print("Total training time: %.2f seconds." % (time() - t_start))
+##             # If (a - b) has non-zero loss, perform gradient step.
+##             if (p < 1.0) & (y != 0.0):
+##                 w.add(a_data_ptr, x_ind_ptr, xnnz_a, (eta * y))
+##                 w.add(b_data_ptr, x_ind_ptr, xnnz_b, (-1.0 * eta * y))
+##             t += 1
+##             count += 1
 
-        # floating-point under-/overflow check.
-        if np.any(np.isinf(weights)) or np.any(np.isnan(weights)) \
-           or np.isnan(intercept) or np.isinf(intercept):
-            raise ValueError("floating-point under-/overflow occured.")
+##         # report epoch information
+##         if verbose > 0:
+##             print("Norm: %.2f, NNZs: %d, "\
+##             "Bias: %.6f, T: %d, Avg. loss: %.6f" % (w.norm(),
+##                                                     weights.nonzero()[0].shape[0],
+##                                                     intercept, count,
+##                                                     sumloss / count))
+##             print("Total training time: %.2f seconds." % (time() - t_start))
 
-    w.reset_wscale()
+##         # floating-point under-/overflow check.
+##         if np.any(np.isinf(weights)) or np.any(np.isnan(weights)) \
+##            or np.isnan(intercept) or np.isinf(intercept):
+##             raise ValueError("floating-point under-/overflow occured.")
 
-    return weights, intercept
+##     w.reset_wscale()
+
+##     return weights, intercept
 
 
 cdef inline double max(double a, double b):
@@ -598,19 +608,22 @@ cdef inline double min(double a, double b):
 
 
 cdef void l1penalty(WeightVector w, DOUBLE *q_data_ptr,
-                    INTEGER *x_ind_ptr, int xnnz, double u):
+                    FeatureVector f_vec, double u):
     """Apply the L1 penalty to each updated feature
 
     This implements the truncated gradient approach by
     [Tsuruoka, Y., Tsujii, J., and Ananiadou, S., 2009].
     """
+    cdef FVElem *fv_elem
     cdef double z = 0.0
-    cdef int j = 0
     cdef int idx = 0
     cdef double wscale = w.wscale
     cdef double* w_data_ptr = w.w_data_ptr
-    for j in range(xnnz):
-        idx = x_ind_ptr[j]
+
+    f_vec.reset_iter()
+    while f_vec.has_next() == 1:
+        fv_elem = f_vec.next()
+        idx = fv_elem.index
         z = w_data_ptr[idx]
         if (wscale * w_data_ptr[idx]) > 0.0:
             w_data_ptr[idx] = max(

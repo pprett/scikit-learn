@@ -20,7 +20,7 @@ from ..utils.extmath import safe_sparse_dot
 
 from .sgd_fast import plain_sgd as plain_sgd
 from .sgd_fast import ranking_sgd as ranking_sgd
-from ..utils.seq_dataset import ArrayDataset, CSRDataset, PairwiseArrayDataset
+from ..utils.seq_dataset import ArrayDataset, CSRDataset#, PairwiseArrayDataset
 from .sgd_fast import Hinge
 from .sgd_fast import Log
 from .sgd_fast import ModifiedHuber
@@ -231,7 +231,7 @@ def _make_dataset(X, y_i, sample_weight, ranking=False):
         dataset = CSRDataset(X.data, X.indptr, X.indices, y_i, sample_weight)
         intercept_decay = SPARSE_INTERCEPT_DECAY
     elif ranking:
-        dataset = PairwiseArrayDataset(X, y_i)
+        dataset = None  # FIXME PairwiseArrayDataset(X, y_i)
         intercept_decay = 1.0
     else:
         dataset = ArrayDataset(X, y_i, sample_weight)
