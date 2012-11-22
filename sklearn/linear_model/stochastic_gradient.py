@@ -18,9 +18,8 @@ from ..feature_selection.selector_mixin import SelectorMixin
 from ..utils import array2d, atleast2d_or_csr, check_arrays
 from ..utils.extmath import safe_sparse_dot
 
-from .sgd_fast import plain_sgd as plain_sgd
-from .sgd_fast import ranking_sgd as ranking_sgd
-from ..utils.seq_dataset import ArrayDataset, CSRDataset#, PairwiseArrayDataset
+from .sgd_fast import plain_sgd
+from ..utils.seq_dataset import ArrayDataset, CSRDataset, PairwiseArrayDataset
 from .sgd_fast import Hinge
 from .sgd_fast import Log
 from .sgd_fast import ModifiedHuber
@@ -228,14 +227,17 @@ def _make_dataset(X, y_i, sample_weight, ranking=False):
     for sparse datasets.
     """
     if sp.issparse(X):
-        dataset = CSRDataset(X.data, X.indptr, X.indices, y_i, sample_weight)
         intercept_decay = SPARSE_INTERCEPT_DECAY
-    elif ranking:
-        dataset = None  # FIXME PairwiseArrayDataset(X, y_i)
-        intercept_decay = 1.0
+        if ranking:
+            raise ValueError('sparse ranking not supported yet!')
+        else:
+            dataset = CSRDataset(X.data, X.indptr, X.indices, y_i, sample_weight)
     else:
-        dataset = ArrayDataset(X, y_i, sample_weight)
         intercept_decay = 1.0
+        if ranking:
+            dataset = PairwiseArrayDataset(X, y_i)
+        else:
+            dataset = ArrayDataset(X, y_i, sample_weight)
     return dataset, intercept_decay
 
 
@@ -669,26 +671,20 @@ def fit_binary(est, i, X, y, n_iter, pos_weight, neg_weight,
     """
     y_i, coef, intercept = _prepare_fit_binary(est, y, i)
     assert y_i.shape[0] == y.shape[0] == sample_weight.shape[0]
+
+    penalty_type = est._get_penalty_type(est.penalty)
+    learning_rate_type = est._get_learning_rate_type(est.learning_rate)
+    ranking = False
     if est.loss == "roc_pairwise_ranking":
         ranking = True
-        dataset, intercept_decay = _make_dataset(X, y_i,
-                                                 sample_weight, ranking)
-        penalty_type = est._get_penalty_type(est.penalty)
         if est.penalty != "l2":
             raise ValueError("The penalty %s is not\
                              supported for pairwise sgd. " % est.penalty)
-        learning_rate_type = est._get_learning_rate_type(est.learning_rate)
-        return ranking_sgd(coef, intercept, est.loss_function,
-                     penalty_type, est.alpha, est.l1_ratio,
-                     dataset, n_iter, int(est.fit_intercept),
-                     int(est.verbose), int(est.shuffle), est.seed,
-                     learning_rate_type, est.eta0,
-                     est.power_t, est.t_, intercept_decay)
-    else:
-        dataset, intercept_decay = _make_dataset(X, y_i, sample_weight)
-        penalty_type = est._get_penalty_type(est.penalty)
-        learning_rate_type = est._get_learning_rate_type(est.learning_rate)
-        return plain_sgd(coef, intercept, est.loss_function,
+        if not (pos_weight == neg_weight == 1.0):
+            raise ValueError("Class weights not supported for pairwise sgd. ")
+
+    dataset, intercept_decay = _make_dataset(X, y_i, sample_weight, ranking=ranking)
+    return plain_sgd(coef, intercept, est.loss_function,
                      penalty_type, est.alpha, est.l1_ratio,
                      dataset, n_iter, int(est.fit_intercept),
                      int(est.verbose), int(est.shuffle), est.seed,
