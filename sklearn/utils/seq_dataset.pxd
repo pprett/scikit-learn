@@ -8,8 +8,8 @@ ctypedef np.float64_t DOUBLE
 ctypedef np.int32_t INTEGER
 
 cdef struct s_FVElem:
-    INTEGER    index
-    DOUBLE     value
+    INTEGER    *index
+    DOUBLE     *value
 
 
 ctypedef s_FVElem FVElem
@@ -23,16 +23,15 @@ cdef class FeatureVector:
     cdef INTEGER iter_pos
     cdef FVElem out
 
-    cdef FVElem* next(self)
-    cdef int has_next(self)
+    cdef int next(self, FVElem *fv_elem)
     cdef void reset_iter(self)
+
 
 cdef class ArrayFeatureVector(FeatureVector):
     cdef DOUBLE *x_data_ptr
 
     cdef void set_row(self, DOUBLE *x_data_ptr, DOUBLE y, DOUBLE sample_weight)
-    cdef FVElem* next(self)
-    cdef int has_next(self)
+    cdef int next(self, FVElem *fv_elem)
 
 
 cdef class CSRFeatureVector(FeatureVector):
@@ -42,8 +41,7 @@ cdef class CSRFeatureVector(FeatureVector):
 
     cdef void set_row(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int nnz,
                       DOUBLE y, DOUBLE sample_weight)
-    cdef FVElem* next(self)
-    cdef int has_next(self)
+    cdef int next(self, FVElem *fv_elem)
 
 
 cdef class SequentialDataset:

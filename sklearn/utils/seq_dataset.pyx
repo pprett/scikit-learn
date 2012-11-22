@@ -16,14 +16,11 @@ cimport cython
 cdef class FeatureVector:
     """A vector that supports iteration over non-zero elements. """
 
-    cdef FVElem* next(self):
-        raise NotImplementedError()
-
-    cdef int has_next(self):
+    cdef int next(self, FVElem *fv_elem):
         raise NotImplementedError()
 
     cdef void reset_iter(self):
-        self.iter_pos = 0
+        self.iter_pos = -1
 
 
 cdef class ArrayFeatureVector(FeatureVector):
@@ -31,7 +28,7 @@ cdef class ArrayFeatureVector(FeatureVector):
 
     def __cinit__(self, Py_ssize_t n_features):
         self.n_features = n_features
-        self.iter_pos = 2 ** 31 - 1  # max int32
+        self.iter_pos = 2**31 - 1
 
     cdef void set_row(self, DOUBLE *x_data_ptr, DOUBLE y, DOUBLE sample_weight):
         self.x_data_ptr = x_data_ptr
@@ -39,14 +36,12 @@ cdef class ArrayFeatureVector(FeatureVector):
         self.sample_weight = sample_weight
         self.reset_iter()
 
-    cdef FVElem* next(self):
-        self.out.index = self.iter_pos
-        self.out.value = self.x_data_ptr[self.iter_pos]
-        self.iter_pos += 1
-        return &(self.out)
-
-    cdef int has_next(self):
-        if self.iter_pos < self.n_features:
+    cdef int next(self, FVElem *fv_elem):
+        cdef INTEGER iter_pos = self.iter_pos + 1
+        if iter_pos < self.n_features:
+            fv_elem.index = &(self.iter_pos)
+            fv_elem.value = &(self.x_data_ptr[iter_pos])
+            self.iter_pos = iter_pos
             return 1
         else:
             return 0
@@ -57,22 +52,21 @@ cdef class CSRFeatureVector(FeatureVector):
 
     def __cinit__(self, Py_ssize_t n_features):
         self.n_features = n_features
+        self.iter_pos = 2**31 - 1
 
     cdef void set_row(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int nnz,
                       DOUBLE y, DOUBLE sample_weight):
         self.x_data_ptr = x_data_ptr
         self.x_ind_ptr = x_ind_ptr
         self.nnz = nnz
-        self.iter_pos = 0
+        self.reset_iter()
 
-    cdef FVElem* next(self):
-        self.out.index = self.x_ind_ptr[self.iter_pos]
-        self.out.value = self.x_data_ptr[self.iter_pos]
-        self.iter_pos += 1
-        return &(self.out)
-
-    cdef int has_next(self):
-        if self.iter_pos < (self.nnz - 1):
+    cdef int next(self, FVElem *fv_elem):
+        cdef INTEGER iter_pos = self.iter_pos + 1
+        if iter_pos < self.nnz:
+            fv_elem.index = self.x_ind_ptr + iter_pos
+            fv_elem.value = self.x_data_ptr + iter_pos
+            self.iter_pos = iter_pos
             return 1
         else:
             return 0

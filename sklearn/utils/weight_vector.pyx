@@ -56,9 +56,9 @@ cdef class WeightVector(object):
         c : double
             The scaling constant for the example.
         """
-        cdef FVElem *fv_elem
-        cdef int idx
-        cdef double val
+        cdef FVElem fv_elem
+        cdef INTEGER idx
+        cdef DOUBLE val
         cdef double innerprod = 0.0
         cdef double xsqnorm = 0.0
 
@@ -67,10 +67,9 @@ cdef class WeightVector(object):
         cdef DOUBLE* w_data_ptr = self.w_data_ptr
 
         f_vec.reset_iter()
-        while f_vec.has_next() == 1:
-            fv_elem = f_vec.next()
-            idx = fv_elem.index
-            val = fv_elem.value
+        while f_vec.next(&fv_elem) == 1:
+            idx = (fv_elem.index)[0]
+            val = (fv_elem.value)[0]
             innerprod += (w_data_ptr[idx] * val)
             xsqnorm += (val * val)
             w_data_ptr[idx] += val * (c / wscale)
@@ -90,16 +89,14 @@ cdef class WeightVector(object):
         innerprod : double
             The inner product of ``x`` and ``w``.
         """
-        cdef FVElem *fv_elem
-        cdef int idx
+        cdef FVElem fv_elem
         cdef double innerprod = 0.0
         cdef DOUBLE* w_data_ptr = self.w_data_ptr
 
         f_vec.reset_iter()
-        while f_vec.has_next() == 1:
-            fv_elem = f_vec.next()
-            idx = fv_elem.index
-            innerprod += w_data_ptr[idx] * fv_elem.value
+        while f_vec.next(&fv_elem) == 1:
+            #print("%d:%.2f" % ((fv_elem.index)[0], (fv_elem.value)[0]))
+            innerprod += w_data_ptr[(fv_elem.index)[0]] * (fv_elem.value)[0]
 
         innerprod *= self.wscale
         return innerprod

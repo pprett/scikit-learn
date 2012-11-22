@@ -346,7 +346,8 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
 
     # helper variable
     cdef FeatureVector f_vec = dataset.get_feature_vector()
-    cdef FVElem *fv_elem
+    dataset.next()  # FIXME
+    cdef FVElem fv_elem
     cdef double eta = 0.0
     cdef double p = 0.0
     cdef double update = 0.0
@@ -379,20 +380,21 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
             dataset.shuffle(seed)
 
         for i in range(n_samples):
-            dataset.next()
+            #dataset.next()
             y = f_vec.y
 
+            ## print("__________")
             ## f_vec.reset_iter()
-            ## print("y:%.2f sample_weight:%.2f" % (y, f_vec.sample_weight))
-            ## while f_vec.has_next():
-            ##     fv_elem = f_vec.next()
-            ##     print("%d:%.4f" % (fv_elem.index, fv_elem.value))
+            ## while f_vec.next(&fv_elem) == 1:
+            ##     idx = (fv_elem.index)[0]
+            ##     val = (fv_elem.value)[0]
+            ##     print("%d:%.2f" % (idx, val))
 
             if learning_rate == OPTIMAL:
                 eta = 1.0 / (alpha * t)
             elif learning_rate == INVSCALING:
                 eta = eta0 / pow(t, power_t)
-            #p = w.dot(f_vec) + intercept
+            p = w.dot(f_vec) + intercept
             if verbose > 0:
                 sumloss += loss.loss(p, y)
 
@@ -403,7 +405,7 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
 
             update = eta * loss.dloss(p, y) * class_weight * f_vec.sample_weight
             if update != 0.0:
-                #w.add(f_vec, -update)
+                w.add(f_vec, -update)
                 if fit_intercept == 1:
                     intercept -= update * intercept_decay
             if penalty_type >= L2:
@@ -614,16 +616,15 @@ cdef void l1penalty(WeightVector w, DOUBLE *q_data_ptr,
     This implements the truncated gradient approach by
     [Tsuruoka, Y., Tsujii, J., and Ananiadou, S., 2009].
     """
-    cdef FVElem *fv_elem
+    cdef FVElem fv_elem
     cdef double z = 0.0
-    cdef int idx = 0
+    cdef INTEGER idx = 0
     cdef double wscale = w.wscale
     cdef double* w_data_ptr = w.w_data_ptr
 
     f_vec.reset_iter()
-    while f_vec.has_next() == 1:
-        fv_elem = f_vec.next()
-        idx = fv_elem.index
+    while f_vec.next(&fv_elem) == 1:
+        idx = fv_elem.index[0]
         z = w_data_ptr[idx]
         if (wscale * w_data_ptr[idx]) > 0.0:
             w_data_ptr[idx] = max(
