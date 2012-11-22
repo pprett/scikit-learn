@@ -13,6 +13,32 @@ cimport numpy as np
 cimport cython
 
 
+cdef struct s_FVElem:
+    INTEGER    index
+    DOUBLE     value
+
+
+ctypedef s_FVElem FVElem
+
+
+cdef class FeatureVector:
+    """A vector that supports iteration over non-zero elements. """
+
+    cdef public DOUBLE y
+    cdef public DOUBLE sample_weight
+
+    cdef FVElem next(self):
+        pass
+
+
+cdef class PairwiseFeatureVector(FeatureVector):
+    """A vector that supports iteration over non-zero elements. """
+
+    cdef FVElem next(self):
+        pass
+
+
+
 cdef class SequentialDataset:
     """Base class for datasets with sequential data access. """
 
@@ -223,14 +249,14 @@ cdef class PairwiseArrayDataset:
         cdef np.ndarray[INTEGER, ndim=1,
                         mode='c'] neg_index = np.array(negatives, dtype=np.int32)
         self.pos_index = pos_index
-        self.neg_index = neg_index        
+        self.neg_index = neg_index
         self.pos_index_data_ptr = <INTEGER *> pos_index.data
         self.neg_index_data_ptr = <INTEGER *> neg_index.data
         self.n_pos_samples = len(pos_index)
         self.n_neg_samples = len(neg_index)
 
-    cdef void next(self, DOUBLE **a_data_ptr, DOUBLE **b_data_ptr, 
-                   INTEGER **x_ind_ptr, int *nnz_a, int *nnz_b, 
+    cdef void next(self, DOUBLE **a_data_ptr, DOUBLE **b_data_ptr,
+                   INTEGER **x_ind_ptr, int *nnz_a, int *nnz_b,
                    DOUBLE *y_a, DOUBLE *y_b):
 
         current_pos_index = np.random.randint(self.n_pos_samples)
@@ -249,6 +275,6 @@ cdef class PairwiseArrayDataset:
         x_ind_ptr[0] = self.feature_indices_ptr
         nnz_a[0] = self.n_features
         nnz_b[0] = self.n_features
-    
+
     cdef void shuffle(self, seed):
-        np.random.RandomState(seed).shuffle(self.index)    
+        np.random.RandomState(seed).shuffle(self.index)
