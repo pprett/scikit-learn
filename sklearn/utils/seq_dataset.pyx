@@ -50,8 +50,7 @@ cdef class ArrayFeatureVector(FeatureVector):
 cdef class CSRFeatureVector(FeatureVector):
     """Feature vector backed by a row in a CSR matrix. """
 
-    def __cinit__(self, Py_ssize_t n_features):
-        self.n_features = n_features
+    def __cinit__(self):
         self.iter_pos = 2**31 - 1
 
     cdef void set_row(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int nnz,
