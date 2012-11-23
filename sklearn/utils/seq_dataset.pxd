@@ -78,13 +78,11 @@ cdef class ArrayDataset(SequentialDataset):
 
 cdef class CSRDataset(SequentialDataset):
     cdef int current_index
-    cdef int stride
     cdef DOUBLE *X_data_ptr
     cdef INTEGER *X_indptr_ptr
     cdef INTEGER *X_indices_ptr
     cdef DOUBLE *Y_data_ptr
-    cdef np.ndarray feature_indices
-    cdef INTEGER *feature_indices_ptr
+
     cdef np.ndarray index
     cdef INTEGER *index_data_ptr
     cdef DOUBLE *sample_weight_data
@@ -96,13 +94,16 @@ cdef class CSRDataset(SequentialDataset):
 
 
 cdef class PairwiseDataset(SequentialDataset):
-
+    cdef DOUBLE *Y_data_ptr
     cdef INTEGER[::1] pos_index
     cdef INTEGER[::1] neg_index
     cdef int n_pos_samples
     cdef int n_neg_samples
 
     cdef PairwiseFeatureVector feature_vector
+
+    cdef void init_label_index(self)
+    cdef void draw_sample(self, INTEGER *a_idx, INTEGER *b_idx, DOUBLE *y)
 
     cdef void next(self)
     cdef void shuffle(self, seed)
@@ -111,14 +112,21 @@ cdef class PairwiseDataset(SequentialDataset):
 
 cdef class PairwiseArrayDataset(PairwiseDataset):
     cdef Py_ssize_t n_features
-
     cdef int stride
     cdef DOUBLE *X_data_ptr
-    cdef DOUBLE *Y_data_ptr
 
     cdef ArrayFeatureVector f_vec_a
     cdef ArrayFeatureVector f_vec_b
 
     cdef void next(self)
-    cdef void shuffle(self, seed)
-    cdef FeatureVector get_feature_vector(self)
+
+
+cdef class PairwiseCSRDataset(PairwiseDataset):
+    cdef DOUBLE *X_data_ptr
+    cdef INTEGER *X_indptr_ptr
+    cdef INTEGER *X_indices_ptr
+
+    cdef CSRFeatureVector f_vec_a
+    cdef CSRFeatureVector f_vec_b
+
+    cdef void next(self)
