@@ -49,7 +49,6 @@ cdef class PairwiseFeatureVector(FeatureVector):
     cdef FeatureVector f_vec_b
     cdef DOUBLE inverted_value
 
-    cdef void set_pair(self, FeatureVector f_vec_a, FeatureVector f_vec_b)
     cdef int next(self, FVElem *fv_elem)
 
 
@@ -98,10 +97,8 @@ cdef class CSRDataset(SequentialDataset):
 
 cdef class PairwiseDataset(SequentialDataset):
 
-    cdef np.ndarray pos_index
-    cdef np.ndarray neg_index
-    cdef INTEGER *pos_index_data_ptr
-    cdef INTEGER *neg_index_data_ptr
+    cdef INTEGER[::1] pos_index
+    cdef INTEGER[::1] neg_index
     cdef int n_pos_samples
     cdef int n_neg_samples
 

@@ -380,15 +380,16 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
         for i in range(n_samples):
             dataset.next()
             y = f_vec.y
-            print("%.1f" % y)
-            print(f_vec)
 
-            print("__________")
-            f_vec.reset_iter()
-            while f_vec.next(&fv_elem) == 1:
-                idx = (fv_elem.index)[0]
-                val = (fv_elem.value)[0]
-                print("%d:%.2f" % (idx, val))
+            ## print("__________")
+            ## print("y:%.2f" % y)
+            ## print("sample_weight:%.2f" % f_vec.sample_weight)
+
+            ## f_vec.reset_iter()
+            ## while f_vec.next(&fv_elem) == 1:
+            ##     idx = (fv_elem.index)[0]
+            ##     val = (fv_elem.value)[0]
+            ##     print("%d:%.2f" % (idx, val))
 
             if learning_rate == OPTIMAL:
                 eta = 1.0 / (alpha * t)
@@ -404,6 +405,9 @@ def plain_sgd(np.ndarray[DOUBLE, ndim=1, mode='c'] weights,
                 class_weight = weight_neg
 
             update = eta * loss.dloss(p, y) * class_weight * f_vec.sample_weight
+            ## print("update:%.9f p:%.6f dloss:%.4f class_weight:%.1f" % (update, p,
+            ##                                                            loss.dloss(p, y),
+            ##                                                            class_weight))
             if update != 0.0:
                 w.add(f_vec, -update)
                 if fit_intercept == 1:

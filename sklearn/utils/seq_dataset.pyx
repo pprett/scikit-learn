@@ -13,6 +13,12 @@ cimport numpy as np
 cimport cython
 
 
+cdef inline void swap(INTEGER *a, INTEGER *b):
+    cdef INTEGER tmp = a[0]
+    a[0] = b[0]
+    b[0] = tmp
+
+
 cdef class FeatureVector:
     """A vector that supports iteration over non-zero elements. """
 
@@ -27,6 +33,7 @@ cdef class ArrayFeatureVector(FeatureVector):
     """Feature vector backed by a row in a numpy array. """
 
     def __cinit__(self, Py_ssize_t n_features):
+        self.sample_weight = 1.0
         self.n_features = n_features
         self.iter_pos = 2**31 - 1
 
@@ -51,6 +58,7 @@ cdef class CSRFeatureVector(FeatureVector):
     """Feature vector backed by a row in a CSR matrix. """
 
     def __cinit__(self):
+        self.sample_weight = 1.0
         self.iter_pos = 2**31 - 1
 
     cdef void set_row(self, DOUBLE *x_data_ptr, INTEGER *x_ind_ptr, int nnz,
@@ -74,16 +82,16 @@ cdef class CSRFeatureVector(FeatureVector):
 cdef class PairwiseFeatureVector(FeatureVector):
     """A vector that is backed by two ``FeatureVector`` objects. """
 
-    cdef void set_pair(self, FeatureVector f_vec_a, FeatureVector f_vec_b):
+    def __cinit__(self, FeatureVector f_vec_a, FeatureVector f_vec_b):
+        self.sample_weight = 1.0
         self.f_vec_a = f_vec_a
         self.f_vec_b = f_vec_b
 
     cdef int next(self, FVElem *fv_elem):
         cdef int has_a_next = 0
         cdef int has_b_next = 0
-        print('before a.next')
+
         has_a_next = self.f_vec_a.next(fv_elem)
-        print('a.next=%d' % has_a_next)
         if not has_a_next:
             # f_vec_a is exhausted
             has_b_next = self.f_vec_b.next(fv_elem)
@@ -93,16 +101,11 @@ cdef class PairwiseFeatureVector(FeatureVector):
                 # invert b's value
                 self.inverted_value = (fv_elem.value)[0] * -1.0
                 fv_elem.value = &(self.inverted_value)
-                print('[b] %d:%.2f' % ((fv_elem.index)[0]),
-                      (fv_elem.value)[0])
                 return 1
         else:
-            print('[a] %d:%.2f' % ((fv_elem.index)[0]),
-                  (fv_elem.value)[0])
             return 1
 
     cdef void reset_iter(self):
-        print('resetting iter')
         self.f_vec_a.reset_iter()
         self.f_vec_b.reset_iter()
 
@@ -311,6 +314,7 @@ cdef class PairwiseArrayDataset(PairwiseDataset):
 
         # Create an index of positives and negatives for fast sampling
         # of disagreeing pairs
+        # FIXME use arrays of size n_samples and shrink afterwards
         positives = []
         negatives = []
         cdef Py_ssize_t i
@@ -325,10 +329,8 @@ cdef class PairwiseArrayDataset(PairwiseDataset):
                         mode='c'] neg_index = np.array(negatives, dtype=np.int32)
         self.pos_index = pos_index
         self.neg_index = neg_index
-        self.pos_index_data_ptr = <INTEGER *> pos_index.data
-        self.neg_index_data_ptr = <INTEGER *> neg_index.data
-        self.n_pos_samples = len(pos_index)
-        self.n_neg_samples = len(neg_index)
+        self.n_pos_samples = pos_index.shape[0]
+        self.n_neg_samples = neg_index.shape[0]
 
         # the feature vectors for this dataset
         self.f_vec_a = ArrayFeatureVector(self.n_features)
@@ -337,25 +339,26 @@ cdef class PairwiseArrayDataset(PairwiseDataset):
                                                     self.f_vec_b)
 
     cdef void next(self):
-        cdef int current_pos_index = np.random.randint(self.n_pos_samples)
-        cdef int current_neg_index = np.random.randint(self.n_neg_samples)
+        cdef np.int_t current_pos_index = np.random.randint(self.n_pos_samples)
+        cdef np.int_t current_neg_index = np.random.randint(self.n_neg_samples)
 
         # For each step, randomly sample one positive and one negative
-        cdef int sample_pos_idx = self.pos_index_data_ptr[current_pos_index]
-        cdef int sample_neg_idx = self.neg_index_data_ptr[current_neg_index]
-        cdef int pos_offset = sample_pos_idx * self.stride
-        cdef int neg_offset = sample_neg_idx * self.stride
+        cdef INTEGER sample_a_idx = self.pos_index[current_pos_index]
+        cdef INTEGER sample_b_idx = self.neg_index[current_neg_index]
 
-        print("%d %d" % (current_pos_index, current_neg_index))
-        print("%d %d" % (sample_pos_idx, sample_neg_idx))
+        # flip a coin an switch a and b if it turns up heads
+        cdef np.int_t coin = np.random.randint(2)
+        if coin == 1:
+            swap(&sample_a_idx, &sample_b_idx)
 
-        self.f_vec_a.set_row(self.X_data_ptr + pos_offset, 0.0, 1.0)
-        self.f_vec_b.set_row(self.X_data_ptr + neg_offset, 0.0, 1.0)
-        print("%.2f %.2f" % (self.X_data_ptr[pos_offset],
-                             self.X_data_ptr[neg_offset]))
+        cdef INTEGER a_offset = sample_a_idx * self.stride
+        cdef INTEGER b_offset = sample_b_idx * self.stride
 
-        cdef DOUBLE y_a = self.Y_data_ptr[sample_pos_idx]
-        cdef DOUBLE y_b = self.Y_data_ptr[sample_neg_idx]
+        self.f_vec_a.set_row(self.X_data_ptr + (sample_a_idx * self.stride), 0.0, 1.0)
+        self.f_vec_b.set_row(self.X_data_ptr + (sample_b_idx * self.stride), 0.0, 1.0)
+
+        cdef DOUBLE y_a = self.Y_data_ptr[sample_a_idx]
+        cdef DOUBLE y_b = self.Y_data_ptr[sample_b_idx]
         cdef DOUBLE y = 0.0
 
         if y_a > y_b:
