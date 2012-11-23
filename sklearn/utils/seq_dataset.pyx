@@ -98,6 +98,8 @@ cdef class CSRFeatureVector(FeatureVector):
         self.x_data_ptr = x_data_ptr
         self.x_ind_ptr = x_ind_ptr
         self.nnz = nnz
+        self.y = y
+        self.sample_weight = sample_weight
         self.reset_iter()
 
     cdef int next(self, FVElem *fv_elem):
