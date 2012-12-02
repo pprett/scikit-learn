@@ -245,6 +245,8 @@ cdef class Tree:
         self.init_error = NULL
         self.n_samples = NULL
 
+        self.features = np.arange(n_features, dtype=np.int32)
+
     def __dealloc__(self):
         """Destructor."""
         # Free all inner structures
@@ -307,7 +309,8 @@ cdef class Tree:
         memcpy(self.children_right, children_right, self.capacity * sizeof(int))
         memcpy(self.feature, feature, self.capacity * sizeof(int))
         memcpy(self.threshold, threshold, self.capacity * sizeof(double))
-        memcpy(self.value, value, self.capacity * self.value_stride * sizeof(double))
+        memcpy(self.value, value, self.capacity * self.value_stride
+               * sizeof(double))
         memcpy(self.best_error, best_error, self.capacity * sizeof(double))
         memcpy(self.init_error, init_error, self.capacity * sizeof(double))
         memcpy(self.n_samples, n_samples, self.capacity * sizeof(int))
@@ -325,28 +328,36 @@ cdef class Tree:
 
         self.capacity = capacity
 
-        cdef int* tmp_children_left = <int*> realloc(self.children_left, capacity * sizeof(int))
+        cdef int* tmp_children_left = <int*> realloc(self.children_left,
+                                                     capacity * sizeof(int))
         if tmp_children_left != NULL: self.children_left = tmp_children_left
 
-        cdef int* tmp_children_right = <int*> realloc(self.children_right, capacity * sizeof(int))
+        cdef int* tmp_children_right = <int*> realloc(self.children_right,
+                                                      capacity * sizeof(int))
         if tmp_children_right != NULL: self.children_right = tmp_children_right
 
         cdef int* tmp_feature = <int*> realloc(self.feature, capacity * sizeof(int))
         if tmp_feature != NULL: self.feature = tmp_feature
 
-        cdef double* tmp_threshold = <double*> realloc(self.threshold, capacity * sizeof(double))
+        cdef double* tmp_threshold = <double*> realloc(self.threshold,
+                                                       capacity * sizeof(double))
         if tmp_threshold != NULL: self.threshold = tmp_threshold
 
-        cdef double* tmp_value = <double*> realloc(self.value, capacity * self.value_stride * sizeof(double))
+        cdef double* tmp_value = <double*> realloc(self.value, capacity
+                                                   * self.value_stride
+                                                   * sizeof(double))
         if tmp_value != NULL: self.value = tmp_value
 
-        cdef double* tmp_best_error = <double*> realloc(self.best_error, capacity * sizeof(double))
+        cdef double* tmp_best_error = <double*> realloc(self.best_error,
+                                                        capacity * sizeof(double))
         if tmp_best_error != NULL: self.best_error = tmp_best_error
 
-        cdef double* tmp_init_error = <double*> realloc(self.init_error, capacity * sizeof(double))
+        cdef double* tmp_init_error = <double*> realloc(self.init_error,
+                                                        capacity * sizeof(double))
         if tmp_init_error != NULL: self.init_error = tmp_init_error
 
-        cdef int* tmp_n_samples = <int*> realloc(self.n_samples, capacity * sizeof(int))
+        cdef int* tmp_n_samples = <int*> realloc(self.n_samples,
+                                                 capacity * sizeof(int))
         if tmp_n_samples != NULL: self.n_samples = tmp_n_samples
 
         if tmp_children_left == NULL or \
@@ -383,14 +394,17 @@ cdef class Tree:
 
         if y.dtype != DOUBLE or not y.flags.contiguous:
             y = np.asarray(y, dtype=DOUBLE, order="C")
-        
+
         if sample_weight is not None:
             if sample_weight.dtype != DOUBLE or not sample_weight.flags.contiguous:
                 sample_weight = np.asarray(
                         sample_weight, dtype=DOUBLE, order="C")
 
+        cdef int n_node_samples = X.shape[0]
         if sample_mask is None:
             sample_mask = np.ones((X.shape[0],), dtype=np.bool)
+        else:
+            n_node_samples = np.sum(sample_mask)
 
         if X_argsorted is None:
             X_argsorted = np.asfortranarray(
@@ -400,19 +414,19 @@ cdef class Tree:
         cdef int init_capacity
 
         if self.max_depth <= 10:
-            init_capacity = (2 ** (int(self.max_depth) + 1)) - 1
+            init_capacity = (2 ** (<int>(self.max_depth) + 1)) - 1
         else:
             init_capacity = 2047
 
         self.resize(init_capacity)
-        cdef double* buffer_value = <double*> malloc(self.value_stride * sizeof(double))
-        
-        n_node_samples = np.sum(sample_mask)
+        cdef double* buffer_value = <double*> malloc(self.value_stride
+                                                     * sizeof(double))
+
         cdef double weighted_n_node_samples
-        if sample_weight is not None:
-            weighted_n_node_samples = np.sum(sample_weight[sample_mask])
-        else:
+        if sample_weight is None:
             weighted_n_node_samples = n_node_samples
+        else:
+            weighted_n_node_samples = np.sum(sample_weight[sample_mask])
 
         # Build the tree by recursive partitioning
         self.recursive_partition(X, X_argsorted, y, sample_weight, sample_mask,
@@ -450,7 +464,8 @@ cdef class Tree:
         cdef DOUBLE_t w = 1.0
 
         cdef int X_stride = <int> X.strides[1] / <int> X.strides[0]
-        cdef int X_argsorted_stride = <int> X_argsorted.strides[1] / <int> X_argsorted.strides[0]
+        cdef int X_argsorted_stride = (<int> X_argsorted.strides[1]
+                                       / <int> X_argsorted.strides[0])
         cdef int y_stride = <int> y.strides[0] / <int> y.strides[1]
 
         cdef int n_total_samples = y.shape[0]
@@ -462,8 +477,12 @@ cdef class Tree:
         cdef int i
         cdef np.ndarray sample_mask_left
         cdef np.ndarray sample_mask_right
-        cdef int n_node_samples_left
-        cdef int n_node_samples_right
+        cdef BOOL_t* sample_mask_left_ptr = NULL
+        cdef BOOL_t* sample_mask_right_ptr = NULL
+        cdef int n_node_samples_left = 0
+        cdef int n_node_samples_right = 0
+        cdef double weighted_n_node_samples_left = 0.0
+        cdef double weighted_n_node_samples_right = 0.0
 
         # Count samples
         if n_node_samples == 0:
@@ -498,14 +517,16 @@ cdef class Tree:
 
         # Current node is leaf
         if feature == -1:
-            self.add_leaf(parent, is_left_child, buffer_value, init_error, n_node_samples)
+            self.add_leaf(parent, is_left_child, buffer_value, init_error,
+                          n_node_samples)
 
         # Current node is internal node (= split node)
         else:
             # Sample mask is too sparse?
             if 1. * n_node_samples / n_total_samples <= self.min_density:
                 X = X[sample_mask]
-                X_argsorted = np.asfortranarray(np.argsort(X.T, axis=1).astype(np.int32).T)
+                X_argsorted = np.asfortranarray(
+                    np.argsort(X.T, axis=1).astype(np.int32).T)
                 y = y[sample_mask]
                 if sample_weight is not None:
                     sample_weight = sample_weight[sample_mask]
@@ -529,21 +550,25 @@ cdef class Tree:
             X_ptr = X_ptr + feature * X_stride
             sample_mask_left = np.zeros((n_total_samples, ), dtype=np.bool)
             sample_mask_right = np.zeros((n_total_samples, ), dtype=np.bool)
+
+            sample_mask_left_ptr = <BOOL_t*> sample_mask_left.data
+            sample_mask_right_ptr = <BOOL_t*> sample_mask_right.data
+
             n_node_samples_left = 0
             n_node_samples_right = 0
-            weighted_n_node_samples_left = 0
-            weighted_n_node_samples_right = 0
+            weighted_n_node_samples_left = 0.0
+            weighted_n_node_samples_right = 0.0
 
             for i from 0 <= i < n_total_samples:
                 if sample_mask_ptr[i]:
                     if sample_weight_ptr != NULL:
                         w = sample_weight_ptr[i]
                     if X_ptr[i] <= threshold:
-                        sample_mask_left[i] = 1
+                        sample_mask_left_ptr[i] = 1
                         n_node_samples_left += 1
                         weighted_n_node_samples_left += w
                     else:
-                        sample_mask_right[i] = 1
+                        sample_mask_right_ptr[i] = 1
                         n_node_samples_right += 1
                         weighted_n_node_samples_right += w
 
@@ -685,6 +710,7 @@ cdef class Tree:
         cdef int i, a, b, best_i = -1
         cdef np.int32_t feature_idx = -1
         cdef int n_left = 0
+        cdef double weighted_n_left = 0.0
 
         cdef double t, initial_error, error
         cdef double best_error = INFINITY, best_t = INFINITY
@@ -693,7 +719,8 @@ cdef class Tree:
         cdef int* X_argsorted_i = NULL
         cdef DTYPE_t X_a, X_b
 
-        cdef np.ndarray[np.int32_t, ndim=1, mode="c"] features = None
+        # Features to consider
+        cdef np.ndarray[np.int32_t, ndim=1, mode="c"] features = self.features
 
         # Compute the initial criterion value in the node
         criterion.init(y_ptr, y_stride,
@@ -712,12 +739,8 @@ cdef class Tree:
 
             return
 
-        # Features to consider
-        features = np.arange(n_features, dtype=np.int32)
-
         if max_features < 0 or max_features >= n_features:
             max_features = n_features
-
         else:
             features = random_state.permutation(features)
 
@@ -822,6 +845,7 @@ cdef class Tree:
         cdef int i, a, b, c, best_i = -1
         cdef np.int32_t feature_idx = -1
         cdef int n_left = 0
+        cdef double weighted_n_left = 0.0
         cdef double random
 
         cdef double t, initial_error, error
@@ -831,7 +855,7 @@ cdef class Tree:
         cdef int* X_argsorted_i = NULL
         cdef DTYPE_t X_a, X_b
 
-        cdef np.ndarray[np.int32_t, ndim=1, mode="c"] features = None
+        cdef np.ndarray[np.int32_t, ndim=1, mode="c"] features = self.features
 
         # Compute the initial criterion value in the node
         criterion.init(y_ptr, y_stride,
@@ -849,9 +873,6 @@ cdef class Tree:
             _initial_error[0] = initial_error
 
             return
-
-        # Features to consider
-        features = np.arange(n_features, dtype=np.int32)
 
         if max_features < 0 or max_features >= n_features:
             max_features = n_features
@@ -907,7 +928,7 @@ cdef class Tree:
                     X_argsorted_i,
                     sample_weight_ptr,
                     sample_mask_ptr)
-            
+
             # Only consider splits that respect min_leaf
             # and that do not create nodes with a net negative or zero
             # weight
@@ -918,7 +939,7 @@ cdef class Tree:
                 continue
 
             error = criterion.eval()
-            
+
             if error < best_error:
                 best_i = i
                 best_t = t
@@ -944,7 +965,8 @@ cdef class Tree:
         cdef int offset_output
 
         cdef np.ndarray[np.float64_t, ndim=3] out
-        out = np.zeros((n_samples, self.n_outputs, self.max_n_classes), dtype=np.float64)
+        out = np.zeros((n_samples, self.n_outputs, self.max_n_classes),
+                       dtype=np.float64)
 
         for i from 0 <= i < n_samples:
             node_id = 0
@@ -1033,7 +1055,8 @@ cdef class Tree:
         return importances
 
     cdef inline double _compute_feature_importances_gini(self, int node):
-        return self.n_samples[node] * (self.init_error[node] - self.best_error[node])
+        return self.n_samples[node] * (self.init_error[node]
+                                       - self.best_error[node])
 
     cdef inline double _compute_feature_importances_squared(self, int node):
         cdef double error = self.init_error[node] - self.best_error[node]
@@ -1092,7 +1115,7 @@ cdef class ClassificationCriterion(Criterion):
 
     n_samples : int
         The number of samples.
-    
+
     weighted_n_samples : double
         The weighted number of samples.
 
@@ -1127,7 +1150,7 @@ cdef class ClassificationCriterion(Criterion):
     cdef int* n_classes
     cdef int n_samples
     cdef double weighted_n_samples
-    
+
     cdef double* label_count_left
     cdef double* label_count_right
     cdef double* label_count_init
@@ -1161,7 +1184,7 @@ cdef class ClassificationCriterion(Criterion):
                 label_count_stride = n_classes[k]
 
         self.label_count_stride = label_count_stride
-        
+
         # Allocate
         self.label_count_left = <double*> calloc(
                 n_outputs * label_count_stride, sizeof(double))
@@ -1288,7 +1311,7 @@ cdef class ClassificationCriterion(Criterion):
 
             if sample_mask[s] == 0:
                 continue
-            
+
             if sample_weight != NULL:
                 w = sample_weight[s]
 
@@ -1326,7 +1349,7 @@ cdef class ClassificationCriterion(Criterion):
         for k from 0 <= k < n_outputs:
             for c from 0 <= c < n_classes[k]:
                 # does anyone know of a better way to handle negative sample
-                # weights here? Using absolute value for now... 
+                # weights here? Using absolute value for now...
                 buffer_value[k * label_count_stride + c] = abs(
                         label_count_init[k * label_count_stride + c])
 
@@ -1364,7 +1387,7 @@ cdef class Gini(ClassificationCriterion):
         cdef double H_right
         cdef int k, c
         cdef double count_left, count_right
-        
+
         if n_samples <= 0:
             # can happen with negative sample weights
             return 0.
@@ -1440,10 +1463,16 @@ cdef class Entropy(ClassificationCriterion):
 
             for c from 0 <= c < n_classes[k]:
                 if label_count_left[k * label_count_stride + c] > 0:
-                    H_left -= ((label_count_left[k * label_count_stride + c] / n_left) * log(label_count_left[k * label_count_stride + c] / n_left))
+                    H_left -= (
+                        (label_count_left[k * label_count_stride + c] / n_left)
+                        * log(label_count_left[k * label_count_stride + c]
+                              / n_left))
 
                 if self.label_count_right[k * label_count_stride + c] > 0:
-                    H_right -= ((label_count_right[k * label_count_stride + c] / n_right) * log(label_count_right[k * label_count_stride + c] / n_right))
+                    H_right -= (
+                        (label_count_right[k * label_count_stride + c] / n_right)
+                        * log(label_count_right[k * label_count_stride + c]
+                              / n_right))
 
             e1 = (n_left / n_samples) * H_left
             e2 = (n_right / n_samples) * H_right
@@ -1469,7 +1498,7 @@ cdef class RegressionCriterion(Criterion):
 
     n_samples : int
         The number of samples
-    
+
     weighted_n_samples : double
         The weighted number of samples.
 
@@ -1540,7 +1569,7 @@ cdef class RegressionCriterion(Criterion):
         self.n_right = 0
         self.weighted_n_left = 0.0
         self.weighted_n_right = 0.0
-        
+
         # Allocate
         self.mean_left = <double*> calloc(n_outputs, sizeof(double))
         self.mean_right = <double*> calloc(n_outputs, sizeof(double))
@@ -1625,7 +1654,7 @@ cdef class RegressionCriterion(Criterion):
 
         self.n_samples = n_samples
         self.weighted_n_samples = weighted_n_samples
-        
+
         cdef int j = 0
         cdef DOUBLE_t y_jk = 0.0
         cdef DOUBLE_t w = 1.0
@@ -1633,7 +1662,7 @@ cdef class RegressionCriterion(Criterion):
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
-            
+
             if sample_weight != NULL:
                 w = sample_weight[j]
 
@@ -1680,7 +1709,7 @@ cdef class RegressionCriterion(Criterion):
             sq_sum_right[k] = sq_sum_init[k]
             sq_sum_left[k] = 0.0
             var_left[k] = 0.0
-            var_right[k] = (sq_sum_right[k] - 
+            var_right[k] = (sq_sum_right[k] -
                     weighted_n_samples * (mean_right[k] * mean_right[k]))
 
     cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
@@ -1714,7 +1743,7 @@ cdef class RegressionCriterion(Criterion):
 
             if sample_mask[j] == 0:
                 continue
-            
+
             if sample_weight != NULL:
                 w = sample_weight[j]
 
@@ -1723,7 +1752,7 @@ cdef class RegressionCriterion(Criterion):
                 sq_sum_left[k] += w * (y_idx * y_idx)
                 sq_sum_right[k] -= w * (y_idx * y_idx)
 
-                mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_idx) / 
+                mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_idx) /
                         <double>(weighted_n_left + w))
                 mean_right[k] = (((weighted_n_samples - weighted_n_left) *
                         mean_right[k] - w * y_idx) /
