@@ -35,6 +35,10 @@ cdef extern from "float.h":
     cdef extern double DBL_MAX
 
 
+from numpy import zeros, ones
+from numpy import bool
+
+
 # ==============================================================================
 # Types and constants
 # ==============================================================================
@@ -531,7 +535,7 @@ cdef class Tree:
                 if sample_weight is not None:
                     sample_weight = sample_weight[sample_mask]
                     sample_weight_ptr = <DOUBLE_t*> sample_weight.data
-                sample_mask = np.ones((n_node_samples, ), dtype=np.bool)
+                sample_mask = ones((n_node_samples, ), dtype=bool)
 
                 n_total_samples = n_node_samples
 
@@ -548,8 +552,8 @@ cdef class Tree:
 
             # Split
             X_ptr = X_ptr + feature * X_stride
-            sample_mask_left = np.zeros((n_total_samples, ), dtype=np.bool)
-            sample_mask_right = np.zeros((n_total_samples, ), dtype=np.bool)
+            sample_mask_left = zeros((n_total_samples, ), dtype=bool)
+            sample_mask_right = zeros((n_total_samples, ), dtype=bool)
 
             sample_mask_left_ptr = <BOOL_t*> sample_mask_left.data
             sample_mask_right_ptr = <BOOL_t*> sample_mask_right.data
