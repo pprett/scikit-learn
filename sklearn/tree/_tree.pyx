@@ -415,7 +415,9 @@ cdef class Tree:
             weighted_n_node_samples = n_node_samples
 
         # Build the tree by recursive partitioning
-        self.recursive_partition(X, X_argsorted, y, sample_mask, np.sum(sample_mask), 0, -1, False, buffer_value)
+        self.recursive_partition(X, X_argsorted, y, sample_weight, sample_mask,
+                np.sum(sample_mask), weighted_n_node_samples,
+                0, -1, False, buffer_value)
 
         # Compactify
         self.resize(self.node_count)
@@ -425,8 +427,10 @@ cdef class Tree:
                                   np.ndarray[DTYPE_t, ndim=2, mode="fortran"] X,
                                   np.ndarray[np.int32_t, ndim=2, mode="fortran"] X_argsorted,
                                   np.ndarray[DOUBLE_t, ndim=2, mode="c"] y,
+                                  np.ndarray[DOUBLE_t, ndim=1, mode="c"] sample_weight,
                                   np.ndarray sample_mask,
                                   int n_node_samples,
+                                  double weighted_n_node_samples,
                                   int depth,
                                   int parent,
                                   int is_left_child,
@@ -476,6 +480,7 @@ cdef class Tree:
                             sample_weight_ptr,
                             sample_mask_ptr,
                             n_node_samples,
+                            weighted_n_node_samples,
                             n_total_samples,
                             &feature, &threshold, &best_error, &init_error)
 
@@ -526,15 +531,21 @@ cdef class Tree:
             sample_mask_right = np.zeros((n_total_samples, ), dtype=np.bool)
             n_node_samples_left = 0
             n_node_samples_right = 0
+            weighted_n_node_samples_left = 0
+            weighted_n_node_samples_right = 0
 
             for i from 0 <= i < n_total_samples:
                 if sample_mask_ptr[i]:
+                    if sample_weight_ptr != NULL:
+                        w = sample_weight_ptr[i]
                     if X_ptr[i] <= threshold:
                         sample_mask_left[i] = 1
                         n_node_samples_left += 1
+                        weighted_n_node_samples_left += w
                     else:
                         sample_mask_right[i] = 1
                         n_node_samples_right += 1
+                        weighted_n_node_samples_right += w
 
             node_id = self.add_split_node(parent, is_left_child, feature,
                                           threshold, buffer_value, best_error,
@@ -1252,6 +1263,8 @@ cdef class ClassificationCriterion(Criterion):
         cdef double* label_count_right = self.label_count_right
         cdef int n_left = self.n_left
         cdef int n_right = self.n_right
+        cdef double weighted_n_left = self.weighted_n_left
+        cdef double weighted_n_right = self.weighted_n_right
 
         cdef int idx, k, c, s
         cdef double w = 1.
@@ -1267,8 +1280,8 @@ cdef class ClassificationCriterion(Criterion):
 
             for k from 0 <= k < n_outputs:
                 c = <int>y[s * y_stride + k]
-                label_count_right[k * label_count_stride + c] -= w
                 label_count_left[k * label_count_stride + c] += w
+                label_count_right[k * label_count_stride + c] -= w
 
             n_left += 1
             n_right -= 1
@@ -1322,7 +1335,7 @@ cdef class Gini(ClassificationCriterion):
 
     cdef double eval(self):
         """Returns Gini index of left branch + Gini index of right branch."""
-        cdef int n_samples = self.weighted_n_samples
+        cdef double n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
@@ -1392,7 +1405,7 @@ cdef class Entropy(ClassificationCriterion):
 
     cdef double eval(self):
         """Returns Entropy of left branch + Entropy index of right branch. """
-        cdef int n_samples = self.weighted_n_samples
+        cdef double n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
         cdef int label_count_stride = self.label_count_stride
@@ -1667,10 +1680,13 @@ cdef class RegressionCriterion(Criterion):
         cdef double* var_left = self.var_left
         cdef double* var_right = self.var_right
 
-        cdef int n_samples = self.weighted_n_samples
+        cdef int n_samples = self.n_samples
+        cdef double weighted_n_samples = self.weighted_n_samples
         cdef int n_outputs = self.n_outputs
-        cdef int n_left = self.weighted_n_left
-        cdef int n_right = self.weighted_n_right
+        cdef int n_left = self.n_left
+        cdef int n_right = self.n_right
+        cdef double weighted_n_left = self.weighted_n_left
+        cdef double weighted_n_right = self.weighted_n_right
 
         cdef double w = 1.0
         cdef double y_idx = 0.0
@@ -1703,7 +1719,7 @@ cdef class RegressionCriterion(Criterion):
             weighted_n_left += w
             self.weighted_n_left = weighted_n_left
             weighted_n_right -= w
-            self.weighted_n_right = weight_n_right
+            self.weighted_n_right = weighted_n_right
 
             for k from 0 <= k < n_outputs:
                 var_left[k] = sq_sum_left[k] - weighted_n_left * (mean_left[k] * mean_left[k])
