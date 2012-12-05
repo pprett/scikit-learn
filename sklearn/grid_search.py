@@ -101,25 +101,32 @@ def fit_grid_point(X, y, sample_weight, base_clf,
         X_train = X[safe_mask(X, train)]
         X_test = X[safe_mask(X, test)]
 
+    score_params = dict()
+    if sample_weight is not None:
+        sample_weight_train = sample_weight[safe_mask(sample_weight, train)]
+        sample_weight_test = sample_weight[safe_mask(sample_weight, test)]
+        fit_params['sample_weight'] = sample_weight_train
+        score_params['sample_weight'] = sample_weight_test
+
     if y is not None:
         y_test = y[safe_mask(y, test)]
         y_train = y[safe_mask(y, train)]
         clf.fit(X_train, y_train, **fit_params)
         if loss_func is not None:
             y_pred = clf.predict(X_test)
-            this_score = -loss_func(y_test, y_pred)
+            this_score = -loss_func(y_test, y_pred, **score_params)
         elif score_func is not None:
             y_pred = clf.predict(X_test)
-            this_score = score_func(y_test, y_pred)
+            this_score = score_func(y_test, y_pred, **score_params)
         else:
-            this_score = clf.score(X_test, y_test)
+            this_score = clf.score(X_test, y_test, **score_params)
         if hasattr(y, 'shape'):
             this_n_test_samples = y.shape[0]
         else:
             this_n_test_samples = len(y)
     else:
         clf.fit(X_train, **fit_params)
-        this_score = clf.score(X_test)
+        this_score = clf.score(X_test, **score_params)
         if hasattr(X, 'shape'):
             this_n_test_samples = X.shape[0]
         else:
@@ -438,7 +445,8 @@ class GridSearchCV(BaseEstimator, MetaEstimatorMixin):
             best_estimator = clone(base_clf).set_params(**best_params)
             if y is not None:
                 if sample_weight is not None:
-                    best_estimator.fit(X, y, sample_weight, **self.fit_params)
+                    best_estimator.fit(X, y, sample_weight=sample_weight,
+                            **self.fit_params)
                 else:
                     best_estimator.fit(X, y, **self.fit_params)
             else:
