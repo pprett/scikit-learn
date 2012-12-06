@@ -383,7 +383,7 @@ cdef class Tree:
 
         if y.dtype != DOUBLE or not y.flags.contiguous:
             y = np.asarray(y, dtype=DOUBLE, order="C")
-        
+
         if sample_weight is not None:
             if sample_weight.dtype != DOUBLE or not sample_weight.flags.contiguous:
                 sample_weight = np.asarray(
@@ -408,7 +408,7 @@ cdef class Tree:
 
         self.resize(init_capacity)
         cdef double* buffer_value = <double*> malloc(self.value_stride * sizeof(double))
-        
+
         n_node_samples = np.sum(sample_mask)
         if sample_weight is not None:
             weighted_n_node_samples = np.sum(sample_weight[sample_mask])
@@ -1093,7 +1093,7 @@ cdef class ClassificationCriterion(Criterion):
 
     n_samples : int
         The number of samples.
-    
+
     weighted_n_samples : double
         The weighted number of samples.
 
@@ -1124,7 +1124,7 @@ cdef class ClassificationCriterion(Criterion):
 
     weighted_n_right : double
         The weighted number of samples right of splitting point.
-    
+
     References
     ----------
 
@@ -1139,7 +1139,7 @@ cdef class ClassificationCriterion(Criterion):
     cdef double* label_count_left
     cdef double* label_count_right
     cdef double* label_count_init
-    
+
     cdef int n_left
     cdef int n_right
     cdef double weighted_n_left
@@ -1234,7 +1234,7 @@ cdef class ClassificationCriterion(Criterion):
                 continue
             if sample_weight != NULL:
                 w = sample_weight[j]
-            
+
             for k from 0 <= k < n_outputs:
                 c = <int>y[j * y_stride + k]
                 label_count_init[k * label_count_stride + c] += w
@@ -1326,7 +1326,7 @@ cdef class ClassificationCriterion(Criterion):
         for k from 0 <= k < n_outputs:
             for c from 0 <= c < n_classes[k]:
                 # does anyone know of a better way to handle negative sample
-                # weights here? Using absolute value for now... 
+                # weights here? Using absolute value for now...
                 buffer_value[k * label_count_stride + c] = abs(
                         label_count_init[k * label_count_stride + c])
 
@@ -1364,7 +1364,7 @@ cdef class Gini(ClassificationCriterion):
         cdef double H_right
         cdef int k, c
         cdef double count_left, count_right
-        
+
         if n_samples <= 0:
             # can happen with negative sample weights
             return 1.
@@ -1469,7 +1469,7 @@ cdef class RegressionCriterion(Criterion):
 
     n_samples : int
         The number of samples
-    
+
     weighted_n_samples : double
         The weighted number of samples.
 
@@ -1678,7 +1678,7 @@ cdef class RegressionCriterion(Criterion):
             sq_sum_right[k] = sq_sum_init[k]
             sq_sum_left[k] = 0.0
             var_left[k] = 0.0
-            var_right[k] = (sq_sum_right[k] - 
+            var_right[k] = (sq_sum_right[k] -
                     weighted_n_samples * (mean_right[k] * mean_right[k]))
 
     cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
@@ -1720,11 +1720,11 @@ cdef class RegressionCriterion(Criterion):
                 sq_sum_left[k] += w * (y_idx * y_idx)
                 sq_sum_right[k] -= w * (y_idx * y_idx)
 
-                mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_idx) / 
-                        (weighted_n_left + w))
+                mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_idx) /
+                                (weighted_n_left + w))
                 mean_right[k] = (((weighted_n_samples - weighted_n_left) *
-                        mean_right[k] - w * y_idx) /
-                        (weighted_n_samples - weighted_n_left - w))
+                                      mean_right[k] - w * y_idx) /
+                                 (weighted_n_samples - weighted_n_left - w))
 
             n_left += 1
             self.n_left = n_left
