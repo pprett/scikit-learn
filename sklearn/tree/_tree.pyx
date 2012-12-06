@@ -398,6 +398,8 @@ cdef class Tree:
 
         # Pre-allocate some space
         cdef int init_capacity
+        cdef int n_node_samples
+        cdef double weighted_n_node_samples
 
         if self.max_depth <= 10:
             init_capacity = (2 ** (int(self.max_depth) + 1)) - 1
@@ -408,7 +410,6 @@ cdef class Tree:
         cdef double* buffer_value = <double*> malloc(self.value_stride * sizeof(double))
         
         n_node_samples = np.sum(sample_mask)
-        cdef double weighted_n_node_samples
         if sample_weight is not None:
             weighted_n_node_samples = np.sum(sample_weight[sample_mask])
         else:
@@ -464,6 +465,8 @@ cdef class Tree:
         cdef np.ndarray sample_mask_right
         cdef int n_node_samples_left
         cdef int n_node_samples_right
+        cdef double weighted_n_node_samples_left
+        cdef double weighted_n_node_samples_right
 
         # Count samples
         if n_node_samples == 0:
@@ -531,8 +534,8 @@ cdef class Tree:
             sample_mask_right = np.zeros((n_total_samples, ), dtype=np.bool)
             n_node_samples_left = 0
             n_node_samples_right = 0
-            weighted_n_node_samples_left = 0
-            weighted_n_node_samples_right = 0
+            weighted_n_node_samples_left = 0.
+            weighted_n_node_samples_right = 0.
 
             for i from 0 <= i < n_total_samples:
                 if sample_mask_ptr[i]:
@@ -909,8 +912,8 @@ cdef class Tree:
             if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
                 continue
 
-            if weighted_n_left <= 0 or (weighted_n_node_samples -
-                    weighted_n_left) <= 0:
+            if (weighted_n_left <= 0 or
+                (weighted_n_node_samples - weighted_n_left) <= 0):
                 # skip splits that result in nodes with net 0 or negative
                 # weights
                 continue
@@ -1352,8 +1355,8 @@ cdef class Gini(ClassificationCriterion):
         cdef int label_count_stride = self.label_count_stride
         cdef double* label_count_left = self.label_count_left
         cdef double* label_count_right = self.label_count_right
-        cdef double n_left = <double> self.weighted_n_left
-        cdef double n_right = <double> self.weighted_n_right
+        cdef double n_left = self.weighted_n_left
+        cdef double n_right = self.weighted_n_right
 
         cdef double total_left = 0.0
         cdef double total_right = 0.0
@@ -1422,8 +1425,8 @@ cdef class Entropy(ClassificationCriterion):
         cdef int label_count_stride = self.label_count_stride
         cdef double* label_count_left = self.label_count_left
         cdef double* label_count_right = self.label_count_right
-        cdef double n_left = <double> self.weighted_n_left
-        cdef double n_right = <double> self.weighted_n_right
+        cdef double n_left = self.weighted_n_left
+        cdef double n_right = self.weighted_n_right
 
         cdef double total = 0.0
         cdef double H_left
@@ -1718,10 +1721,10 @@ cdef class RegressionCriterion(Criterion):
                 sq_sum_right[k] -= w * (y_idx * y_idx)
 
                 mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_idx) / 
-                        <double>(weighted_n_left + w))
+                        (weighted_n_left + w))
                 mean_right[k] = (((weighted_n_samples - weighted_n_left) *
                         mean_right[k] - w * y_idx) /
-                        <double>(weighted_n_samples - weighted_n_left - w))
+                        (weighted_n_samples - weighted_n_left - w))
 
             n_left += 1
             self.n_left = n_left
