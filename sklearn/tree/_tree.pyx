@@ -416,9 +416,17 @@ cdef class Tree:
             weighted_n_node_samples = n_node_samples
 
         # Build the tree by recursive partitioning
-        self.recursive_partition(X, X_argsorted, y, sample_weight, sample_mask,
-                n_node_samples, weighted_n_node_samples,
-                0, -1, False, buffer_value)
+        self.recursive_partition(X,
+                                 X_argsorted,
+                                 y,
+                                 sample_weight,
+                                 sample_mask,
+                                 n_node_samples,
+                                 weighted_n_node_samples,
+                                 0,
+                                 -1,
+                                 False,
+                                 buffer_value)
 
         # Compactify
         self.resize(self.node_count)
