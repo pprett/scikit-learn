@@ -1281,7 +1281,7 @@ cdef class ClassificationCriterion(Criterion):
         cdef double weighted_n_right = self.weighted_n_right
 
         cdef int idx, k, c, s
-        cdef double w = 1.
+        cdef DOUBLE_t w = 1.
 
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
@@ -1626,10 +1626,10 @@ cdef class RegressionCriterion(Criterion):
         self.n_samples = n_samples
         self.weighted_n_samples = weighted_n_samples
         
-        cdef DTYPE_t w = 1.0
-        cdef int j = 0
+        cdef DOUBLE_t w = 1.0
         cdef DOUBLE_t y_jk = 0.0
-
+        cdef int j = 0
+        
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
@@ -1669,8 +1669,8 @@ cdef class RegressionCriterion(Criterion):
 
         self.n_right = self.n_samples
         self.n_left = 0
-        self.weighted_n_left = self.weighted_n_samples
-        self.weighted_n_right = 0.0
+        self.weighted_n_right = self.weighted_n_samples
+        self.weighted_n_left = 0.0
 
         for k from 0 <= k < n_outputs:
             mean_right[k] = mean_init[k]
@@ -1702,10 +1702,10 @@ cdef class RegressionCriterion(Criterion):
         cdef double weighted_n_left = self.weighted_n_left
         cdef double weighted_n_right = self.weighted_n_right
 
-        cdef double w = 1.0
-        cdef double y_idx = 0.0
+        cdef DOUBLE_t w = 1.0
+        cdef DOUBLE_t y_idx = 0.0
         cdef int idx, j, k
-
+        
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
             j = X_argsorted_i[idx]
