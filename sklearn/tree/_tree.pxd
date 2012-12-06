@@ -24,7 +24,7 @@ cdef class Criterion:
 
     cdef void reset(self)
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
                     BOOL_t* sample_mask)

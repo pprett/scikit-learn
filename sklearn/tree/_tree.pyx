@@ -416,7 +416,7 @@ cdef class Tree:
 
         # Build the tree by recursive partitioning
         self.recursive_partition(X, X_argsorted, y, sample_weight, sample_mask,
-                np.sum(sample_mask), weighted_n_node_samples,
+                n_node_samples, weighted_n_node_samples,
                 0, -1, False, buffer_value)
 
         # Compactify
@@ -686,6 +686,7 @@ cdef class Tree:
         cdef int i, a, b, best_i = -1
         cdef np.int32_t feature_idx = -1
         cdef int n_left = 0
+        cdef double weighted_n_left = 0.
 
         cdef double t, initial_error, error
         cdef double best_error = INFINITY, best_t = INFINITY
@@ -755,10 +756,11 @@ cdef class Tree:
                     break
 
                 # Better split than the best so far?
-                n_left = criterion.update(a, b, y_ptr, y_stride,
-                                          X_argsorted_i,
-                                          sample_weight_ptr,
-                                          sample_mask_ptr)
+                n_left, weighted_n_left = criterion.update(
+                        a, b, y_ptr, y_stride,
+                        X_argsorted_i,
+                        sample_weight_ptr,
+                        sample_mask_ptr)
 
                 # Only consider splits that respect min_leaf
                 if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
@@ -817,6 +819,7 @@ cdef class Tree:
         cdef int i, a, b, c, best_i = -1
         cdef np.int32_t feature_idx = -1
         cdef int n_left = 0
+        cdef double weighted_n_left = 0.
         cdef double random
 
         cdef double t, initial_error, error
@@ -897,14 +900,22 @@ cdef class Tree:
                 c += 1
 
             # Better than the best so far?
-            n_left = criterion.update(0, c, y_ptr, y_stride,
-                                      X_argsorted_i,
-                                      sample_weight_ptr,
-                                      sample_mask_ptr)
-            error = criterion.eval()
-
+            n_left, weighted_n_left = criterion.update(
+                    0, c, y_ptr, y_stride,
+                    X_argsorted_i,
+                    sample_weight_ptr,
+                    sample_mask_ptr)
+            
             if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
                 continue
+
+            if weighted_n_left <= 0 or (weighted_n_node_samples -
+                    weighted_n_left) <= 0:
+                # skip splits that result in nodes with net 0 or negative
+                # weights
+                continue
+            
+            error = criterion.eval()
 
             if error < best_error:
                 best_i = i
@@ -1047,7 +1058,7 @@ cdef class Criterion:
         """Reset the criterion for a new feature index."""
         pass
 
-    cdef int update(self, int a, int b,
+    cdef tuple update(self, int a, int b,
                     DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
@@ -1251,7 +1262,7 @@ cdef class ClassificationCriterion(Criterion):
                 # Reset right label counts to the initial counts
                 label_count_right[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
                     BOOL_t* sample_mask):
@@ -1293,7 +1304,7 @@ cdef class ClassificationCriterion(Criterion):
         self.weighted_n_left = weighted_n_left
         self.weighted_n_right = weighted_n_right
 
-        return n_left
+        return n_left, weighted_n_left
 
     cdef double eval(self):
         """Evaluate the criteria (aka the split error)."""
@@ -1353,7 +1364,7 @@ cdef class Gini(ClassificationCriterion):
         
         if n_samples <= 0:
             # can happen with negative sample weights
-            return 0.
+            return 1.
 
         for k from 0 <= k < n_outputs:
             H_left = n_left * n_left
@@ -1667,7 +1678,7 @@ cdef class RegressionCriterion(Criterion):
             var_right[k] = (sq_sum_right[k] - 
                     weighted_n_samples * (mean_right[k] * mean_right[k]))
 
-    cdef int update(self, int a, int b, DOUBLE_t* y, int y_stride,
+    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
                     int* X_argsorted_i,
                     DOUBLE_t* sample_weight,
                     BOOL_t* sample_mask):
@@ -1725,7 +1736,7 @@ cdef class RegressionCriterion(Criterion):
                 var_left[k] = sq_sum_left[k] - weighted_n_left * (mean_left[k] * mean_left[k])
                 var_right[k] = sq_sum_right[k] - weighted_n_right * (mean_right[k] * mean_right[k])
 
-        return n_left
+        return n_left, weighted_n_left
 
     cdef double eval(self):
         """Evaluate the criteria (aka the split error)."""
