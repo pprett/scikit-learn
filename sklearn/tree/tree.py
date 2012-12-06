@@ -17,6 +17,7 @@ from abc import ABCMeta, abstractmethod
 
 from ..base import BaseEstimator, ClassifierMixin, RegressorMixin
 from ..feature_selection.selector_mixin import SelectorMixin
+from ..metrics import weighted_r2_score
 from ..utils import array2d, check_random_state
 from ..utils.validation import check_arrays
 
@@ -748,32 +749,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         -------
         z : float
         """
-        y_true = y
-        y_pred = self.predict(X)
-
-        y_true, y_pred = check_arrays(y_true, y_pred)
-
-        if len(y_true) == 1:
-            raise ValueError("r2_score can only be computed given more than one"
-                             " sample.")
-
-        if sample_weight is None:
-            numerator = ((y_true - y_pred) ** 2).sum()
-            denominator = ((y_true - y_true.mean()) ** 2).sum()
-
-        else:
-            numerator = (sample_weight * (y_true - y_pred) ** 2).sum()
-            denominator = (sample_weight * (y_true - y_true.mean()) ** 2).sum()
-
-        if denominator == 0.0:
-            if numerator == 0.0:
-                return 1.0
-            else:
-                # arbitary set to zero to avoid -inf scores, having a constant
-                # y_true is not interesting for scoring a regression anyway
-                return 0.0
-
-        return 1 - numerator / denominator
+        weighted_r2_score(y, self.predict(X), weights=sample_weight)
 
 
 class ExtraTreeClassifier(DecisionTreeClassifier):
