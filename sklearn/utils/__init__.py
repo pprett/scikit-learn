@@ -294,10 +294,12 @@ def balance_weights(y):
     Parameters
     ----------
     y : array-like
+        Labels for the samples.
 
     Returns
     -------
     weights : array-like
+        The sample weights.
     """
     y = safe_asarray(y)
     y = np.searchsorted(np.unique(y), y)
