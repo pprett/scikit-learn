@@ -985,7 +985,7 @@ def weighted_r2_score(y_true, y_pred, weights=None):
     Returns
     -------
     z : float
-        The R^2 score
+        The weighted R^2 score
 
     Notes
     -----
