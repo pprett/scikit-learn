@@ -972,7 +972,7 @@ def r2_score(y_true, y_pred):
 
 
 def weighted_r2_score(y_true, y_pred, weights=None):
-    """R^2 (coefficient of determination) regression score function
+    """Weighted R^2 (coefficient of determination) regression score function
 
     Best possible score is 1.0, lower values are worse.
 
