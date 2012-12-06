@@ -470,7 +470,6 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         total reduction of error brought by that feature. It is also known as
         the Gini importance [4]_.
 
-
     See also
     --------
     DecisionTreeRegressor
@@ -615,12 +614,8 @@ class DecisionTreeClassifier(BaseDecisionTree, ClassifierMixin):
         Returns
         -------
         z : float
-
         """
-        if sample_weight is not None:
-            # weighted average
-            return np.average((self.predict(X) == y), weights=sample_weight)
-        return np.mean(self.predict(X) == y)
+        return np.average((self.predict(X) == y), weights=sample_weight)
 
 
 class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
@@ -682,7 +677,6 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         total reduction of error brought by that feature. It is also known as
         the Gini importance [4]_.
 
-
     See also
     --------
     DecisionTreeClassifier
@@ -734,6 +728,52 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
                                                     max_features,
                                                     compute_importances,
                                                     random_state)
+
+    def score(self, X, y, sample_weight=None):
+        """Returns the coefficient of determination R^2 of the prediction.
+
+        The coefficient R^2 is defined as (1 - u/v), where u is the
+        regression sum of squares ((y - y_pred) ** 2).sum() and v is the
+        residual sum of squares ((y_true - y_true.mean()) ** 2).sum().
+        Best possible score is 1.0, lower values are worse.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            Training set.
+
+        y : array-like, shape = [n_samples]
+
+        Returns
+        -------
+        z : float
+        """
+        y_true = y
+        y_pred = self.predict(X)
+
+        y_true, y_pred = check_arrays(y_true, y_pred)
+
+        if len(y_true) == 1:
+            raise ValueError("r2_score can only be computed given more than one"
+                             " sample.")
+
+        if sample_weight is None:
+            numerator = ((y_true - y_pred) ** 2).sum()
+            denominator = ((y_true - y_true.mean()) ** 2).sum()
+
+        else:
+            numerator = (sample_weight * (y_true - y_pred) ** 2).sum()
+            denominator = (sample_weight * (y_true - y_true.mean()) ** 2).sum()
+
+        if denominator == 0.0:
+            if numerator == 0.0:
+                return 1.0
+            else:
+                # arbitary set to zero to avoid -inf scores, having a constant
+                # y_true is not interesting for scoring a regression anyway
+                return 0.0
+
+        return 1 - numerator / denominator
 
 
 class ExtraTreeClassifier(DecisionTreeClassifier):
