@@ -1206,11 +1206,11 @@ cdef class ClassificationCriterion(Criterion):
         pass
 
     cdef void init(self, DOUBLE_t* y, int y_stride,
-                   DOUBLE_t* sample_weight,
-                   BOOL_t* sample_mask,
-                   int n_samples,
-                   double weighted_n_samples,
-                   int n_total_samples):
+                         DOUBLE_t* sample_weight,
+                         BOOL_t* sample_mask,
+                         int n_samples,
+                         double weighted_n_samples,
+                         int n_total_samples):
         """Initialise the criterion."""
         cdef int n_outputs = self.n_outputs
         cdef int* n_classes = self.n_classes
@@ -1265,10 +1265,11 @@ cdef class ClassificationCriterion(Criterion):
                 # Reset right label counts to the initial counts
                 label_count_right[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
 
-    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
-                    int* X_argsorted_i,
-                    DOUBLE_t* sample_weight,
-                    BOOL_t* sample_mask):
+    cdef tuple update(self, int a, int b,
+                          DOUBLE_t* y, int y_stride,
+                          int* X_argsorted_i,
+                          DOUBLE_t* sample_weight,
+                          BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int n_outputs = self.n_outputs
@@ -1593,11 +1594,11 @@ cdef class RegressionCriterion(Criterion):
         pass
 
     cdef void init(self, DOUBLE_t* y, int y_stride,
-                   DOUBLE_t* sample_weight,
-                   BOOL_t* sample_mask,
-                   int n_samples,
-                   double weighted_n_samples,
-                   int n_total_samples):
+                         DOUBLE_t* sample_weight,
+                         BOOL_t* sample_mask,
+                         int n_samples,
+                         double weighted_n_samples,
+                         int n_total_samples):
         """Initialise the criterion class; assume all samples
            are in the right branch and store the mean and squared
            sum in `self.mean_init` and `self.sq_sum_init`. """
@@ -1681,10 +1682,11 @@ cdef class RegressionCriterion(Criterion):
             var_right[k] = (sq_sum_right[k] -
                     weighted_n_samples * (mean_right[k] * mean_right[k]))
 
-    cdef tuple update(self, int a, int b, DOUBLE_t* y, int y_stride,
-                    int* X_argsorted_i,
-                    DOUBLE_t* sample_weight,
-                    BOOL_t* sample_mask):
+    cdef tuple update(self, int a, int b,
+                          DOUBLE_t* y, int y_stride,
+                          int* X_argsorted_i,
+                          DOUBLE_t* sample_weight,
+                          BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef double* mean_left = self.mean_left
