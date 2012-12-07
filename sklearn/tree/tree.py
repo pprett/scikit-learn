@@ -749,7 +749,7 @@ class DecisionTreeRegressor(BaseDecisionTree, RegressorMixin):
         -------
         z : float
         """
-        weighted_r2_score(y, self.predict(X), weights=sample_weight)
+        return weighted_r2_score(y, self.predict(X), weights=sample_weight)
 
 
 class ExtraTreeClassifier(DecisionTreeClassifier):
