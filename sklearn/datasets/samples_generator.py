@@ -1260,7 +1260,7 @@ def make_gaussian_quantiles(n_samples=100, n_features=2, n_classes=3,
     >>> X.shape
     (10, 5)
     >>> y
-    array([0, 1, 0, 1, 0, 1, 1, 0, 0, 1], dtype=int32)
+    array([0, 1, 0, 1, 0, 1, 1, 0, 0, 1])
 
     Notes
     -----
@@ -1284,7 +1284,7 @@ def make_gaussian_quantiles(n_samples=100, n_features=2, n_classes=3,
     X = np.array(X)
 
     # Label by quantile.
-    y = np.empty(n_samples, dtype=np.int32)
+    y = np.empty(n_samples, dtype=np.int)
     step = n_samples / n_classes
     begin = 0
     for i in xrange(n_classes):

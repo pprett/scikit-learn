@@ -19,8 +19,6 @@ The module structure is the following:
 # Authors: Noel Dawe
 # License: BSD Style
 
-import math
-
 import numpy as np
 
 from .base import BaseEnsemble
@@ -400,8 +398,8 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
 
         # boost weight using multi-class AdaBoost SAMME alg
         alpha = self.learn_rate * (
-                math.log((1. - err) / err) +
-                math.log(n_classes - 1.))
+                np.log((1. - err) / err) +
+                np.log(n_classes - 1.))
 
         # only bother to boost the weights if I will fit again
         if not is_last:
@@ -618,10 +616,17 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
             self.estimators_.pop(-1)
             return None, None, None
 
+        # negative sample weights can yield an overall negative error...
+        if err < 0:
+            # use the absolute value
+            # if you have a better idea of how to handle negative
+            # sample weights let me know
+            err = abs(err)
+
         beta = err / (1. - err)
 
         # boost weight using AdaBoost.R2 alg
-        alpha = self.learn_rate * math.log(1. / beta)
+        alpha = self.learn_rate * np.log(1. / beta)
         if not is_last:
             sample_weight *= np.power(beta, (1. - err_vect) * self.learn_rate)
         return sample_weight, alpha, err
