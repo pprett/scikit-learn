@@ -358,7 +358,6 @@ class BaseForest(BaseEnsemble, SelectorMixin):
             if isinstance(self, ClassifierMixin):
                 self.oob_decision_function_ = []
                 self.oob_score_ = 0.0
-
                 n_classes_ = self.n_classes_
                 classes_ = self.classes_
 
@@ -392,10 +391,12 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                     decision = (predictions[k] /
                                 predictions[k].sum(axis=1)[:, np.newaxis])
                     self.oob_decision_function_.append(decision)
-                    self.oob_score_ += (np.mean(y[:, k] ==
-                                        classes_[k].take(
-                                            np.argmax(predictions[k], axis=1),
-                                            axis=0)))
+                    self.oob_score_ += \
+                        np.average((y[:, k] == classes_[k].take(
+                                                   np.argmax(predictions[k],
+                                                             axis=1),
+                                                   axis=0)),
+                                   weights=sample_weight)
 
                 if self.n_outputs_ == 1:
                     self.oob_decision_function_ = \
@@ -411,28 +412,34 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                 for estimator in self.estimators_:
                     mask = np.ones(n_samples, dtype=np.bool)
                     mask[estimator.indices_] = False
-
                     p_estimator = estimator.predict(X[mask, :])
+
                     if self.n_outputs_ == 1:
                         p_estimator = p_estimator[:, np.newaxis]
 
                     predictions[mask, :] += p_estimator
                     n_predictions[mask, :] += 1
+
                 if (n_predictions == 0).any():
                     warn("Some inputs do not have OOB scores. "
                          "This probably means too few trees were used "
                          "to compute any reliable oob estimates.")
                     n_predictions[n_predictions == 0] = 1
-                predictions /= n_predictions
 
+                predictions /= n_predictions
                 self.oob_prediction_ = predictions
+
                 if self.n_outputs_ == 1:
                     self.oob_prediction_ = \
                         self.oob_prediction_.reshape((n_samples, ))
 
                 self.oob_score_ = 0.0
+
                 for k in xrange(self.n_outputs_):
-                    self.oob_score_ += r2_score(y[:, k], predictions[:, k])
+                    self.oob_score_ += weighted_r2_score(y[:, k],
+                                                         predictions[:, k],
+                                                         weights=sample_weight)
+
                 self.oob_score_ /= self.n_outputs_
 
         # Sum the importances
