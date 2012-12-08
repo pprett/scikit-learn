@@ -44,7 +44,6 @@ norm = sum(bdt.boost_weights_)
 for weight, tree in zip(bdt.boost_weights_, bdt.estimators_):
     Z = tree.predict(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
-    print weight / norm
     cs = pl.contourf(xx, yy, Z, alpha=weight / norm, cmap=pl.cm.Paired)
 pl.axis("tight")
 
