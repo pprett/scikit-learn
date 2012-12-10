@@ -220,17 +220,12 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             X, y = check_arrays(X, y)
         self.random_state = check_random_state(self.random_state)
 
-        # set min_samples_split sensibly
-        self.min_samples_split = max(self.min_samples_split,
-                                     2 * self.min_samples_leaf)
-
         # Convert data
         if getattr(X, "dtype", None) != DTYPE or \
            X.ndim != 2 or not X.flags.fortran:
             X = array2d(X, dtype=DTYPE, order="F")
 
         n_samples, self.n_features_ = X.shape
-
         is_classification = isinstance(self, ClassifierMixin)
 
         y = np.atleast_1d(y)
@@ -329,6 +324,10 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             if X_argsorted.shape != X.shape:
                 raise ValueError("Shape of X_argsorted does not match "
                                  "the shape of X")
+
+        # Set min_samples_split sensibly
+        self.min_samples_split = max(self.min_samples_split,
+                                     2 * self.min_samples_leaf)
 
         # Build tree
         self.tree_ = _tree.Tree(self.n_features_, self.n_classes_,
