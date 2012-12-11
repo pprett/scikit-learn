@@ -86,12 +86,21 @@ Changelog
    - Implement `predict_proba` in :class:`multiclass.OneVsRestClassifier`, by
      Andrew Winterman.
 
+   - Added :class:`kernel_approximation.Nystrom` for approximating arbitrary
+     kernels to the :ref:`kernel_approximation` module by `Andreas Müller`_.
+
+   - Improve consistency in :mod:`ensemble.gradient_boosting`: estimators
+    :class:`ensemble.gradient_boosting.GradientBoostingRegressor` and
+    :class:`ensemble.gradient_boosting.GradientBoostingClassifier` use
+    the estimator :class:`tree.DecisionTreeRegressor` instead of the
+    :class:`tree._tree.Tree` datastructure by `Arnaud Joly`_.
+
 API changes summary
 -------------------
    - Renamed all occurences of ``n_atoms`` to ``n_components`` for consistency.
-     This applies to :class:`dic_learning.DictionaryLearning`,
-     :class:`dic_learning.MiniBatchDictionaryLearning`,
-     :func:'dic_learning.dict_learning', :func:'dic_learning.dict_learning_online'
+     This applies to :class:`decomposition.DictionaryLearning`,
+     :class:`decomposition.MiniBatchDictionaryLearning`,
+     :func:`decomposition.dict_learning`, :func:`decomposition.dict_learning_online`.
 
    - Renamed all occurences of ``max_iters`` to ``max_iter`` for consistency.
      This applies to :class:`label_propagation.BaseLabelPropagation`,
@@ -136,7 +145,7 @@ API changes summary
      had different meanings; ``l1_ratio`` was introduced to avoid confusion.
      It has the same meaning as previously ``rho`` in
      :class:`linear_model.ElasticNet` and ``(1-rho)`` in
-     :class:`linear_model.SGDClassifier`,
+     :class:`linear_model.SGDClassifier`.
 
    - :class:`linear_model.LassoLars` and :class:`linear_model.Lars` now
      store a list of paths in the case of multiple targets, rather than
@@ -150,15 +159,21 @@ API changes summary
 
    - Renamed ``eig_tol`` in :func:`manifold.spectral_embedding`,
      :class:`cluster.SpectralClustering` to ``eigen_tol``, renamed ``mode``
-     to ``eigen_solver``
+     to ``eigen_solver``.
 
    - Renamed ``mode`` in :func:`manifold.spectral_embedding` and
      :class:`cluster.SpectralClustering` to ``eigen_solver``.
 
-    - ``classes_`` and ``n_classes_`` attributes of
-      :class:`tree.DecisionTreeClassifier` and all derived ensemble models are
-      now flat in case of single output problems and nested in case of
-      multi-output problems.
+   - ``classes_`` and ``n_classes_`` attributes of
+     :class:`tree.DecisionTreeClassifier` and all derived ensemble models are
+     now flat in case of single output problems and nested in case of
+     multi-output problems.
+
+
+    - The ``estimators_`` attribute of
+    :class:`ensemble.gradient_boosting.GradientBoostingRegressor` and
+    :class:`ensemble.gradient_boosting.GradientBoostingClassifier` is now
+    an array of :class:'tree.DecisionTreeRegressor'.
 
 .. _changes_0_12.1:
 
