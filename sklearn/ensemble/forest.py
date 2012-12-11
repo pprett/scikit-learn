@@ -40,7 +40,7 @@ import numpy as np
 from warnings import warn
 from abc import ABCMeta, abstractmethod
 
-from ..base import ClassifierMixin, RegressorMixin, \
+from ..base import ClassifierMixin, \
                    WeightedClassifierMixin, WeightedRegressorMixin
 from ..externals.joblib import Parallel, delayed, cpu_count
 from ..feature_selection.selector_mixin import SelectorMixin
@@ -48,7 +48,7 @@ from ..tree import (DecisionTreeClassifier, DecisionTreeRegressor,
                     ExtraTreeClassifier, ExtraTreeRegressor)
 from ..tree._tree import DTYPE, DOUBLE
 from ..utils import array2d, check_random_state, check_arrays, safe_asarray
-from ..metrics import r2_score, weighted_r2_score
+from ..metrics import weighted_r2_score
 from ..preprocessing import OneHotEncoder
 
 from .base import BaseEnsemble
