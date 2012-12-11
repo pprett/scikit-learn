@@ -24,6 +24,7 @@ import numpy as np
 from .base import BaseEnsemble
 from ..base import ClassifierMixin, RegressorMixin, \
                    WeightedClassifierMixin, WeightedRegressorMixin
+from ..metrics import weighted_r2_score
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 from ..tree._tree import DTYPE
 from ..utils import array2d, check_arrays
@@ -72,12 +73,17 @@ class BaseWeightBoosting(BaseEnsemble):
                  n_estimators=10,
                  learn_rate=.5,
                  compute_importances=False):
+        self.boost_weights_ = []
+        self.errs_ = []
+        self.learn_rate = learn_rate
+        self.compute_importances = compute_importances
+        self.feature_importances_ = None
 
         if base_estimator is None:
             if isinstance(self, ClassifierMixin):
-                base_estimator = DecisionTreeClassifier()
+                base_estimator = DecisionTreeClassifier(max_depth=3)
             else:
-                base_estimator = DecisionTreeRegressor()
+                base_estimator = DecisionTreeRegressor(max_depth=3)
         elif (isinstance(self, ClassifierMixin)
               and not isinstance(base_estimator, ClassifierMixin)):
             raise TypeError("base_estimator must be a "
@@ -87,23 +93,6 @@ class BaseWeightBoosting(BaseEnsemble):
             raise TypeError("base_estimator must be a "
                             "subclass of ClassifierMixin")
 
-        if learn_rate <= 0:
-            raise ValueError("learn_rate must be greater than 0")
-
-        self.boost_weights_ = list()
-        self.errs_ = list()
-        self.learn_rate = learn_rate
-        self.compute_importances = compute_importances
-        self.feature_importances_ = None
-
-        if compute_importances:
-            try:
-                base_estimator.compute_importances = True
-            except AttributeError:
-                raise AttributeError(
-                    "Unable to compute feature importances "
-                    "since base_estimator does not have a "
-                    "compute_importances attribute")
         super(BaseWeightBoosting, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators)
@@ -128,9 +117,16 @@ class BaseWeightBoosting(BaseEnsemble):
         self : object
             Returns self.
         """
+        # Check parameters
+        if self.learn_rate <= 0:
+            raise ValueError("learn_rate must be greater than 0")
+
+        if self.compute_importances:
+            self.base_estimator.set_params(compute_importances=True)
+
+        # Format data
         X, y = check_arrays(X, y, sparse_format='dense')
         X = np.asfortranarray(X, dtype=DTYPE)
-        #y = np.ravel(y, order='C')
 
         if sample_weight is None:
             # initialize weights to 1/N
@@ -140,10 +136,10 @@ class BaseWeightBoosting(BaseEnsemble):
             # normalize
             sample_weight /= sample_weight.sum()
 
-        # clear any previous fit results
-        self.estimators_ = list()
-        self.boost_weights_ = list()
-        self.errs_ = list()
+        # Clear any previous fit results
+        self.estimators_ = []
+        self.boost_weights_ = []
+        self.errs_ = []
 
         for iboost in xrange(self.n_estimators):
             estimator = self._make_estimator()
@@ -154,25 +150,29 @@ class BaseWeightBoosting(BaseEnsemble):
                 p = estimator.fit_predict(X, y, sample_weight=sample_weight)
             else:
                 p = estimator.fit(X, y, sample_weight=sample_weight).predict(X)
+
             if iboost == 0:
                 if hasattr(estimator, 'classes_'):
                     self.classes_ = estimator.classes_
                     self.n_classes_ = estimator.n_classes_
                 else:
                     self.n_classes_ = 1
-                self.n_outputs_ = getattr(estimator, 'n_outputs_', 1)
+
             sample_weight, alpha, err = self.boost(sample_weight, p, y,
                     iboost == self.n_estimators - 1)
+
             # early termination
             if sample_weight is None:
                 break
+
             self.boost_weights_.append(alpha)
             self.errs_.append(err)
+
             if iboost < self.n_estimators - 1:
                 # normalize
                 sample_weight /= sample_weight.sum()
 
-        # sum the importances
+        # Sum the importances
         try:
             if self.compute_importances:
                 norm = sum(self.boost_weights_)
@@ -189,10 +189,10 @@ class BaseWeightBoosting(BaseEnsemble):
         return self
 
     def predict(self, X, n_estimators=-1):
-        """Predict class for X.
+        """Predict class or regression value for X.
 
-        The predicted class of an input sample is computed as the weighted
-        mean prediction of the classifiers in the ensemble.
+        The predicted class or regression value of an input sample is computed
+        as the weighted mean prediction of the classifiers in the ensemble.
 
         Parameters
         ----------
@@ -221,58 +221,38 @@ class BaseWeightBoosting(BaseEnsemble):
 
         pred = None
         norm = 0.
+
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
+
             if isinstance(self, ClassifierMixin):
-                if self.n_outputs_ > 1:
-                    current_pred = [out * alpha
-                            for out in estimator.predict_proba(X)]
-                else:
-                    current_pred = estimator.predict_proba(X) * alpha
+                current_pred = estimator.predict_proba(X) * alpha
             else:
                 current_pred = estimator.predict(X) * alpha
 
             if pred is None:
                 pred = current_pred
             else:
-                if self.n_outputs_ > 1:
-                    for i in xrange(self.n_outputs_):
-                        pred[i] += current_pred[i]
-                else:
-                    pred += current_pred
+                pred += current_pred
 
             norm += alpha
 
-        if self.n_outputs_ > 1:
-            pred = [pred[i] / norm for i in xrange(self.n_outputs_)]
-        else:
-            pred /= norm
+        pred /= norm
 
         if isinstance(self, ClassifierMixin):
-            if self.n_outputs_ > 1:
-                predictions = np.zeros((n_samples, self.n_outputs_))
-                for k in xrange(self.n_outputs_):
-                    predictions[:, k] = self.classes_[k].take(
-                            np.argmax(pred[k], axis=1), axis=0)
-            else:
-                if isinstance(self.classes_, list):
-                    classes = self.classes_[0]
-                else:
-                    classes = self.classes_
-                predictions = classes.take(
-                        np.argmax(pred, axis=1), axis=0)
+            return self.classes_.take(np.argmax(pred, axis=1), axis=0)
 
-            return predictions
         else:
             return pred
 
     def staged_predict(self, X, n_estimators=-1):
-        """Predict class for X.
+        """Return staged predictions for X.
 
-        The predicted class of an input sample is computed as the weighted
-        mean prediction of the classifiers in the ensemble.
+        The predicted class or regression value of an input sample is computed
+        as the weighted mean prediction of the classifiers in the ensemble.
+
         This method allows monitoring (i.e. determine error on testing set)
         after each boost. See examples/ensemble/plot_adaboost_error.py
 
@@ -300,51 +280,58 @@ class BaseWeightBoosting(BaseEnsemble):
 
         pred = None
         norm = 0.
+
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
+
             if isinstance(self, ClassifierMixin):
-                if self.n_outputs_ > 1:
-                    current_pred = [out * alpha
-                            for out in estimator.predict_proba(X)]
-                else:
-                    current_pred = estimator.predict_proba(X) * alpha
+                current_pred = estimator.predict_proba(X) * alpha
             else:
                 current_pred = estimator.predict(X) * alpha
 
             if pred is None:
                 pred = current_pred
             else:
-                if self.n_outputs_ > 1:
-                    for i in xrange(self.n_outputs_):
-                        pred[i] += current_pred[i]
-                else:
-                    pred += current_pred
+                pred += current_pred
 
             norm += alpha
-
-            if self.n_outputs_ > 1:
-                normed_pred = [pred[i] / norm for i in xrange(self.n_outputs_)]
-            else:
-                normed_pred = pred / norm
+            normed_pred = pred / norm
 
             if isinstance(self, ClassifierMixin):
-                if self.n_outputs_ > 1:
-                    predictions = np.zeros((n_samples, self.n_outputs_))
-                    for k in xrange(self.n_outputs_):
-                        predictions[:, k] = self.classes_[k].take(
-                                np.argmax(normed_pred[k], axis=1), axis=0)
-                else:
-                    if isinstance(self.classes_, list):
-                        classes = self.classes_[0]
-                    else:
-                        classes = self.classes_
-                    predictions = classes.take(
-                            np.argmax(normed_pred, axis=1), axis=0)
-                yield predictions
+                yield self.classes_.take(np.argmax(normed_pred, axis=1),
+                                         axis=0)
             else:
                 yield normed_pred
+
+    def staged_score(self, X, y, sample_weight=None, n_estimators=-1):
+        """Return staged scores for X, y.
+
+        This method allows monitoring (i.e. determine error on testing set)
+        after each boost. See examples/ensemble/plot_adaboost_error.py
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            Training set.
+
+        y : array-like, shape = [n_samples]
+            Labels for X.
+
+        sample_weight : array-like, shape = [n_samples], optional
+            Sample weights.
+
+        Returns
+        -------
+        z : float
+
+        """
+        for y_pred in self.staged_predict(X, n_estimators=n_estimators):
+            if isinstance(self, ClassifierMixin):
+                yield np.average((y_pred == y), weights=sample_weight)
+            else:
+                yield weighted_r2_score(y, y_pred, weights=sample_weight)
 
 
 class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
@@ -391,6 +378,7 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         """
         # instances incorrectly classified
         incorrect = (y_predict != y_true).astype(np.int32)
+
         # error fraction
         err = np.mean(np.average(incorrect, weights=sample_weight, axis=0))
 
@@ -407,10 +395,7 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
             # sample weights let me know
             err = abs(err)
 
-        if isinstance(self.n_classes_, list):
-            n_classes = max(self.n_classes_)
-        else:
-            n_classes = self.n_classes_
+        n_classes = self.n_classes_
 
         # stop if the error is at least as bad as random guessing
         if err >= 1. - (1. / n_classes):
@@ -425,6 +410,7 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         # only bother to boost the weights if I will fit again
         if not is_last:
             sample_weight *= np.exp(alpha * incorrect)
+
         return sample_weight, alpha, err
 
     def predict_proba(self, X, n_estimators=-1):
@@ -434,76 +420,6 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         the weighted mean predicted class probabilities
         of the classifiers in the ensemble.
 
-        Parameters
-        ----------
-        X : array-like of shape = [n_samples, n_features]
-            The input samples.
-
-        n_estimators : int, optional (default=-1)
-            See docs above for the predict method
-
-        Returns
-        -------
-        p : array of shape = [n_samples]
-            The class probabilities of the input samples. Classes are
-            ordered by arithmetical order.
-        """
-        if n_estimators == 0:
-            raise ValueError("n_estimators must not equal 0")
-
-        if self.n_outputs_ == 1:
-            proba = None
-            norm = 0.
-
-            for i, (alpha, estimator) in enumerate(
-                    zip(self.boost_weights_, self.estimators_)):
-
-                if i == n_estimators:
-                    break
-
-                current_proba = estimator.predict_proba(X) * alpha
-
-                if proba is None:
-                    proba = current_proba
-                else:
-                    proba += current_proba
-
-                norm += alpha
-
-            return proba / norm
-
-        else:
-            proba = []
-            norm = []
-
-            for i, (alpha, estimator) in enumerate(
-                    zip(self.boost_weights_, self.estimators_)):
-
-                if i == n_estimators:
-                    break
-
-                current_proba = estimator.predict_proba(X)
-
-                for j in xrange(self.n_outputs_):
-                    if i == 0:
-                        proba.append(current_proba[j] * alpha)
-                        norm.append(alpha)
-
-                    else:
-                        proba[j] += current_proba[j] * alpha
-                        norm[j] += alpha
-
-            for j in xrange(self.n_outputs_):
-                proba[j] /= norm[j]
-
-            return proba
-
-    def staged_predict_proba(self, X, n_estimators=-1):
-        """Predict class probabilities for X.
-
-        The predicted class probabilities of an input sample is computed as
-        the weighted mean predicted class probabilities
-        of the classifiers in the ensemble.
         This method allows monitoring (i.e. determine error on testing set)
         after each boost. See examples/ensemble/plot_adaboost_error.py
 
@@ -523,19 +439,72 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         """
         if n_estimators == 0:
             raise ValueError("n_estimators must not equal 0")
-        probs = None
+
+        proba = None
         norm = 0.
+
+        for i, (alpha, estimator) in enumerate(
+                zip(self.boost_weights_, self.estimators_)):
+
+            if i == n_estimators:
+                break
+
+            current_proba = estimator.predict_proba(X) * alpha
+
+            if proba is None:
+                proba = current_proba
+            else:
+                proba += current_proba
+
+            norm += alpha
+
+        return proba / norm
+
+    def staged_predict_proba(self, X, n_estimators=-1):
+        """Predict class probabilities for X.
+
+        The predicted class probabilities of an input sample is computed as
+        the weighted mean predicted class probabilities
+        of the classifiers in the ensemble.
+
+        This method allows monitoring (i.e. determine error on testing set)
+        after each boost. See examples/ensemble/plot_adaboost_error.py
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        n_estimators : int, optional (default=-1)
+            See docs above for the predict method
+
+        Returns
+        -------
+        p : array of shape = [n_samples]
+            The class probabilities of the input samples. Classes are
+            ordered by arithmetical order.
+        """
+        if n_estimators == 0:
+            raise ValueError("n_estimators must not equal 0")
+
+        proba = None
+        norm = 0.
+
         for i, (alpha, estimator) in enumerate(
                 zip(self.boost_weights_, self.estimators_)):
             if i == n_estimators:
                 break
-            current_probs = estimator.predict_proba(X) * alpha
-            if probs is None:
-                probs = current_probs
+
+            current_proba = estimator.predict_proba(X) * alpha
+
+            if proba is None:
+                proba = current_proba
             else:
-                probs += current_probs
+                proba += current_proba
+
             norm += alpha
-            yield probs / norm
+
+            yield proba / norm
 
     def predict_log_proba(self, X, n_estimators=-1):
         """Predict class log-probabilities for X.
@@ -558,69 +527,7 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
             The class log-probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        proba = self.predict_proba(X, n_estimators=n_estimators)
-
-        if self.n_outputs_ == 1:
-            return np.log(proba)
-
-        else:
-            for k in xrange(self.n_outputs_):
-                proba[k] = np.log(proba[k])
-
-            return proba
-
-    def score(self, X, y, sample_weight=None, n_estimators=-1):
-        """Returns the mean accuracy on the given test data and labels.
-
-        Parameters
-        ----------
-        X : array-like, shape = [n_samples, n_features]
-            Training set.
-
-        y : array-like, shape = [n_samples]
-            Labels for X.
-
-        sample_weight : array-like, shape = [n_samples], optional
-            Sample weights.
-
-        Returns
-        -------
-        z : float
-
-        """
-        if sample_weight is not None:
-            # weighted average
-            return np.average(
-                    (self.predict(X, n_estimators=n_estimators) == y),
-                    weights=sample_weight)
-        return np.mean(self.predict(X, n_estimators=n_estimators) == y)
-
-    def staged_score(self, X, y, sample_weight=None, n_estimators=-1):
-        """Returns the mean accuracy on the given test data and labels.
-
-        Parameters
-        ----------
-        X : array-like, shape = [n_samples, n_features]
-            Training set.
-
-        y : array-like, shape = [n_samples]
-            Labels for X.
-
-        sample_weight : array-like, shape = [n_samples], optional
-            Sample weights.
-
-        Returns
-        -------
-        z : float
-
-        """
-        if sample_weight is not None:
-            for y_pred in self.staged_predict(X, n_estimators=n_estimators):
-                # weighted average
-                yield np.average((y_pred == y), weights=sample_weight)
-        else:
-            for y_pred in self.staged_predict(X, n_estimators=n_estimators):
-                yield np.mean(y_pred == y)
+        return np.log(self.predict_proba(X, n_estimators=n_estimators))
 
 
 class AdaBoostRegressor(BaseWeightBoosting, WeightedRegressorMixin):

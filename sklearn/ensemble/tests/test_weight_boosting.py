@@ -7,6 +7,7 @@ from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
 from nose.tools import assert_true
+from nose.tools import assert_raises
 
 from sklearn.grid_search import GridSearchCV
 from sklearn.ensemble import AdaBoostClassifier, AdaBoostRegressor
@@ -63,10 +64,10 @@ def test_iris():
 
 def test_boston():
     """Check consistency on dataset boston house prices."""
-    clf = AdaBoostRegressor(n_estimators=10)
+    clf = AdaBoostRegressor(n_estimators=50)
     clf.fit(boston.data, boston.target)
     score = clf.score(boston.data, boston.target)
-    assert score > 0.99
+    assert score > 0.85
 
 
 def test_probability():
@@ -74,6 +75,7 @@ def test_probability():
     # AdaBoost classification
     clf = AdaBoostClassifier(n_estimators=10)
     clf.fit(iris.data, iris.target)
+
     assert_array_almost_equal(np.sum(clf.predict_proba(iris.data), axis=1),
                               np.ones(iris.data.shape[0]))
     assert_array_almost_equal(clf.predict_proba(iris.data),
@@ -81,14 +83,38 @@ def test_probability():
 
 
 def test_staged_predict():
-    """Check that staged predictions."""
-    clf = AdaBoostRegressor(n_estimators=10)
-    clf.fit(boston.data, boston.target)
-    predictions = clf.predict(boston.data)
-    staged_predictions = [p for p in clf.staged_predict(boston.data)]
+    """Check staged predictions."""
+    # AdaBoost classification
+    clf = AdaBoostClassifier(n_estimators=10)
+    clf.fit(iris.data, iris.target)
+
+    predictions = clf.predict(iris.data)
+    staged_predictions = [p for p in clf.staged_predict(iris.data)]
+    proba = clf.predict_proba(iris.data)
+    staged_probas = [p for p in clf.staged_predict_proba(iris.data)]
+    score = clf.score(iris.data, iris.target)
+    staged_scores = [s for s in clf.staged_score(iris.data, iris.target)]
 
     assert_equal(len(staged_predictions), 10)
     assert_array_equal(predictions, staged_predictions[-1])
+    assert_equal(len(staged_probas), 10)
+    assert_array_equal(proba, staged_probas[-1])
+    assert_equal(len(staged_scores), 10)
+    assert_array_equal(score, staged_scores[-1])
+
+    # AdaBoost regression
+    clf = AdaBoostRegressor(n_estimators=10)
+    clf.fit(boston.data, boston.target)
+
+    predictions = clf.predict(boston.data)
+    staged_predictions = [p for p in clf.staged_predict(boston.data)]
+    score = clf.score(boston.data, boston.target)
+    staged_scores = [s for s in clf.staged_score(boston.data, boston.target)]
+
+    assert_equal(len(staged_predictions), 10)
+    assert_array_equal(predictions, staged_predictions[-1])
+    assert_equal(len(staged_scores), 10)
+    assert_array_equal(score, staged_scores[-1])
 
 
 def test_gridsearch():
@@ -158,59 +184,12 @@ def test_importances():
     assert_true(clf.feature_importances_ is None)
 
 
-def test_multioutput():
-    """Check estimators on multi-output problems."""
-
-    X = [[-2, -1],
-         [-1, -1],
-         [-1, -2],
-         [1, 1],
-         [1, 2],
-         [2, 1],
-         [-2, 1],
-         [-1, 1],
-         [-1, 2],
-         [2, -1],
-         [1, -1],
-         [1, -2]]
-
-    y = [[-1, 0],
-         [-1, 0],
-         [-1, 0],
-         [1, 1],
-         [1, 1],
-         [1, 1],
-         [-1, 2],
-         [-1, 2],
-         [-1, 2],
-         [1, 3],
-         [1, 3],
-         [1, 3]]
-
-    T = [[-1, -1], [1, 1], [-1, 1], [1, -1]]
-    y_true = [[-1, 0], [1, 1], [-1, 2], [1, 3]]
-
-    # toy classification problem
-    clf = AdaBoostClassifier()
-    y_hat = clf.fit(X, y).predict(T)
-    assert_array_equal(y_hat, y_true)
-    assert_equal(y_hat.shape, (4, 2))
-
-    proba = clf.predict_proba(T)
-    assert_equal(len(proba), 2)
-    assert_equal(proba[0].shape, (4, 2))
-    assert_equal(proba[1].shape, (4, 4))
-
-    log_proba = clf.predict_log_proba(T)
-    assert_equal(len(log_proba), 2)
-    assert_equal(log_proba[0].shape, (4, 2))
-    assert_equal(log_proba[1].shape, (4, 4))
-
-    # toy regression problem
-    # clf = AdaBoostRegressor()
-    # y_hat = clf.fit(X, y).predict(T)
-    # assert_almost_equal(y_hat, y_true)
-    # assert_equal(y_hat.shape, (4, 2))
+def test_error():
+    """Test that it gives proper exception on deficient input."""
+    # Invalid values for parameters
+    assert_raises(ValueError,
+                  AdaBoostClassifier(learn_rate=-1).fit,
+                  X, y)
 
 
 if __name__ == "__main__":

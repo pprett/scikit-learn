@@ -15,10 +15,9 @@ from __future__ import division
 import numpy as np
 from abc import ABCMeta, abstractmethod
 
-from ..base import BaseEstimator, ClassifierMixin, RegressorMixin, \
+from ..base import BaseEstimator, ClassifierMixin, \
                    WeightedClassifierMixin, WeightedRegressorMixin
 from ..feature_selection.selector_mixin import SelectorMixin
-from ..metrics import weighted_r2_score
 from ..utils import array2d, check_random_state
 from ..utils.validation import check_arrays
 
@@ -149,14 +148,15 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, criterion,
-                       max_depth,
-                       min_samples_split,
-                       min_samples_leaf,
-                       min_density,
-                       max_features,
-                       compute_importances,
-                       random_state):
+    def __init__(self,
+                 criterion,
+                 max_depth,
+                 min_samples_split,
+                 min_samples_leaf,
+                 min_density,
+                 max_features,
+                 compute_importances,
+                 random_state):
         self.criterion = criterion
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
@@ -212,6 +212,10 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         sample_weight : array-like, shape = [n_samples], optional
             Sample weights
 
+        check_input: boolean, (default=True)
+            Allow to bypass several input checking.
+            Don't use this parameter unless you know what you do.
+
         Returns
         -------
         self : object
@@ -222,8 +226,8 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         self.random_state = check_random_state(self.random_state)
 
         # Convert data
-        if getattr(X, "dtype", None) != DTYPE or \
-           X.ndim != 2 or not X.flags.fortran:
+        if (getattr(X, "dtype", None) != DTYPE or
+            X.ndim != 2 or not X.flags.fortran):
             X = array2d(X, dtype=DTYPE, order="F")
 
         n_samples, self.n_features_ = X.shape
@@ -231,7 +235,9 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
 
         y = np.atleast_1d(y)
         if y.ndim == 1:
-            y = y[:, np.newaxis]
+            # reshape is necessary to preserve the data contiguity against vs
+            # [:, np.newaxis] that does not.
+            y = np.reshape(y, (-1, 1))
 
         self.n_outputs_ = y.shape[1]
 
@@ -353,7 +359,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         return self
 
     def predict(self, X):
-        """Predict class or regression target for X.
+        """Predict class or regression value for X.
 
         For a classification model, the predicted class for each sample in X is
         returned. For a regression model, the predicted value based on X is
@@ -504,14 +510,15 @@ class DecisionTreeClassifier(BaseDecisionTree, WeightedClassifierMixin):
     array([ 1.     ,  0.93...,  0.86...,  0.93...,  0.93...,
             0.93...,  0.93...,  1.     ,  0.93...,  1.      ])
     """
-    def __init__(self, criterion="gini",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features=None,
-                       compute_importances=False,
-                       random_state=None):
+    def __init__(self,
+                 criterion="gini",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features=None,
+                 compute_importances=False,
+                 random_state=None):
         super(DecisionTreeClassifier, self).__init__(criterion,
                                                      max_depth,
                                                      min_samples_split,
@@ -693,14 +700,15 @@ class DecisionTreeRegressor(BaseDecisionTree, WeightedRegressorMixin):
     array([ 0.61..., 0.57..., -0.34..., 0.41..., 0.75...,
             0.07..., 0.29..., 0.33..., -1.42..., -1.77...])
     """
-    def __init__(self, criterion="mse",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features=None,
-                       compute_importances=False,
-                       random_state=None):
+    def __init__(self,
+                 criterion="mse",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features=None,
+                 compute_importances=False,
+                 random_state=None):
         super(DecisionTreeRegressor, self).__init__(criterion,
                                                     max_depth,
                                                     min_samples_split,
@@ -733,14 +741,15 @@ class ExtraTreeClassifier(DecisionTreeClassifier):
     .. [1] P. Geurts, D. Ernst., and L. Wehenkel, "Extremely randomized trees",
            Machine Learning, 63(1), 3-42, 2006.
     """
-    def __init__(self, criterion="gini",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features="auto",
-                       compute_importances=False,
-                       random_state=None):
+    def __init__(self,
+                 criterion="gini",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features="auto",
+                 compute_importances=False,
+                 random_state=None):
         super(ExtraTreeClassifier, self).__init__(criterion,
                                                   max_depth,
                                                   min_samples_split,
@@ -779,14 +788,15 @@ class ExtraTreeRegressor(DecisionTreeRegressor):
     .. [1] P. Geurts, D. Ernst., and L. Wehenkel, "Extremely randomized trees",
            Machine Learning, 63(1), 3-42, 2006.
     """
-    def __init__(self, criterion="mse",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features="auto",
-                       compute_importances=False,
-                       random_state=None):
+    def __init__(self,
+                 criterion="mse",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features="auto",
+                 compute_importances=False,
+                 random_state=None):
         super(ExtraTreeRegressor, self).__init__(criterion,
                                                  max_depth,
                                                  min_samples_split,

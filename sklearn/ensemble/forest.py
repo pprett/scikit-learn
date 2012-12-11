@@ -40,15 +40,15 @@ import numpy as np
 from warnings import warn
 from abc import ABCMeta, abstractmethod
 
-from ..base import ClassifierMixin, RegressorMixin, \
+from ..base import ClassifierMixin, \
                    WeightedClassifierMixin, WeightedRegressorMixin
 from ..externals.joblib import Parallel, delayed, cpu_count
 from ..feature_selection.selector_mixin import SelectorMixin
-from ..tree import DecisionTreeClassifier, DecisionTreeRegressor, \
-                   ExtraTreeClassifier, ExtraTreeRegressor
+from ..tree import (DecisionTreeClassifier, DecisionTreeRegressor,
+                    ExtraTreeClassifier, ExtraTreeRegressor)
 from ..tree._tree import DTYPE, DOUBLE
 from ..utils import array2d, check_random_state, check_arrays, safe_asarray
-from ..metrics import r2_score, weighted_r2_score
+from ..metrics import weighted_r2_score
 from ..preprocessing import OneHotEncoder
 
 from .base import BaseEnsemble
@@ -204,15 +204,16 @@ class BaseForest(BaseEnsemble, SelectorMixin):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, base_estimator,
-                       n_estimators=10,
-                       estimator_params=tuple(),
-                       bootstrap=False,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 base_estimator,
+                 n_estimators=10,
+                 estimator_params=tuple(),
+                 bootstrap=False,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(BaseForest, self).__init__(
             base_estimator=base_estimator,
             n_estimators=n_estimators,
@@ -273,8 +274,8 @@ class BaseForest(BaseEnsemble, SelectorMixin):
 
         # Precompute some data
         X, y = check_arrays(X, y, sparse_format="dense")
-        if getattr(X, "dtype", None) != DTYPE or \
-           X.ndim != 2 or not X.flags.fortran:
+        if (getattr(X, "dtype", None) != DTYPE or
+            X.ndim != 2 or not X.flags.fortran):
             X = array2d(X, dtype=DTYPE, order="F")
 
         n_samples, self.n_features_ = X.shape
@@ -286,7 +287,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
         else:
             if self.oob_score:
                 raise ValueError("Out of bag estimation only available"
-                        " if bootstrap=True")
+                                 " if bootstrap=True")
 
             sample_mask = np.ones((n_samples,), dtype=np.bool)
 
@@ -301,7 +302,9 @@ class BaseForest(BaseEnsemble, SelectorMixin):
 
         y = np.atleast_1d(y)
         if y.ndim == 1:
-            y = y[:, np.newaxis]
+            # reshape is necessary to preserve the data contiguity against vs
+            # [:, np.newaxis] that does not.
+            y = np.reshape(y, (-1, 1))
 
         self.n_outputs_ = y.shape[1]
 
@@ -331,7 +334,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
                 self.classes_ = [None] * self.n_outputs_
                 self.n_classes_ = [1] * self.n_outputs_
 
-        if getattr(y, "dtype", None) != DTYPE or not y.flags.contiguous:
+        if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
 
         # Assign chunk of trees to jobs
@@ -461,15 +464,16 @@ class ForestClassifier(BaseForest, WeightedClassifierMixin):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, base_estimator,
-                       n_estimators=10,
-                       estimator_params=tuple(),
-                       bootstrap=False,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 base_estimator,
+                 n_estimators=10,
+                 estimator_params=tuple(),
+                 bootstrap=False,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
 
         super(ForestClassifier, self).__init__(
             base_estimator,
@@ -606,15 +610,16 @@ class ForestRegressor(BaseForest, WeightedRegressorMixin):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, base_estimator,
-                       n_estimators=10,
-                       estimator_params=tuple(),
-                       bootstrap=False,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 base_estimator,
+                 n_estimators=10,
+                 estimator_params=tuple(),
+                 bootstrap=False,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(ForestRegressor, self).__init__(
             base_estimator,
             n_estimators=n_estimators,
@@ -765,25 +770,26 @@ class RandomForestClassifier(ForestClassifier):
     --------
     DecisionTreeClassifier, ExtraTreesClassifier
     """
-    def __init__(self, n_estimators=10,
-                       criterion="gini",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features="auto",
-                       bootstrap=True,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 n_estimators=10,
+                 criterion="gini",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features="auto",
+                 bootstrap=True,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(RandomForestClassifier, self).__init__(
             base_estimator=DecisionTreeClassifier(),
             n_estimators=n_estimators,
             estimator_params=("criterion", "max_depth", "min_samples_split",
-                "min_samples_leaf", "min_density", "max_features",
-                "random_state"),
+                              "min_samples_leaf", "min_density",
+                              "max_features", "random_state"),
             bootstrap=bootstrap,
             compute_importances=compute_importances,
             oob_score=oob_score,
@@ -903,25 +909,26 @@ class RandomForestRegressor(ForestRegressor):
     --------
     DecisionTreeRegressor, ExtraTreesRegressor
     """
-    def __init__(self, n_estimators=10,
-                       criterion="mse",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features="auto",
-                       bootstrap=True,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 n_estimators=10,
+                 criterion="mse",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features="auto",
+                 bootstrap=True,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(RandomForestRegressor, self).__init__(
             base_estimator=DecisionTreeRegressor(),
             n_estimators=n_estimators,
             estimator_params=("criterion", "max_depth", "min_samples_split",
-                "min_samples_leaf", "min_density", "max_features",
-                "random_state"),
+                              "min_samples_leaf", "min_density",
+                              "max_features", "random_state"),
             bootstrap=bootstrap,
             compute_importances=compute_importances,
             oob_score=oob_score,
@@ -1044,25 +1051,26 @@ class ExtraTreesClassifier(ForestClassifier):
     RandomForestClassifier : Ensemble Classifier based on trees with optimal
         splits.
     """
-    def __init__(self, n_estimators=10,
-                       criterion="gini",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features="auto",
-                       bootstrap=False,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 n_estimators=10,
+                 criterion="gini",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features="auto",
+                 bootstrap=False,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(ExtraTreesClassifier, self).__init__(
             base_estimator=ExtraTreeClassifier(),
             n_estimators=n_estimators,
             estimator_params=("criterion", "max_depth", "min_samples_split",
-                "min_samples_leaf", "min_density", "max_features",
-                "random_state"),
+                              "min_samples_leaf", "min_density",
+                              "max_features", "random_state"),
             bootstrap=bootstrap,
             compute_importances=compute_importances,
             oob_score=oob_score,
@@ -1184,25 +1192,26 @@ class ExtraTreesRegressor(ForestRegressor):
     sklearn.tree.ExtraTreeRegressor: Base estimator for this ensemble.
     RandomForestRegressor: Ensemble regressor using trees with optimal splits.
     """
-    def __init__(self, n_estimators=10,
-                       criterion="mse",
-                       max_depth=None,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       max_features="auto",
-                       bootstrap=False,
-                       compute_importances=False,
-                       oob_score=False,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 n_estimators=10,
+                 criterion="mse",
+                 max_depth=None,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 max_features="auto",
+                 bootstrap=False,
+                 compute_importances=False,
+                 oob_score=False,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(ExtraTreesRegressor, self).__init__(
             base_estimator=ExtraTreeRegressor(),
             n_estimators=n_estimators,
             estimator_params=("criterion", "max_depth", "min_samples_split",
-                "min_samples_leaf", "min_density", "max_features",
-                "random_state"),
+                              "min_samples_leaf", "min_density",
+                              "max_features", "random_state"),
             bootstrap=bootstrap,
             compute_importances=compute_importances,
             oob_score=oob_score,
@@ -1285,20 +1294,21 @@ class RandomTreesEmbedding(BaseForest):
 
     """
 
-    def __init__(self, n_estimators=10,
-                       max_depth=5,
-                       min_samples_split=1,
-                       min_samples_leaf=1,
-                       min_density=0.1,
-                       n_jobs=1,
-                       random_state=None,
-                       verbose=0):
+    def __init__(self,
+                 n_estimators=10,
+                 max_depth=5,
+                 min_samples_split=1,
+                 min_samples_leaf=1,
+                 min_density=0.1,
+                 n_jobs=1,
+                 random_state=None,
+                 verbose=0):
         super(RandomTreesEmbedding, self).__init__(
             base_estimator=ExtraTreeRegressor(),
             n_estimators=n_estimators,
             estimator_params=("criterion", "max_depth", "min_samples_split",
-                "min_samples_leaf", "min_density", "max_features",
-                "random_state"),
+                              "min_samples_leaf", "min_density",
+                              "max_features", "random_state"),
             bootstrap=False,
             compute_importances=False,
             oob_score=False,

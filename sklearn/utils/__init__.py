@@ -6,8 +6,11 @@ import numpy as np
 from scipy.sparse import issparse
 import warnings
 
-from .validation import *
 from .murmurhash import murmurhash3_32
+from .validation import (as_float_array, check_arrays, safe_asarray,
+                         assert_all_finite, array2d, atleast2d_or_csc,
+                         atleast2d_or_csr, warn_if_not_float,
+                         check_random_state)
 
 # Make sure that DeprecationWarning get printed
 warnings.simplefilter("always", DeprecationWarning)
@@ -285,30 +288,6 @@ def shuffle(*arrays, **options):
     """
     options['replace'] = False
     return resample(*arrays, **options)
-
-
-def balance_weights(y):
-    """Compute sample weights such that the class distribution of y becomes
-       balanced.
-
-    Parameters
-    ----------
-    y : array-like
-        Labels for the samples.
-
-    Returns
-    -------
-    weights : array-like
-        The sample weights.
-    """
-    y = safe_asarray(y)
-    y = np.searchsorted(np.unique(y), y)
-    bins = np.bincount(y)
-
-    weights = 1. / bins.take(y)
-    weights *= bins.min()
-
-    return weights
 
 
 def safe_sqr(X, copy=True):
