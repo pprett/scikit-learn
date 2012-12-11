@@ -12,7 +12,7 @@ from nose.tools import assert_true
 
 from sklearn import tree
 from sklearn import datasets
-from sklearn.utils import balance_weights
+from sklearn.preprocessing import balance_weights
 
 # toy sample
 X = [[-2, -1], [-1, -1], [-1, -2], [1, 1], [1, 2], [2, 1]]
