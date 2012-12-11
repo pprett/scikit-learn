@@ -85,11 +85,16 @@ def test_staged_predict():
     """Check that staged predictions."""
     clf = AdaBoostRegressor(n_estimators=10)
     clf.fit(boston.data, boston.target)
+
     predictions = clf.predict(boston.data)
     staged_predictions = [p for p in clf.staged_predict(boston.data)]
+    score = clf.score(boston.data, boston.target)
+    staged_scores = [s for s in clf.staged_score(boston.data, boston.target)]
 
     assert_equal(len(staged_predictions), 10)
     assert_array_equal(predictions, staged_predictions[-1])
+    assert_equal(len(staged_scores), 10)
+    assert_array_equal(score, staged_scores[-1])
 
 
 def test_gridsearch():

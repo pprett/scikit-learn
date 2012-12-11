@@ -360,7 +360,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
         return self
 
     def predict(self, X):
-        """Predict class or regression target for X.
+        """Predict class or regression value for X.
 
         For a classification model, the predicted class for each sample in X is
         returned. For a regression model, the predicted value based on X is
