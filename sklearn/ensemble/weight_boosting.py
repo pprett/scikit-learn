@@ -22,7 +22,8 @@ The module structure is the following:
 import numpy as np
 
 from .base import BaseEnsemble
-from ..base import ClassifierMixin, RegressorMixin
+from ..base import ClassifierMixin, RegressorMixin, \
+                   WeightedClassifierMixin, WeightedRegressorMixin
 from ..tree import DecisionTreeClassifier, DecisionTreeRegressor
 from ..tree._tree import DTYPE
 from ..utils import array2d, check_arrays
@@ -48,6 +49,24 @@ class BaseWeightBoosting(BaseEnsemble):
     learn_rate : float, optional (default=0.5)
         learning rate shrinks the contribution of each classifier by
         `learn_rate`. There is a trade-off between learn_rate and n_estimators.
+
+    compute_importances : boolean, optional (default=False)
+        Whether feature importances are computed and stored into the
+        ``feature_importances_`` attribute when calling fit.
+
+    Attributes
+    ----------
+    `feature_importances_` : array of shape = [n_features]
+        The feature importances (the higher, the more important the feature).
+        The importance I(f) of a feature f is computed as the (normalized)
+        total reduction of error brought by that feature. It is also known as
+        the Gini importance [1]_.
+
+    References
+    ----------
+
+    .. [1] L. Breiman, and A. Cutler, "Random Forests",
+           http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
     """
     def __init__(self, base_estimator=None,
                  n_estimators=10,
@@ -76,6 +95,7 @@ class BaseWeightBoosting(BaseEnsemble):
         self.learn_rate = learn_rate
         self.compute_importances = compute_importances
         self.feature_importances_ = None
+
         if compute_importances:
             try:
                 base_estimator.compute_importances = True
@@ -110,7 +130,7 @@ class BaseWeightBoosting(BaseEnsemble):
         """
         X, y = check_arrays(X, y, sparse_format='dense')
         X = np.asfortranarray(X, dtype=DTYPE)
-        y = np.ravel(y, order='C')
+        #y = np.ravel(y, order='C')
 
         if sample_weight is None:
             # initialize weights to 1/N
@@ -326,7 +346,7 @@ class BaseWeightBoosting(BaseEnsemble):
                 yield P_local
 
 
-class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
+class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
     """An AdaBoosted classifier.
 
     An AdaBoosted classifier is a meta estimator that begins by fitting a
@@ -371,7 +391,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         # instances incorrectly classified
         incorrect = (y_predict != y_true).astype(np.int32)
         # error fraction
-        err = np.average(incorrect, weights=sample_weight)
+        err = np.mean(np.average(incorrect, weights=sample_weight, axis=0))
 
         # stop if classification is perfect
         if err == 0:
@@ -429,19 +449,53 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
         """
         if n_estimators == 0:
             raise ValueError("n_estimators must not equal 0")
-        probs = None
-        norm = 0.
-        for i, (alpha, estimator) in enumerate(
-                zip(self.boost_weights_, self.estimators_)):
-            if i == n_estimators:
-                break
-            current_probs = estimator.predict_proba(X) * alpha
-            if probs is None:
-                probs = current_probs
-            else:
-                probs += current_probs
-            norm += alpha
-        return probs / norm
+
+        if self.n_outputs_ == 1:
+            probs = None
+            norm = 0.
+
+            for i, (alpha, estimator) in enumerate(
+                    zip(self.boost_weights_, self.estimators_)):
+
+                if i == n_estimators:
+                    break
+
+                current_probs = estimator.predict_proba(X) * alpha
+
+                if probs is None:
+                    probs = current_probs
+                else:
+                    probs += current_probs
+
+                norm += alpha
+
+            return probs / norm
+
+        else:
+            probs = []
+            norm = []
+
+            for i, (alpha, estimator) in enumerate(
+                    zip(self.boost_weights_, self.estimators_)):
+
+                if i == n_estimators:
+                    break
+
+                p = estimator.predict_proba(X)
+
+                for j in xrange(self.n_outputs_):
+                    if i == 0:
+                        probs.append(p[j] * alpha)
+                        norm.append(alpha)
+
+                    else:
+                        probs[j] += p[j] * alpha
+                        norm[j] += alpha
+
+            for j in xrange(self.n_outputs_):
+                probs[j] /= norm[j]
+
+            return probs
 
     def staged_predict_proba(self, X, n_estimators=-1):
         """Predict class probabilities for X.
@@ -503,7 +557,16 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
             The class log-probabilities of the input samples. Classes are
             ordered by arithmetical order.
         """
-        return np.log(self.predict_proba(X, n_estimators=n_estimators))
+        proba = self.predict_proba(X, n_estimators=n_estimators)
+
+        if self.n_outputs_ == 1:
+            return np.log(proba)
+
+        else:
+            for k in xrange(self.n_outputs_):
+                proba[k] = np.log(proba[k])
+
+            return proba
 
     def score(self, X, y, sample_weight=None, n_estimators=-1):
         """Returns the mean accuracy on the given test data and labels.
@@ -559,7 +622,7 @@ class AdaBoostClassifier(BaseWeightBoosting, ClassifierMixin):
                 yield np.mean(y_pred == y)
 
 
-class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
+class AdaBoostRegressor(BaseWeightBoosting, WeightedRegressorMixin):
     """An AdaBoosted regressor.
 
     An AdaBoosted regressor is a meta estimator that begins by fitting a
@@ -601,7 +664,10 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
             True if this is the last boost.
         """
         err_vect = np.abs(y_predict - y_true)
-        err_vect /= err_vect.max()
+        err_max = err_vect.max()
+
+        if err_max != 0.:
+            err_vect /= err_vect.max()
 
         err = (sample_weight * err_vect).sum()
 
@@ -629,4 +695,5 @@ class AdaBoostRegressor(BaseWeightBoosting, RegressorMixin):
         alpha = self.learn_rate * np.log(1. / beta)
         if not is_last:
             sample_weight *= np.power(beta, (1. - err_vect) * self.learn_rate)
+
         return sample_weight, alpha, err

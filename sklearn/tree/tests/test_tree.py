@@ -38,15 +38,22 @@ boston.target = boston.target[perm]
 
 def test_classification_toy():
     """Check classification on a toy dataset."""
+    # Decision trees
     clf = tree.DecisionTreeClassifier()
     clf.fit(X, y)
-
     assert_array_equal(clf.predict(T), true_result)
 
-    # With subsampling
     clf = tree.DecisionTreeClassifier(max_features=1, random_state=1)
     clf.fit(X, y)
+    assert_array_equal(clf.predict(T), true_result)
 
+    # Extra-trees
+    clf = tree.ExtraTreeClassifier()
+    clf.fit(X, y)
+    assert_array_equal(clf.predict(T), true_result)
+
+    clf = tree.ExtraTreeClassifier(max_features=1, random_state=1)
+    clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
 
 
@@ -63,15 +70,22 @@ def test_weighted_classification_toy():
 
 def test_regression_toy():
     """Check regression on a toy dataset."""
+    # Decision trees
     clf = tree.DecisionTreeRegressor()
     clf.fit(X, y)
-
     assert_almost_equal(clf.predict(T), true_result)
 
-    # With subsampling
     clf = tree.DecisionTreeRegressor(max_features=1, random_state=1)
     clf.fit(X, y)
+    assert_almost_equal(clf.predict(T), true_result)
 
+    # Extra-trees
+    clf = tree.ExtraTreeRegressor()
+    clf.fit(X, y)
+    assert_almost_equal(clf.predict(T), true_result)
+
+    clf = tree.ExtraTreeRegressor(max_features=1, random_state=1)
+    clf.fit(X, y)
     assert_almost_equal(clf.predict(T), true_result)
 
 
@@ -199,7 +213,7 @@ def test_boston():
                                          random_state=1)\
               .fit(boston.data, boston.target)
 
-        #using fewer features reduces the learning ability of this tree,
+        # using fewer features reduces the learning ability of this tree,
         # but reduces training time.
         score = np.mean(np.power(clf.predict(boston.data) - boston.target, 2))
         assert score < 2, "Failed with criterion " + c + \
@@ -303,6 +317,10 @@ def test_error():
                   X, y)
 
     assert_raises(ValueError,
+                  tree.DecisionTreeClassifier(min_samples_split=-1).fit,
+                  X, y)
+
+    assert_raises(ValueError,
                   tree.DecisionTreeClassifier(max_depth=-1).fit,
                   X, y)
 
@@ -328,6 +346,7 @@ def test_error():
     # predict before fitting
     clf = tree.DecisionTreeClassifier()
     assert_raises(Exception, clf.predict, T)
+
     # predict on vector with different dims
     clf.fit(X, y)
     t = np.asarray(T)

@@ -6,9 +6,10 @@ import numpy as np
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_array_almost_equal
 from numpy.testing import assert_equal
+from nose.tools import assert_true
 
 from sklearn.grid_search import GridSearchCV
-from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import AdaBoostClassifier, AdaBoostRegressor
 from sklearn.tree import DecisionTreeClassifier
 from sklearn import datasets
 
@@ -21,16 +22,29 @@ true_result = [-1, 1, 1]
 # also load the iris dataset
 # and randomly permute it
 iris = datasets.load_iris()
-np.random.seed([1])
-perm = np.random.permutation(iris.target.size)
+rng = np.random.RandomState(0)
+perm = rng.permutation(iris.target.size)
 iris.data = iris.data[perm]
 iris.target = iris.target[perm]
+
+# also load the boston dataset
+# and randomly permute it
+boston = datasets.load_boston()
+perm = rng.permutation(boston.target.size)
+boston.data = boston.data[perm]
+boston.target = boston.target[perm]
 
 
 def test_classification_toy():
     """Check classification on a toy dataset."""
-    # Adaboost Classification
     clf = AdaBoostClassifier(n_estimators=10)
+    clf.fit(X, y)
+    assert_array_equal(clf.predict(T), true_result)
+
+
+def test_regression_toy():
+    """Check classification on a toy dataset."""
+    clf = AdaBoostRegressor(n_estimators=10)
     clf.fit(X, y)
     assert_array_equal(clf.predict(T), true_result)
 
@@ -46,6 +60,15 @@ def test_iris():
         assert score > 0.9, "Failed with criterion %s and score = %f" % (c,
                                                                          score)
 
+
+def test_boston():
+    """Check consistency on dataset boston house prices."""
+    clf = AdaBoostRegressor(n_estimators=10)
+    clf.fit(boston.data, boston.target)
+    score = clf.score(boston.data, boston.target)
+    assert score > 0.99
+
+
 def test_probability():
     """Predict probabilities."""
     # AdaBoost classification
@@ -57,6 +80,17 @@ def test_probability():
                               np.exp(clf.predict_log_proba(iris.data)))
 
 
+def test_staged_predict():
+    """Check that staged predictions."""
+    clf = AdaBoostRegressor(n_estimators=10)
+    clf.fit(boston.data, boston.target)
+    predictions = clf.predict(boston.data)
+    staged_predictions = [p for p in clf.staged_predict(boston.data)]
+
+    assert_equal(len(staged_predictions), 10)
+    assert_array_equal(predictions, staged_predictions[-1])
+
+
 def test_gridsearch():
     """Check that base trees can be grid-searched."""
     # AdaBoost classification
@@ -66,12 +100,19 @@ def test_gridsearch():
     clf = GridSearchCV(boost, parameters)
     clf.fit(iris.data, iris.target)
 
+    # AdaBoost regression
+    boost = AdaBoostRegressor()
+    parameters = {'n_estimators': (1, 2),
+                  'base_estimator__max_depth': (1, 2)}
+    clf = GridSearchCV(boost, parameters)
+    clf.fit(boston.data, boston.target)
+
 
 def test_pickle():
     """Check pickability."""
     import pickle
 
-    # Adaboost
+    # Adaboost classifier
     obj = AdaBoostClassifier()
     obj.fit(iris.data, iris.target)
     score = obj.score(iris.data, iris.target)
@@ -81,6 +122,95 @@ def test_pickle():
     assert_equal(type(obj2), obj.__class__)
     score2 = obj2.score(iris.data, iris.target)
     assert score == score2
+
+    # Adaboost regressor
+    obj = AdaBoostRegressor()
+    obj.fit(boston.data, boston.target)
+    score = obj.score(boston.data, boston.target)
+    s = pickle.dumps(obj)
+
+    obj2 = pickle.loads(s)
+    assert_equal(type(obj2), obj.__class__)
+    score2 = obj2.score(boston.data, boston.target)
+    assert score == score2
+
+
+def test_importances():
+    """Check variable importances."""
+    X, y = datasets.make_classification(n_samples=1000,
+                                        n_features=10,
+                                        n_informative=3,
+                                        n_redundant=0,
+                                        n_repeated=0,
+                                        shuffle=False,
+                                        random_state=2)
+
+    clf = AdaBoostClassifier(compute_importances=True, n_estimators=100)
+    clf.fit(X, y)
+    importances = clf.feature_importances_
+    n_important = sum(importances > 0.1)
+
+    assert_equal(importances.shape[0], 10)
+    assert_equal(n_important, 3)
+
+    clf = AdaBoostClassifier()
+    clf.fit(X, y)
+    assert_true(clf.feature_importances_ is None)
+
+
+def test_multioutput():
+    """Check estimators on multi-output problems."""
+
+    X = [[-2, -1],
+         [-1, -1],
+         [-1, -2],
+         [1, 1],
+         [1, 2],
+         [2, 1],
+         [-2, 1],
+         [-1, 1],
+         [-1, 2],
+         [2, -1],
+         [1, -1],
+         [1, -2]]
+
+    y = [[-1, 0],
+         [-1, 0],
+         [-1, 0],
+         [1, 1],
+         [1, 1],
+         [1, 1],
+         [-1, 2],
+         [-1, 2],
+         [-1, 2],
+         [1, 3],
+         [1, 3],
+         [1, 3]]
+
+    T = [[-1, -1], [1, 1], [-1, 1], [1, -1]]
+    y_true = [[-1, 0], [1, 1], [-1, 2], [1, 3]]
+
+    # toy classification problem
+    clf = AdaBoostClassifier()
+    y_hat = clf.fit(X, y).predict(T)
+    assert_array_equal(y_hat, y_true)
+    assert_equal(y_hat.shape, (4, 2))
+
+    proba = clf.predict_proba(T)
+    assert_equal(len(proba), 2)
+    assert_equal(proba[0].shape, (4, 2))
+    assert_equal(proba[1].shape, (4, 4))
+
+    log_proba = clf.predict_log_proba(T)
+    assert_equal(len(log_proba), 2)
+    assert_equal(log_proba[0].shape, (4, 2))
+    assert_equal(log_proba[1].shape, (4, 4))
+
+    # toy regression problem
+    # clf = AdaBoostRegressor()
+    # y_hat = clf.fit(X, y).predict(T)
+    # assert_almost_equal(y_hat, y_true)
+    # assert_equal(y_hat.shape, (4, 2))
 
 
 if __name__ == "__main__":
