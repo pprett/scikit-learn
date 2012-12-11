@@ -81,9 +81,9 @@ class BaseWeightBoosting(BaseEnsemble):
 
         if base_estimator is None:
             if isinstance(self, ClassifierMixin):
-                base_estimator = DecisionTreeClassifier()
+                base_estimator = DecisionTreeClassifier(max_depth=3)
             else:
-                base_estimator = DecisionTreeRegressor()
+                base_estimator = DecisionTreeRegressor(max_depth=3)
         elif (isinstance(self, ClassifierMixin)
               and not isinstance(base_estimator, ClassifierMixin)):
             raise TypeError("base_estimator must be a "
@@ -330,7 +330,7 @@ class BaseWeightBoosting(BaseEnsemble):
             if isinstance(self, ClassifierMixin):
                 yield np.average((y_pred == y), weights=sample_weight)
             else:
-                yield weighted_r2_score(y_pred, y, weights=sample_weight)
+                yield weighted_r2_score(y, y_pred, weights=sample_weight)
 
 
 class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
@@ -419,6 +419,9 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         the weighted mean predicted class probabilities
         of the classifiers in the ensemble.
 
+        This method allows monitoring (i.e. determine error on testing set)
+        after each boost. See examples/ensemble/plot_adaboost_error.py
+
         Parameters
         ----------
         X : array-like of shape = [n_samples, n_features]
@@ -462,6 +465,7 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         The predicted class probabilities of an input sample is computed as
         the weighted mean predicted class probabilities
         of the classifiers in the ensemble.
+
         This method allows monitoring (i.e. determine error on testing set)
         after each boost. See examples/ensemble/plot_adaboost_error.py
 
@@ -482,7 +486,7 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
         if n_estimators == 0:
             raise ValueError("n_estimators must not equal 0")
 
-        probs = None
+        proba = None
         norm = 0.
 
         for i, (alpha, estimator) in enumerate(
@@ -490,16 +494,16 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
             if i == n_estimators:
                 break
 
-            current_probs = estimator.predict_proba(X) * alpha
+            current_proba = estimator.predict_proba(X) * alpha
 
-            if probs is None:
-                probs = current_probs
+            if proba is None:
+                proba = current_proba
             else:
-                probs += current_probs
+                proba += current_proba
 
             norm += alpha
 
-            yield probs / norm
+            yield proba / norm
 
     def predict_log_proba(self, X, n_estimators=-1):
         """Predict class log-probabilities for X.
