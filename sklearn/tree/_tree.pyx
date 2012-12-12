@@ -458,9 +458,9 @@ cdef class Tree:
             sample_weight_ptr = <DOUBLE_t*> sample_weight.data
         cdef DOUBLE_t w = 1.0
 
-        cdef int X_stride = <int> X.strides[1] / <int> X.strides[0]
-        cdef int X_argsorted_stride = <int> X_argsorted.strides[1] / <int> X_argsorted.strides[0]
-        cdef int y_stride = <int> y.strides[0] / <int> y.strides[1]
+        cdef int X_stride = <int> X.strides[1] / <int> X.itemsize
+        cdef int X_argsorted_stride = <int> X_argsorted.strides[1] / <int> X_argsorted.itemsize
+        cdef int y_stride = <int> y.strides[0] / <int> y.itemsize
 
         cdef int n_total_samples = y.shape[0]
         cdef int feature
@@ -526,15 +526,14 @@ cdef class Tree:
                 n_total_samples = n_node_samples
 
                 X_ptr = <DTYPE_t*> X.data
-                X_stride = <int> X.strides[1] / <int> X.strides[0]
-
+                X_stride = <int> X.strides[1] / <int> X.itemsize
                 sample_mask_ptr = <BOOL_t*> sample_mask.data
 
                 # !! No need to update the other variables
                 # X_argsorted_ptr = <int*> X_argsorted.data
                 # y_ptr = <DOUBLE_t*> y.data
-                # X_argsorted_stride = <int> X_argsorted.strides[1] / <int> X_argsorted.strides[0]
-                # y_stride = <int> y.strides[0] / <int> y.strides[1]
+                # X_argsorted_stride = <int> X_argsorted.strides[1] / <int> X_argsorted.itemsize
+                # y_stride = <int> y.strides[0] / <int> y.itemsize
 
             # Split
             X_ptr = X_ptr + feature * X_stride
@@ -916,7 +915,7 @@ cdef class Tree:
                     X_argsorted_i,
                     sample_weight_ptr,
                     sample_mask_ptr)
-            
+
             if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
                 continue
 
@@ -925,7 +924,7 @@ cdef class Tree:
                 # skip splits that result in nodes with net 0 or negative
                 # weights
                 continue
-            
+
             error = criterion.eval()
 
             if error < best_error:
@@ -1634,11 +1633,11 @@ cdef class RegressionCriterion(Criterion):
 
         self.n_samples = n_samples
         self.weighted_n_samples = weighted_n_samples
-        
+
         cdef DOUBLE_t w = 1.0
         cdef DOUBLE_t y_jk = 0.0
         cdef int j = 0
-        
+
         for j from 0 <= j < n_total_samples:
             if sample_mask[j] == 0:
                 continue
@@ -1715,7 +1714,7 @@ cdef class RegressionCriterion(Criterion):
         cdef DOUBLE_t w = 1.0
         cdef DOUBLE_t y_idx = 0.0
         cdef int idx, j, k
-        
+
         # post condition: all samples from [0:b) are on the left side
         for idx from a <= idx < b:
             j = X_argsorted_i[idx]
