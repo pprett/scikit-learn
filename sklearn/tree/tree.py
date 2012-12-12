@@ -210,7 +210,7 @@ class BaseDecisionTree(BaseEstimator, SelectorMixin):
             tree ensembles. For maximum efficiency use dtype np.int32.
 
         sample_weight : array-like, shape = [n_samples], optional
-            Sample weights
+            Sample weights.
 
         check_input: boolean, (default=True)
             Allow to bypass several input checking.

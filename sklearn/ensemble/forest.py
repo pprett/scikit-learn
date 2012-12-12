@@ -263,7 +263,7 @@ class BaseForest(BaseEnsemble, SelectorMixin):
             classification, real numbers in regression).
 
         sample_weight : array-like, shape = [n_samples], optional
-            Sample weights
+            Sample weights.
 
         Returns
         -------
@@ -760,7 +760,6 @@ class RandomForestClassifier(ForestClassifier):
         Decision function computed with out-of-bag estimate on the training
         set.
 
-
     References
     ----------
 
@@ -897,8 +896,6 @@ class RandomForestRegressor(ForestRegressor):
 
     `oob_prediction_` : array, shape = [n_samples]
         Prediction computed with out-of-bag estimate on the training set.
-
-
 
     References
     ----------
