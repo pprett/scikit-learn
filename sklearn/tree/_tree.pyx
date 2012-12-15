@@ -766,11 +766,12 @@ cdef class Tree:
                     break
 
                 # Better split than the best so far?
-                n_left, weighted_n_left = criterion.update(
-                        a, b, y_ptr, y_stride,
-                        X_argsorted_i,
-                        sample_weight_ptr,
-                        sample_mask_ptr)
+                criterion.update(a, b, y_ptr, y_stride,
+                                 X_argsorted_i,
+                                 sample_weight_ptr,
+                                 sample_mask_ptr)
+                n_left = criterion.n_left
+                weighted_n_left = criterion.weighted_n_left
 
                 # Only consider splits that respect min_leaf
                 if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
@@ -910,13 +911,15 @@ cdef class Tree:
                 c += 1
 
             # Better than the best so far?
-            n_left, weighted_n_left = criterion.update(
-                    0, c, y_ptr, y_stride,
-                    X_argsorted_i,
-                    sample_weight_ptr,
-                    sample_mask_ptr)
+            criterion.update(0, c, y_ptr, y_stride,
+                             X_argsorted_i,
+                             sample_weight_ptr,
+                             sample_mask_ptr)
+            n_left = criterion.n_left
+            weighted_n_left = criterion.weighted_n_left
 
-            if n_left < min_samples_leaf or (n_node_samples - n_left) < min_samples_leaf:
+            if (n_left < min_samples_leaf or
+                (n_node_samples - n_left) < min_samples_leaf):
                 continue
 
             if (weighted_n_left <= 0 or
@@ -1068,11 +1071,11 @@ cdef class Criterion:
         """Reset the criterion for a new feature index."""
         pass
 
-    cdef tuple update(self, int a, int b,
-                    DOUBLE_t* y, int y_stride,
-                    int* X_argsorted_i,
-                    DOUBLE_t* sample_weight,
-                    BOOL_t* sample_mask):
+    cdef void update(self, int a, int b,
+                      DOUBLE_t* y, int y_stride,
+                      int* X_argsorted_i,
+                      DOUBLE_t* sample_weight,
+                      BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         pass
@@ -1137,20 +1140,12 @@ cdef class ClassificationCriterion(Criterion):
 
     [1] Hastie et al. "Elements of Statistical Learning", 2009.
     """
-    cdef int n_outputs
     cdef int* n_classes
-    cdef int n_samples
-    cdef double weighted_n_samples
 
     cdef int label_count_stride
     cdef double* label_count_left
     cdef double* label_count_right
     cdef double* label_count_init
-
-    cdef int n_left
-    cdef int n_right
-    cdef double weighted_n_left
-    cdef double weighted_n_right
 
     def __cinit__(self, int n_outputs, object n_classes):
         """Constructor."""
@@ -1272,11 +1267,11 @@ cdef class ClassificationCriterion(Criterion):
                 # Reset right label counts to the initial counts
                 label_count_right[k * label_count_stride + c] = label_count_init[k * label_count_stride + c]
 
-    cdef tuple update(self, int a, int b,
-                          DOUBLE_t* y, int y_stride,
-                          int* X_argsorted_i,
-                          DOUBLE_t* sample_weight,
-                          BOOL_t* sample_mask):
+    cdef void update(self, int a, int b,
+                      DOUBLE_t* y, int y_stride,
+                      int* X_argsorted_i,
+                      DOUBLE_t* sample_weight,
+                      BOOL_t* sample_mask):
         """Update the criteria for each value in interval [a,b) (where a and b
            are indices in `X_argsorted_i`)."""
         cdef int n_outputs = self.n_outputs
@@ -1314,8 +1309,6 @@ cdef class ClassificationCriterion(Criterion):
         self.n_right = n_right
         self.weighted_n_left = weighted_n_left
         self.weighted_n_right = weighted_n_right
-
-        return n_left, weighted_n_left
 
     cdef double eval(self):
         """Evaluate the criteria (aka the split error)."""
@@ -1517,11 +1510,6 @@ cdef class RegressionCriterion(Criterion):
     weighted_n_right : double
         The weighted number of samples right of splitting point.
     """
-
-    cdef int n_outputs
-    cdef int n_samples
-    cdef double weighted_n_samples
-
     cdef double* mean_left
     cdef double* mean_right
     cdef double* mean_init
@@ -1530,11 +1518,6 @@ cdef class RegressionCriterion(Criterion):
     cdef double* sq_sum_init
     cdef double* var_left
     cdef double* var_right
-
-    cdef int n_right
-    cdef int n_left
-    cdef double weighted_n_right
-    cdef double weighted_n_left
 
     def __cinit__(self, int n_outputs):
         """Constructor."""
@@ -1689,7 +1672,7 @@ cdef class RegressionCriterion(Criterion):
             var_right[k] = (sq_sum_right[k] -
                     weighted_n_samples * (mean_right[k] * mean_right[k]))
 
-    cdef tuple update(self, int a, int b,
+    cdef void update(self, int a, int b,
                           DOUBLE_t* y, int y_stride,
                           int* X_argsorted_i,
                           DOUBLE_t* sample_weight,
@@ -1747,8 +1730,6 @@ cdef class RegressionCriterion(Criterion):
             for k from 0 <= k < n_outputs:
                 var_left[k] = sq_sum_left[k] - weighted_n_left * (mean_left[k] * mean_left[k])
                 var_right[k] = sq_sum_right[k] - weighted_n_right * (mean_right[k] * mean_right[k])
-
-        return n_left, weighted_n_left
 
     cdef double eval(self):
         """Evaluate the criteria (aka the split error)."""
