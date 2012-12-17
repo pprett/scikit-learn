@@ -8,6 +8,7 @@ from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_true
 from sklearn.utils.testing import assert_less
 from sklearn.utils.testing import assert_greater
+from sklearn.utils.testing import assert_raises
 
 from sklearn import linear_model, datasets
 
@@ -22,8 +23,16 @@ def test_simple():
     Principle of Lars is to keep covariances tied and decreasing
     """
 
+    # also test verbose output
+    from cStringIO import StringIO
+    import sys
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+
     alphas_, active, coef_path_ = linear_model.lars_path(
-        diabetes.data, diabetes.target, method="lar")
+        diabetes.data, diabetes.target, method="lar", verbose=10)
+
+    sys.stdout = old_stdout
 
     for (i, coef_) in enumerate(coef_path_.T):
         res = y - np.dot(X, coef_)
@@ -422,6 +431,10 @@ def test_lasso_lars_ic():
     assert_greater(lars_bic.alpha_, lars_aic.alpha_)
     assert_less(len(nonzero_bic), len(nonzero_aic))
     assert_less(np.max(nonzero_bic), diabetes.data.shape[1])
+
+    # test error on unknown IC
+    lars_broken = linear_model.LassoLarsIC('<unknown>')
+    assert_raises(ValueError, lars_broken.fit, X, y)
 
 
 if __name__ == '__main__':
