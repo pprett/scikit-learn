@@ -427,6 +427,14 @@ class DecisionTreeClassifier(BaseDecisionTree, WeightedClassifierMixin):
         The function to measure the quality of a split. Supported criteria are
         "gini" for the Gini impurity and "entropy" for the information gain.
 
+    max_features : int, string or None, optional (default=None)
+        The number of features to consider when looking for the best split.
+        If "auto", then `max_features=sqrt(n_features)` on classification
+        tasks and `max_features=n_features` on regression problems. If "sqrt",
+        then `max_features=sqrt(n_features)`. If "log2", then
+        `max_features=log2(n_features)`. If None, then
+        `max_features=n_features`.
+
     max_depth : integer or None, optional (default=None)
         The maximum depth of the tree. If None, then nodes are expanded until
         all leaves are pure or until all leaves contain less than
@@ -447,14 +455,6 @@ class DecisionTreeClassifier(BaseDecisionTree, WeightedClassifierMixin):
         the partitions are always represented as copies of the original
         data. Otherwise, partitions are represented as bit masks (aka
         sample masks).
-
-    max_features : int, string or None, optional (default=None)
-        The number of features to consider when looking for the best split.
-        If "auto", then `max_features=sqrt(n_features)` on classification
-        tasks and `max_features=n_features` on regression problems. If "sqrt",
-        then `max_features=sqrt(n_features)`. If "log2", then
-        `max_features=log2(n_features)`. If None, then
-        `max_features=n_features`.
 
     compute_importances : boolean, optional (default=False)
         Whether feature importances are computed and stored into the
@@ -615,6 +615,14 @@ class DecisionTreeRegressor(BaseDecisionTree, WeightedRegressorMixin):
         The function to measure the quality of a split. The only supported
         criterion is "mse" for the mean squared error.
 
+    max_features : int, string or None, optional (default=None)
+        The number of features to consider when looking for the best split.
+        If "auto", then `max_features=sqrt(n_features)` on classification
+        tasks and `max_features=n_features` on regression problems. If "sqrt",
+        then `max_features=sqrt(n_features)`. If "log2", then
+        `max_features=log2(n_features)`. If None, then
+        `max_features=n_features`.
+
     max_depth : integer or None, optional (default=None)
         The maximum depth of the tree. If None, then nodes are expanded until
         all leaves are pure or until all leaves contain less than
@@ -635,14 +643,6 @@ class DecisionTreeRegressor(BaseDecisionTree, WeightedRegressorMixin):
         the partitions are always represented as copies of the original
         data. Otherwise, partitions are represented as bit masks (aka
         sample masks).
-
-    max_features : int, string or None, optional (default=None)
-        The number of features to consider when looking for the best split.
-        If "auto", then `max_features=sqrt(n_features)` on classification
-        tasks and `max_features=n_features` on regression problems. If "sqrt",
-        then `max_features=sqrt(n_features)`. If "log2", then
-        `max_features=log2(n_features)`. If None, then
-        `max_features=n_features`.
 
     compute_importances : boolean, optional (default=True)
         Whether feature importances are computed and stored into the
