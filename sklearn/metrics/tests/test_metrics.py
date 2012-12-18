@@ -27,6 +27,7 @@ from sklearn.metrics import auc_score
 from sklearn.metrics import average_precision_score
 from sklearn.metrics import zero_one
 from sklearn.metrics import hinge_loss
+from sklearn.metrics import weighted_r2_score
 
 
 def make_prediction(dataset=None, binary=False):
@@ -549,3 +550,24 @@ def test_roc_curve_one_label():
     # all negative labels, all tpr should be nan
     assert_array_equal(tpr,
                        np.nan * np.ones(len(thresholds) + 1))
+
+
+def test_weighted_r2_score():
+    """Test weighted score functions"""
+    y_true, y_pred, _ = make_prediction(binary=True)
+    n = y_true.shape[0]
+
+    assert_array_equal(r2_score(y_true, y_pred),
+                       weighted_r2_score(y_true, y_pred))
+
+    assert_array_equal(r2_score(y_true, y_pred),
+                       weighted_r2_score(np.r_[y_true, y_true],
+                                         np.r_[y_pred, y_pred],
+                                         weights=0.5 * np.ones((2 * n,))))
+
+
+def test_weighted_r2_score_check():
+    """Test input checks of weighted_r2_score"""
+    assert_raises(ValueError, weighted_r2_score, [1.0, 0.0, 1.0], [])
+    assert_raises(ValueError, weighted_r2_score, [], [])
+    assert_raises(ValueError, weighted_r2_score, [1.0], [1.0])
