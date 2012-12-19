@@ -273,11 +273,33 @@ are missed by the previous ones in the sequence [HTF2009]_.
 
 AdaBoost can be used both for classification and regression problems:
 
-  - For multi-class classification, :class:`AdaBoostClassifier` implements AdaBoost-SAMME [ZZRH2009]_.
+  - For multi-class classification, :class:`AdaBoostClassifier` implements
+    AdaBoost-SAMME [ZZRH2009]_.
 
   - For regression, :class:`AdaBoostRegressor` implements AdaBoost.R2 [D1997]_.
 
+Usage
+-----
 
+The following example shows how to fit an AdaBoost classifier with 100 weak
+learners::
+
+    >>> from sklearn.cross_validation import cross_val_score
+    >>> from sklearn.datasets import load_iris
+    >>> from sklearn.ensemble import AdaBoostClassifier
+
+    >>> iris = load_iris()
+    >>> clf = AdaBoostClassifier(n_estimators=100, learning_rate=0.01)
+    >>> scores = cross_val_score(clf, iris.data, iris.target)
+    >>> scores.mean()                             # doctest: +ELLIPSIS
+    0.966...
+
+The number of weak learners is controlled by the parameter ``n_estimators``.
+The ``learning_rate`` parameter controls the contribution of the weak learners
+in the final combination. A good practice is to use many weak learners with a
+small learning rate. By default, weak learners are decision trees of
+``max_depth=3``. Different weak learners can be specified through the
+``base_estimator`` parameter.
 
 .. topic:: Examples:
 
