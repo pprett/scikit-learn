@@ -1604,3 +1604,5 @@ of commits):
 .. _@kernc: http://github.com/kernc
 
 .. _Christian Osendorfer: http://osdf.github.com
+
+.. _Noel Dawe: http://noel.dawe.me
