@@ -8,6 +8,13 @@
 Changelog
 ---------
 
+   - New estimators :class:`ensemble.AdaBoostClassifier` and
+     :class:`ensemble.AdaBoostRegressor` implementing the popular AdaBoost
+     algorithm, by `Noel Dawe`_  and `Gilles Louppe`_.
+
+   - :class:`tree.DecisionTreeClassifier` and all derived ensemble models now
+     support sample weighting, by `Noel Dawe`_  and `Gilles Louppe`_.
+
    - Partial dependence plots for :mod:`ensemble.gradient_boosting` by
      `Peter Prettenhofer`_.
 
@@ -95,10 +102,10 @@ Changelog
      the estimator :class:`tree.DecisionTreeRegressor` instead of the
      :class:`tree._tree.Tree` datastructure by `Arnaud Joly`_.
 
-   - Fixed a floating point exception in the :ref:`decision trees <tree>` 
-     module, by Seberg. 
+   - Fixed a floating point exception in the :ref:`decision trees <tree>`
+     module, by Seberg.
 
-   - Fix :func:`metrics.roc_curve` fails when y_true has only one class 
+   - Fix :func:`metrics.roc_curve` fails when y_true has only one class
      by Wei Li.
 
 
@@ -175,7 +182,6 @@ API changes summary
      :class:`tree.DecisionTreeClassifier` and all derived ensemble models are
      now flat in case of single output problems and nested in case of
      multi-output problems.
-
 
     - The ``estimators_`` attribute of
     :class:`ensemble.gradient_boosting.GradientBoostingRegressor` and
