@@ -163,15 +163,15 @@ def test_pickle():
 
 def test_importances():
     """Check variable importances."""
-    X, y = datasets.make_classification(n_samples=1000,
+    X, y = datasets.make_classification(n_samples=2000,
                                         n_features=10,
                                         n_informative=3,
                                         n_redundant=0,
                                         n_repeated=0,
                                         shuffle=False,
-                                        random_state=2)
+                                        random_state=1)
 
-    clf = AdaBoostClassifier(compute_importances=True, n_estimators=100)
+    clf = AdaBoostClassifier(compute_importances=True, n_estimators=50)
     clf.fit(X, y)
     importances = clf.feature_importances_
     n_important = sum(importances > 0.1)
@@ -190,6 +190,35 @@ def test_error():
     assert_raises(ValueError,
                   AdaBoostClassifier(learning_rate=-1).fit,
                   X, y)
+
+
+def test_base_estimator():
+    """Test different base estimators."""
+    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.svm import SVC
+
+    clf = AdaBoostClassifier(base_estimator=DecisionTreeClassifier())
+    clf.fit(X, y)
+
+    clf = AdaBoostClassifier(base_estimator=RandomForestClassifier())
+    clf.fit(X, y)
+
+    clf = AdaBoostClassifier(base_estimator=SVC())
+    clf.fit(X, y)
+
+    from sklearn.tree import DecisionTreeRegressor
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.svm import SVR
+
+    clf = AdaBoostRegressor(base_estimator=DecisionTreeRegressor())
+    clf.fit(X, y)
+
+    clf = AdaBoostRegressor(base_estimator=RandomForestRegressor())
+    clf.fit(X, y)
+
+    clf = AdaBoostRegressor(base_estimator=SVR())
+    clf.fit(X, y)
 
 
 if __name__ == "__main__":

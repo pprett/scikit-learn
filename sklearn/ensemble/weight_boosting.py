@@ -39,43 +39,8 @@ __all__ = [
 class BaseWeightBoosting(BaseEnsemble):
     """Base class for weight boosting.
 
-    Parameters
-    ----------
-    base_estimator : object, optional (default=DecisionTreeClassifier)
-        The base estimator from which the boosted ensemble is built.
-
-    n_estimators : integer, optional (default=10)
-        The maximum number of estimators at which boosting is terminated.
-
-    learning_rate : float, optional (default=0.5)
-        Learning rate shrinks the contribution of each classifier by
-        ``learning_rate``. There is a trade-off between ``learning_rate`` and
-        ``n_estimators``.
-
-    compute_importances : boolean, optional (default=False)
-        Whether feature importances are computed and stored into the
-        ``feature_importances_`` attribute when calling fit.
-
-    Attributes
-    ----------
-    `weights_` : list of floats
-        Weights for each estimator in the boosted ensemble.
-
-    `errors_` : list of floats
-        Classification or regression error for each estimator in the boosted
-        ensemble.
-
-    `estimators_` : list of classifiers or regressors
-        The collection of fitted sub-estimators.
-
-    `feature_importances_` : array of shape = [n_features]
-        The feature importances if supported by the ``base_estimator``.
-
-    References
-    ----------
-
-    .. [1] L. Breiman, and A. Cutler, "Random Forests",
-           http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm
+    Warning: This class should not be used directly. Use derived classes
+    instead.
     """
     def __init__(self, base_estimator=None,
                  n_estimators=10,
@@ -166,7 +131,7 @@ class BaseWeightBoosting(BaseEnsemble):
                 else:
                     self.n_classes_ = 1
 
-            sample_weight, weight, error = self.boost(sample_weight, p, y,
+            sample_weight, weight, error = self._boost(sample_weight, p, y,
                     iboost == self.n_estimators - 1)
 
             # early termination
@@ -351,27 +316,71 @@ class BaseWeightBoosting(BaseEnsemble):
 
 
 class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
-    """An AdaBoosted classifier.
+    """An AdaBoost classifier.
 
-    An AdaBoosted classifier is a meta estimator that begins by fitting a
-    classifier on a dataset and then fits additional copies of the classifer
-    on the same dataset where the weights of incorrectly
-    classified instances are adjusted such that subsequent classifiers
-    focus more on difficult cases.
+    An AdaBoost classifier is a meta-estimator that begins by fitting a
+    classifier on the original dataset and then fits additional copies of the
+    classifer on the same dataset but where the weights of incorrectly
+    classified instances are adjusted such that subsequent classifiers focus
+    more on difficult cases.
+
+    This class implements the algorithm known as AdaBoost-SAMME [2].
+
+    Parameters
+    ----------
+    base_estimator : object, optional (default=DecisionTreeClassifier)
+        The base estimator from which the boosted ensemble is built.
+        Support for sample weighting is required, as well as proper `classes_`
+        and `n_classes_` attributes in case of classification.
+
+    n_estimators : integer, optional (default=10)
+        The maximum number of estimators at which boosting is terminated.
+
+    learning_rate : float, optional (default=0.5)
+        Learning rate shrinks the contribution of each classifier by
+        ``learning_rate``. There is a trade-off between ``learning_rate`` and
+        ``n_estimators``.
+
+    compute_importances : boolean, optional (default=False)
+        Whether feature importances are computed and stored into the
+        ``feature_importances_`` attribute when calling fit.
+
+    Attributes
+    ----------
+    `estimators_` : list of classifiers
+        The collection of fitted sub-estimators.
+
+    `classes_`: array of shape = [n_classes]
+        The classes labels.
+
+    `n_classes_`: int
+        The number of classes.
+
+    `weights_` : list of floats
+        Weights for each estimator in the boosted ensemble.
+
+    `errors_` : list of floats
+        Classification error for each estimator in the boosted
+        ensemble.
+
+    `feature_importances_` : array of shape = [n_features]
+        The feature importances if supported by the ``base_estimator``.
 
     See also
     --------
-    DecisionTreeClassifier
+    AdaBoostRegressor, GradientBoostingClassifier, DecisionTreeClassifier
 
     References
     ----------
+
     .. [1] Yoav Freund, Robert E. Schapire. "A Decision-Theoretic
            Generalization of on-Line Learning and an Application
-           to Boosting", 1995
+           to Boosting", 1995.
+
     .. [2] Ji Zhu, Hui Zou, Saharon Rosset, Trevor Hastie.
-           "Multi-class AdaBoost" 2009
+           "Multi-class AdaBoost", 2009.
     """
-    def boost(self, sample_weight, y_predict, y_true, is_last):
+    def _boost(self, sample_weight, y_predict, y_true, is_last):
         """Implement a single boost
 
         Perform a single boost according to the multi-class SAMME algorithm and
@@ -573,26 +582,64 @@ class AdaBoostClassifier(BaseWeightBoosting, WeightedClassifierMixin):
 
 
 class AdaBoostRegressor(BaseWeightBoosting, WeightedRegressorMixin):
-    """An AdaBoosted regressor.
+    """An AdaBoost regressor.
 
-    An AdaBoosted regressor is a meta estimator that begins by fitting a
-    regressor on a dataset and then fits additional copies of the regressor
-    on the same dataset where the weights of instances are adjusted
-    according to the error of the prediction such that subsequent regressors
-    focus more on difficult cases.
+    An AdaBoost regressor is a meta-estimator that begins by fitting a
+    regressor on the original dataset and then fits additional copies of the
+    regressor on the same dataset but where the weights of instances are
+    adjusted according to the error of the current prediction. As such,
+    subsequent regressors focus more on difficult cases.
+
+    This class implements the algorithm known as AdaBoost.R2 [2].
+
+    Parameters
+    ----------
+    base_estimator : object, optional (default=DecisionTreeClassifier)
+        The base estimator from which the boosted ensemble is built.
+        Support for sample weighting is required, as well as proper `classes_`
+        and `n_classes_` attributes in case of classification.
+
+    n_estimators : integer, optional (default=10)
+        The maximum number of estimators at which boosting is terminated.
+
+    learning_rate : float, optional (default=0.5)
+        Learning rate shrinks the contribution of each regressor by
+        ``learning_rate``. There is a trade-off between ``learning_rate`` and
+        ``n_estimators``.
+
+    compute_importances : boolean, optional (default=False)
+        Whether feature importances are computed and stored into the
+        ``feature_importances_`` attribute when calling fit.
+
+    Attributes
+    ----------
+    `estimators_` : list of classifiers
+        The collection of fitted sub-estimators.
+
+    `weights_` : list of floats
+        Weights for each estimator in the boosted ensemble.
+
+    `errors_` : list of floats
+        Regression error for each estimator in the boosted ensemble.
+
+    `feature_importances_` : array of shape = [n_features]
+        The feature importances if supported by the ``base_estimator``.
 
     See also
     --------
-    DecisionTreeRegressor
+    AdaBoostClassifier, GradientBoostingRegressor, DecisionTreeRegressor
 
     References
     ----------
+
     .. [1] Yoav Freund, Robert E. Schapire. "A Decision-Theoretic
            Generalization of on-Line Learning and an Application
-           to Boosting", 1995
-    .. [2] Drucker. AdaBoost.R2, 1997
+           to Boosting", 1995.
+
+    .. [2] Harris Drucker. "Improving Regressor using Boosting Techniques",
+           1997.
     """
-    def boost(self, sample_weight, y_predict, y_true, is_last):
+    def _boost(self, sample_weight, y_predict, y_true, is_last):
         """Implement a single boost for regression
 
         Perform a single boost according to the AdaBoost.R2 algorithm and
