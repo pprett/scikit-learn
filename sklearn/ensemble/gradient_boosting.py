@@ -422,13 +422,56 @@ class MultinomialDeviance(LossFunction):
             tree.value[leaf, 0, 0] = numerator / denominator
 
 
+class MOMeanEstimator(BaseEstimator):
+    """An estimator predicting the mean of the training targets."""
+
+    def fit(self, X, y):
+        self.mean = np.mean(y, axis=0)
+
+    def predict(self, X):
+        y = np.ones((X.shape[0], self.mean.shape[0]), dtype=np.float64)
+        y *= self.mean
+        return y
+
+
+class MOLeastSquaresError(RegressionLossFunction):
+    """Loss function for least squares (LS) estimation for multi-outputs.
+    Terminal regions need not to be updated for least squares. """
+
+    def init_estimator(self):
+        return MOMeanEstimator()
+
+    def __call__(self, y, pred):
+        assert y.shape == pred.shape
+        return np.mean(np.sum((y - pred) ** 2.0, axis=1))
+
+    def negative_gradient(self, y, pred, **kargs):
+        assert y.shape == pred.shape
+        return y - pred
+
+    def update_terminal_regions(self, tree, X, y, residual, y_pred,
+                                sample_mask, learning_rate=1.0, k=0):
+        """Least squares does not need to update terminal regions.
+
+        But it has to update the predictions.
+        """
+        # update predictions
+        # we simply ignore k (its 1 in MO)
+        y_pred += learning_rate * tree.predict(X)[:, :, 0]
+
+    def _update_terminal_region(self, tree, terminal_regions, leaf, X, y,
+                                residual, pred):
+        pass
+
+
 LOSS_FUNCTIONS = {'ls': LeastSquaresError,
                   'lad': LeastAbsoluteError,
                   'huber': HuberLossFunction,
                   'quantile': QuantileLossFunction,
                   'bdeviance': BinomialDeviance,
                   'mdeviance': MultinomialDeviance,
-                  'deviance': None}  # for both, multinomial and binomial
+                  'deviance': None,  # for both, multinomial and binomial
+                  'mo_ls': MOLeastSquaresError}
 
 
 class BaseGradientBoosting(BaseEnsemble):
@@ -509,11 +552,6 @@ class BaseGradientBoosting(BaseEnsemble):
         self : object
             Returns self.
         """
-        # Check input
-        X, y = check_arrays(X, y, sparse_format='dense')
-        X = np.asfortranarray(X, dtype=DTYPE)
-        y = np.ravel(y, order='C')
-
         # Check parameters
         n_samples, n_features = X.shape
         self.n_features = n_features
@@ -584,6 +622,7 @@ class BaseGradientBoosting(BaseEnsemble):
 
         # init predictions
         y_pred = self.init_.predict(X)
+        print('init: y_pred.shape = %s' % str(y_pred.shape))
 
         self.estimators_ = np.empty((self.n_estimators, self.loss_.K),
                                     dtype=np.object)
@@ -851,6 +890,11 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
         self.n_classes_ = len(self.classes_)
         y = np.searchsorted(self.classes_, y)
 
+        # Check input
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+        y = np.ravel(y, order='C')
+
         return super(GradientBoostingClassifier, self).fit(X, y)
 
     def _score_to_proba(self, score):
@@ -1083,6 +1127,11 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
             Returns self.
         """
         self.n_classes_ = 1
+
+        # Check input
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+        y = np.ravel(y, order='C')
         return super(GradientBoostingRegressor, self).fit(X, y)
 
     def predict(self, X):
@@ -1118,3 +1167,125 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
         """
         for y in self.staged_decision_function(X):
             yield y.ravel()
+
+
+class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
+
+    def __init__(self, learning_rate=0.1, n_estimators=100,
+                 subsample=1.0, min_samples_split=2, min_samples_leaf=1,
+                 max_depth=3, init=None, random_state=None,
+                 max_features=None, alpha=0.9, verbose=0):
+
+        super(MultiOutputGradientBoostingRegressor, self).__init__(
+            'mo_ls', learning_rate, n_estimators, min_samples_split,
+            min_samples_leaf, max_depth, init, subsample, max_features,
+            random_state, alpha, verbose)
+
+    def fit(self, X, y):
+        """Fit the gradient boosting model.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            Training vectors, where n_samples is the number of samples
+            and n_features is the number of features. Use fortran-style
+            to avoid memory copies.
+
+        y : array-like, shape = [n_samples]
+            Target values (integers in classification, real numbers in
+            regression)
+            For classification, labels must correspond to classes
+            ``0, 1, ..., n_classes_-1``
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+        y = np.ascontiguousarray(y)
+        n_outputs = y.shape[1]
+        assert n_outputs > 1
+        self.n_outputs = n_outputs
+        self.n_classes_ = 1
+
+        # Check input
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+
+        return super(MultiOutputGradientBoostingRegressor, self).fit(X, y)
+
+    def decision_function(self, X):
+        """Compute the decision function of ``X``.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        score : array, shape = [n_samples, k]
+            The decision function of the input samples. Classes are
+            ordered by arithmetical order. Regression and binary
+            classification are special cases with ``k == 1``,
+            otherwise ``k==n_classes``.
+        """
+        X = array2d(X, dtype=DTYPE, order='C')
+        score = self._init_decision_function(X)
+
+        for i in range(self.n_estimators):
+            tree = self.estimators_[i, 0]
+            score += self.learning_rate * tree.predict(X)
+
+        return score
+
+    def predict(self, X):
+        """Predict regression target for X.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        y: array of shape = [n_samples]
+            The predicted values.
+        """
+        return self.decision_function(X)
+
+    def staged_predict(self, X):
+        """Predict regression target at each stage for X.
+
+        This method allows monitoring (i.e. determine error on testing set)
+        after each stage.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        y : array of shape = [n_samples]
+            The predicted value of the input samples.
+        """
+        raise NotImplementedError()
+
+    def staged_decision_function(self, X):
+        """Predict regression target at each stage for X.
+
+        This method allows monitoring (i.e. determine error on testing set)
+        after each stage.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        y : array of shape = [n_samples]
+            The predicted value of the input samples.
+        """
+        raise NotImplementedError()
