@@ -622,7 +622,6 @@ class BaseGradientBoosting(BaseEnsemble):
 
         # init predictions
         y_pred = self.init_.predict(X)
-        print('init: y_pred.shape = %s' % str(y_pred.shape))
 
         self.estimators_ = np.empty((self.n_estimators, self.loss_.K),
                                     dtype=np.object)
