@@ -438,12 +438,19 @@ class MOLeastSquaresError(RegressionLossFunction):
     """Loss function for least squares (LS) estimation for multi-outputs.
     Terminal regions need not to be updated for least squares. """
 
+    def __init__(self, n_classes, alpha=0.5):
+        super(MOLeastSquaresError, self).__init__(n_classes)
+        self.alpha = alpha
+
     def init_estimator(self):
         return MOMeanEstimator()
 
     def __call__(self, y, pred):
         assert y.shape == pred.shape
-        return np.mean(np.sum((y - pred) ** 2.0, axis=1))
+        #return np.mean(np.sum((y - pred) ** 2.0, axis=1))
+        rmses = np.sqrt(np.mean((y - pred) ** 2.0, axis=0))
+        assert len(rmses) == 2
+        return (self.alpha * rmses[0]) + ((1.0 - self.alpha) * rmses[1])
 
     def negative_gradient(self, y, pred, **kargs):
         assert y.shape == pred.shape
@@ -572,7 +579,7 @@ class BaseGradientBoosting(BaseEnsemble):
         else:
             loss_class = LOSS_FUNCTIONS[self.loss]
 
-        if self.loss in ('huber', 'quantile'):
+        if self.loss in ('huber', 'quantile', 'mo_ls'):
             self.loss_ = loss_class(self.n_classes_, self.alpha)
         else:
             self.loss_ = loss_class(self.n_classes_)
@@ -1173,7 +1180,7 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
     def __init__(self, learning_rate=0.1, n_estimators=100,
                  subsample=1.0, min_samples_split=2, min_samples_leaf=1,
                  max_depth=3, init=None, random_state=None,
-                 max_features=None, alpha=0.9, verbose=0):
+                 max_features=None, alpha=0.5, verbose=0):
 
         super(MultiOutputGradientBoostingRegressor, self).__init__(
             'mo_ls', learning_rate, n_estimators, min_samples_split,
