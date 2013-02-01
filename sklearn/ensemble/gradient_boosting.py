@@ -1276,7 +1276,8 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
         y : array of shape = [n_samples]
             The predicted value of the input samples.
         """
-        raise NotImplementedError()
+        for y in self.staged_decision_function(X):
+            yield y
 
     def staged_decision_function(self, X):
         """Predict regression target at each stage for X.
@@ -1294,4 +1295,10 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
         y : array of shape = [n_samples]
             The predicted value of the input samples.
         """
-        raise NotImplementedError()
+        X = array2d(X, dtype=DTYPE, order='C')
+        score = self._init_decision_function(X)
+
+        for i in range(self.n_estimators):
+            tree = self.estimators_[i, 0]
+            score += self.learning_rate * tree.predict(X)
+            yield score
