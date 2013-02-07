@@ -485,3 +485,18 @@ def test_min_density():
     clf = GradientBoostingClassifier(max_depth=5)
     clf.fit(X, y)
     assert clf.min_density == 0.0
+
+
+def test_fit_more():
+    clf = GradientBoostingRegressor(n_estimators=10, max_depth=4,
+                                    min_samples_split=1, random_state=1)
+    clf.fit(boston.data, boston.target)
+    clf.fit_more(boston.data, boston.target, n_estimators=90)
+
+    y_pred_more = clf.predict(boston.data)
+
+    clf.set_params(n_estimators=100)
+    clf.fit(boston.data, boston.target)
+    y_pred = clf.predict(boston.data)
+
+    assert_array_almost_equal(y_pred, y_pred_more)

@@ -615,14 +615,13 @@ class BaseGradientBoosting(BaseEnsemble):
         if not (0.0 < self.alpha and self.alpha < 1.0):
             raise ValueError("alpha must be in (0.0, 1.0)")
 
-        random_state = check_random_state(self.random_state)
-
         # use default min_density (0.1) only for deep trees
         self.min_density = 0.0 if self.max_depth < 6 else 0.1
 
-        # create argsorted X for fast tree induction
-        X_argsorted = np.asfortranarray(
-            np.argsort(X.T, axis=1).astype(np.int32).T)
+        self.estimators_ = np.empty((self.n_estimators, self.loss_.K),
+                                    dtype=np.object)
+        self.train_score_ = np.zeros((self.n_estimators,), dtype=np.float64)
+        self.oob_score_ = np.zeros((self.n_estimators), dtype=np.float64)
 
         # fit initial model
         self.init_.fit(X, y)
@@ -630,16 +629,22 @@ class BaseGradientBoosting(BaseEnsemble):
         # init predictions
         y_pred = self.init_.predict(X)
 
-        self.estimators_ = np.empty((self.n_estimators, self.loss_.K),
-                                    dtype=np.object)
+        self._fit_stages(X, y, y_pred)
+        return self
 
-        self.train_score_ = np.zeros((self.n_estimators,), dtype=np.float64)
-        self.oob_score_ = np.zeros((self.n_estimators), dtype=np.float64)
+    def _fit_stages(self, X, y, y_pred, begin_at_stage=0):
+        n_samples, _ = X.shape
+        random_state = check_random_state(self.random_state)
+
+        # create argsorted X for fast tree induction
+        X_argsorted = np.asfortranarray(
+            np.argsort(X.T, axis=1).astype(np.int32).T)
 
         sample_mask = np.ones((n_samples,), dtype=np.bool)
         n_inbag = max(1, int(self.subsample * n_samples))
+
         # perform boosting iterations
-        for i in range(self.n_estimators):
+        for i in range(begin_at_stage, self.n_estimators):
 
             # subsampling
             if self.subsample < 1.0:
@@ -671,6 +676,29 @@ class BaseGradientBoosting(BaseEnsemble):
             if self.verbose == 1:
                 print(end='.')
                 sys.stdout.flush()
+
+    def fit_more(self, X, y, n_estimators=None):
+        assert X.shape[1] == self.n_features
+        additional_n_estimators = n_estimators
+        if additional_n_estimators is None:
+            additional_n_estimators = self.n_estimators
+
+        total_n_estimators = self.n_estimators + additional_n_estimators
+
+        # get predictions of current model
+        y_pred = self.decision_function(X)
+
+        # resize data structures
+        self.estimators_.resize((total_n_estimators, self.loss_.K))
+        self.train_score_.resize(total_n_estimators)
+        self.oob_score_.resize(total_n_estimators)
+
+        # override n_estimators
+        old_n_estimators = self.n_estimators
+        self.n_estimators = total_n_estimators
+
+        # fit stages beginning at old_n_estimators
+        self._fit_stages(X, y, y_pred, begin_at_stage=old_n_estimators)
 
         return self
 
@@ -1140,6 +1168,13 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
         y = np.ravel(y, order='C')
         return super(GradientBoostingRegressor, self).fit(X, y)
 
+    def fit_more(self, X, y, n_estimators=None):
+        # Check input
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+        y = np.ravel(y, order='C')
+        return super(GradientBoostingRegressor, self).fit_more(X, y, n_estimators)
+
     def predict(self, X):
         """Predict regression target for X.
 
@@ -1219,6 +1254,18 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
         X = np.asfortranarray(X, dtype=DTYPE)
 
         return super(MultiOutputGradientBoostingRegressor, self).fit(X, y)
+
+    def fit_more(self, X, y, n_estimators=None):
+        y = np.ascontiguousarray(y)
+        n_outputs = y.shape[1]
+        assert n_outputs == self.n_outputs
+
+        # Check input
+        X, y = check_arrays(X, y, sparse_format='dense')
+        X = np.asfortranarray(X, dtype=DTYPE)
+
+        return super(MultiOutputGradientBoostingRegressor, self).fit_more(
+            X, y, n_estimators)
 
     def decision_function(self, X):
         """Compute the decision function of ``X``.
