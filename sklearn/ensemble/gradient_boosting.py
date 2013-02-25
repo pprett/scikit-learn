@@ -538,7 +538,7 @@ class BaseGradientBoosting(BaseEnsemble):
 
         return y_pred
 
-    def fit(self, X, y):
+    def fit(self, X, y, **fit_params):
         """Fit the gradient boosting model.
 
         Parameters
@@ -629,10 +629,12 @@ class BaseGradientBoosting(BaseEnsemble):
         # init predictions
         y_pred = self.init_.predict(X)
 
-        self._fit_stages(X, y, y_pred)
+        monitor = fit_params.get('monitor')
+
+        self._fit_stages(X, y, y_pred, monitor=monitor)
         return self
 
-    def _fit_stages(self, X, y, y_pred, begin_at_stage=0):
+    def _fit_stages(self, X, y, y_pred, begin_at_stage=0, monitor=None):
         n_samples, _ = X.shape
         random_state = check_random_state(self.random_state)
 
@@ -677,7 +679,10 @@ class BaseGradientBoosting(BaseEnsemble):
                 print(end='.')
                 sys.stdout.flush()
 
-    def fit_more(self, X, y, n_estimators=None):
+            if monitor is not None:
+                monitor(i, self, locals())
+
+    def fit_more(self, X, y, n_estimators=None, **fit_params):
         assert X.shape[1] == self.n_features
         additional_n_estimators = n_estimators
         if additional_n_estimators is None:
@@ -697,8 +702,11 @@ class BaseGradientBoosting(BaseEnsemble):
         old_n_estimators = self.n_estimators
         self.n_estimators = total_n_estimators
 
+        monitor = fit_params.get('monitor')
+
         # fit stages beginning at old_n_estimators
-        self._fit_stages(X, y, y_pred, begin_at_stage=old_n_estimators)
+        self._fit_stages(X, y, y_pred, begin_at_stage=old_n_estimators,
+                         monitor=monitor)
 
         return self
 
@@ -899,7 +907,7 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
             min_samples_leaf, max_depth, init, subsample, max_features,
             random_state, verbose=verbose)
 
-    def fit(self, X, y):
+    def fit(self, X, y, **fit_params):
         """Fit the gradient boosting model.
 
         Parameters
@@ -929,7 +937,7 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
         X = np.asfortranarray(X, dtype=DTYPE)
         y = np.ravel(y, order='C')
 
-        return super(GradientBoostingClassifier, self).fit(X, y)
+        return super(GradientBoostingClassifier, self).fit(X, y, **fit_params)
 
     def _score_to_proba(self, score):
         """Compute class probability estimates from decision scores. """
@@ -1139,7 +1147,7 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
             min_samples_leaf, max_depth, init, subsample, max_features,
             random_state, alpha, verbose)
 
-    def fit(self, X, y):
+    def fit(self, X, y, **fit_params):
         """Fit the gradient boosting model.
 
         Parameters
@@ -1166,14 +1174,15 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
         X, y = check_arrays(X, y, sparse_format='dense')
         X = np.asfortranarray(X, dtype=DTYPE)
         y = np.ravel(y, order='C')
-        return super(GradientBoostingRegressor, self).fit(X, y)
+        return super(GradientBoostingRegressor, self).fit(X, y, **fit_params)
 
-    def fit_more(self, X, y, n_estimators=None):
+    def fit_more(self, X, y, n_estimators=None, **fit_params):
         # Check input
         X, y = check_arrays(X, y, sparse_format='dense')
         X = np.asfortranarray(X, dtype=DTYPE)
         y = np.ravel(y, order='C')
-        return super(GradientBoostingRegressor, self).fit_more(X, y, n_estimators)
+        return super(GradientBoostingRegressor, self).fit_more(X, y, n_estimators,
+                                                               **fit_params)
 
     def predict(self, X):
         """Predict regression target for X.
@@ -1222,7 +1231,7 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
             min_samples_leaf, max_depth, init, subsample, max_features,
             random_state, alpha, verbose)
 
-    def fit(self, X, y):
+    def fit(self, X, y, **fit_params):
         """Fit the gradient boosting model.
 
         Parameters
@@ -1253,9 +1262,10 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
         X, y = check_arrays(X, y, sparse_format='dense')
         X = np.asfortranarray(X, dtype=DTYPE)
 
-        return super(MultiOutputGradientBoostingRegressor, self).fit(X, y)
+        return super(MultiOutputGradientBoostingRegressor, self).fit(X, y,
+                                                                     **fit_params)
 
-    def fit_more(self, X, y, n_estimators=None):
+    def fit_more(self, X, y, n_estimators=None, **fit_params):
         y = np.ascontiguousarray(y)
         n_outputs = y.shape[1]
         assert n_outputs == self.n_outputs
@@ -1265,7 +1275,7 @@ class MultiOutputGradientBoostingRegressor(BaseGradientBoosting, RegressorMixin)
         X = np.asfortranarray(X, dtype=DTYPE)
 
         return super(MultiOutputGradientBoostingRegressor, self).fit_more(
-            X, y, n_estimators)
+            X, y, n_estimators, **fit_params)
 
     def decision_function(self, X):
         """Compute the decision function of ``X``.
