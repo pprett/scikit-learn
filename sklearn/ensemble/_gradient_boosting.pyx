@@ -227,7 +227,15 @@ cpdef _partial_dependence_tree(Tree tree, DTYPE_t[:, ::1] X,
     cdef int32 stack_size = 1
     cdef double left_sample_frac
     cdef double current_weight
-    cdef double total_weight = 0.0
+    cdef double total_weight = 0
+
+    cdef int n_outputs = tree.value.shape[1]
+    cdef int value_node_stride = tree.value.strides[0] // tree.value.strides[1]
+    # FIXME use sizeof instead of 8
+    cdef int value_output_stride = tree.value.strides[1] // 8
+    cdef int out_row_stride = out.strides[0] // out.strides[1]
+    cdef int out_col_stride = out.strides[1] // 8
+
 
     for i in range(X.shape[0]):
         # init stacks for new example
@@ -242,8 +250,12 @@ cpdef _partial_dependence_tree(Tree tree, DTYPE_t[:, ::1] X,
             current_node = node_stack[stack_size]
 
             if children_left[current_node] == LEAF:
-                out[i] += weight_stack[stack_size] * value[current_node] * \
-                          learn_rate
+                for k in range(n_outputs):
+                    output_offset = k * value_output_stride
+                    out[(i * out_row_stride) + (k * out_col_stride)] += (
+                        weight_stack[stack_size] *
+                        value[(current_node * value_node_stride) + (k * value_output_stride)] *
+                        learn_rate)
                 total_weight += weight_stack[stack_size]
             else:
                 # non-terminal node
