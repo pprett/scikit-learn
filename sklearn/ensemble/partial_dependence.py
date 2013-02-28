@@ -151,10 +151,13 @@ def partial_dependence(gbrt, target_variables, grid=None, X=None,
 
     n_trees_per_stage = gbrt.estimators_.shape[1]
     n_estimators = gbrt.estimators_.shape[0]
-    if n_trees_per_stage == 1 and gbrt.estimators_[0,0].n_outputs_ > 1:
+    n_outputs = gbrt.estimators_[0,0].n_outputs_
+
+    print('grid size: %d' % grid.shape[0])
+    print('n_outputs: %d' % n_outputs)
+    if n_trees_per_stage == 1 and n_outputs > 1:
         # multi-output trees as weak learners
-        n_outputs = gbrt.estimators_[0,0].n_outputs_
-        pdp = np.zeros((n_trees_per_stage, grid.shape[0], n_outputs),
+        pdp = np.zeros((n_trees_per_stage, grid.shape[0] * n_outputs),
                        dtype=np.float64, order='C')
     else:
         pdp = np.zeros((n_trees_per_stage, grid.shape[0],), dtype=np.float64,
@@ -164,6 +167,9 @@ def partial_dependence(gbrt, target_variables, grid=None, X=None,
             tree = gbrt.estimators_[stage, k].tree_
             _partial_dependence_tree(tree, grid, target_variables,
                                      gbrt.learning_rate, pdp[k])
+
+    if n_outputs > 1:
+        pdp = pdp.reshape((n_trees_per_stage, grid.shape[0], n_outputs))
 
     return pdp, axes
 

@@ -211,7 +211,15 @@ cpdef _partial_dependence_tree(Tree tree, DTYPE_t[:, ::1] X,
         The value of the partial dependence function on each grid
         point.
     """
+    cdef int n_outputs = tree.n_outputs
+    # FIXME use sizeof instead of 8
+    cdef int value_node_stride = n_outputs
+    cdef int value_output_stride = 1
+    cdef int out_row_stride = tree.n_outputs
+    cdef int out_col_stride = 1
+
     cdef Py_ssize_t i = 0
+    cdef Py_ssize_t k = 0
     cdef Py_ssize_t n_features = X.shape[1]
     cdef int *children_left = tree.children_left
     cdef int *children_right = tree.children_right
@@ -229,14 +237,6 @@ cpdef _partial_dependence_tree(Tree tree, DTYPE_t[:, ::1] X,
     cdef double current_weight
     cdef double total_weight = 0
 
-    cdef int n_outputs = tree.value.shape[1]
-    cdef int value_node_stride = tree.value.strides[0] // tree.value.strides[1]
-    # FIXME use sizeof instead of 8
-    cdef int value_output_stride = tree.value.strides[1] // 8
-    cdef int out_row_stride = out.strides[0] // out.strides[1]
-    cdef int out_col_stride = out.strides[1] // 8
-
-
     for i in range(X.shape[0]):
         # init stacks for new example
         stack_size = 1
@@ -251,7 +251,6 @@ cpdef _partial_dependence_tree(Tree tree, DTYPE_t[:, ::1] X,
 
             if children_left[current_node] == LEAF:
                 for k in range(n_outputs):
-                    output_offset = k * value_output_stride
                     out[(i * out_row_stride) + (k * out_col_stride)] += (
                         weight_stack[stack_size] *
                         value[(current_node * value_node_stride) + (k * value_output_stride)] *
