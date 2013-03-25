@@ -38,6 +38,7 @@ from ..utils import check_random_state, array2d, check_arrays
 from ..utils.extmath import logsumexp
 
 from ..tree.tree import DecisionTreeRegressor
+from ..tree.tree import ExtraTreeRegressor
 from ..tree._tree import _random_sample_mask
 from ..tree._tree import DTYPE, TREE_LEAF
 
@@ -438,7 +439,7 @@ class BaseGradientBoosting(BaseEnsemble):
     @abstractmethod
     def __init__(self, loss, learning_rate, n_estimators, min_samples_split,
                  min_samples_leaf, max_depth, init, subsample, max_features,
-                 random_state, alpha=0.9, verbose=0):
+                 random_state, alpha=0.9, verbose=0, split='best'):
 
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
@@ -453,6 +454,7 @@ class BaseGradientBoosting(BaseEnsemble):
         self.alpha = alpha
         self.verbose = verbose
         self.estimators_ = np.empty((0, 0), dtype=np.object)
+        self.split = split
 
     def _fit_stage(self, i, X, X_argsorted, y, y_pred, sample_mask,
                    random_state):
@@ -467,7 +469,15 @@ class BaseGradientBoosting(BaseEnsemble):
             residual = loss.negative_gradient(y, y_pred, k=k)
 
             # induce regression tree on residuals
-            tree = DecisionTreeRegressor(
+
+            if self.split == 'best':
+                tree_cls = DecisionTreeRegressor
+            elif self.split == 'random':
+                tree_cls = ExtraTreeRegressor
+            else:
+                raise ValueError('split must be either "best" or "random"')
+
+            tree = tree_cls(
                 criterion="mse",
                 max_depth=self.max_depth,
                 min_samples_split=self.min_samples_split,
@@ -815,12 +825,12 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
     def __init__(self, loss='deviance', learning_rate=0.1, n_estimators=100,
                  subsample=1.0, min_samples_split=2, min_samples_leaf=1,
                  max_depth=3, init=None, random_state=None,
-                 max_features=None, verbose=0):
+                 max_features=None, verbose=0, split='best'):
 
         super(GradientBoostingClassifier, self).__init__(
             loss, learning_rate, n_estimators, min_samples_split,
             min_samples_leaf, max_depth, init, subsample, max_features,
-            random_state, verbose=verbose)
+            random_state, verbose=verbose, split=split)
 
     def fit(self, X, y):
         """Fit the gradient boosting model.
@@ -1057,12 +1067,13 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
     def __init__(self, loss='ls', learning_rate=0.1, n_estimators=100,
                  subsample=1.0, min_samples_split=2, min_samples_leaf=1,
                  max_depth=3, init=None, random_state=None,
-                 max_features=None, alpha=0.9, verbose=0):
+                 max_features=None, alpha=0.9, verbose=0,
+                 split='best'):
 
         super(GradientBoostingRegressor, self).__init__(
             loss, learning_rate, n_estimators, min_samples_split,
             min_samples_leaf, max_depth, init, subsample, max_features,
-            random_state, alpha, verbose)
+            random_state, alpha, verbose, split)
 
     def fit(self, X, y):
         """Fit the gradient boosting model.
