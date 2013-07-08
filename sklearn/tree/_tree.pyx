@@ -1164,10 +1164,11 @@ cdef class RandomSplitter(Splitter):
 cdef class PresortedBestSplitter(Splitter):
     """Splitter for finding the best split using presorted X.
 
-    Presorting can be much faster if the trees to be grown are shallow or a large number
-    of trees are grown (e.g. in boosting).
+    Presorting can be much faster if the trees to be grown are shallow or a
+    large number of trees are grown (e.g. in boosting).
 
-    This splitter argsorts each column of X and uses a binary mask to represent partitions.
+    This splitter argsorts each column of X and uses a binary mask to
+    represent partitions.
     """
     def __reduce__(self):
         return (PresortedBestSplitter,
@@ -1178,11 +1179,48 @@ cdef class PresortedBestSplitter(Splitter):
                          np.ndarray[DOUBLE_t, ndim=2, mode="c"] y,
                          DOUBLE_t* sample_weight):
         """Initialize the splitter."""
-        Splitter.init(self, X, y, sample_weight)
+        cdef SIZE_t n_samples = X.shape[0]
+        cdef SIZE_t n_features = X.shape[1]
+        cdef SIZE_t* features = <SIZE_t*> malloc(n_features * sizeof(SIZE_t))
+        for i from 0 <= i < n_features:
+            features[i] = i
 
-        self.X_argsorted = np.asfortranarray(np.argsort(X.T, axis=1).astype(np.int32).T)
-        self.sample_mask = None
+        self.features = features
+        self.n_features = n_features
+
+        self.X = X
+        self.y = <DOUBLE_t*> y.data
+        self.y_stride = <SIZE_t> y.strides[0] / <SIZE_t> y.itemsize
+        self.sample_weight = sample_weight
+
+        # Reset random number generator
+        srand(self.random_state.randint(0, RAND_MAX))
+
+        # FIXME this should be done in cinit rather than here!
+        self.X_argsorted = np.asfortranarray(
+            np.argsort(X.T, axis=1).astype(np.int32).T)
         self.sample_index = np.arange(X.shape[0])
+        self.sample_mask = np.ones(X.shape[0], dtype=np.bool)
+
+        # cast to raw data ptrs
+        self.X_ptr = <DTYPE_t*> X.data
+        self.X_argsorted_ptr = <int*> X_argsorted.data
+        self.y_ptr = <DOUBLE_t*> y.data
+        self.sample_mask_ptr = <BOOL_t*> sample_mask.data
+
+        self.sample_weight_ptr = NULL
+        if sample_weight is not None:
+            sample_weight_ptr = <DOUBLE_t*> sample_weight.data
+
+        # get ptr strides
+        self.X_stride = <Py_ssize_t> X.strides[1] / <int> X.itemsize
+        self.X_argsorted_stride = (<Py_ssize_t> X_argsorted.strides[1] /
+                                   <int> X_argsorted.itemsize)
+        self.y_stride = <Py_ssize_t> y.strides[0] / <int> y.itemsize
+
+        self.part = y.copy()
+        self.part_ptr = <DOUBLE_t*> self.part.data
+
 
     cdef void find_split(self, SIZE_t start,
                                SIZE_t end,
@@ -1203,7 +1241,116 @@ cdef class PresortedBestSplitter(Splitter):
             impurity[0] = node_impurity
             return
 
+        cdef int n_features = self.n_features
+        cdef SIZE_t* features = self.features
+        cdef int max_features = self.max_features
+        cdef int visited_features = 0
+        cdef int min_samples_leaf = self.min_samples_leaf
+        cdef object random_state = self.random_state
+
+        cdef int i, a, b, best_i = -1
+        cdef np.int32_t feature_idx = -1
+        cdef int n_left = 0
+
+        cdef double t, initial_error, error
+        cdef double best_error = INFINITY, best_t = INFINITY
+
+        cdef DTYPE_t* X_ptr = self.X_ptr
+        cdef int* X_argsorted = self.X_argsorted_ptr
+        cdef BOOL_t* sample_mask_ptr = self.sample_mask_ptr
+        cdef DOUBLE_t* sample_weight_ptr = self.sample_weight_ptr
+        cdef SIZE_t X_stride = self.X_stride
+        cdef SIZE_t X_argsorted_stride = self.X_argsorted_stride
+
+        cdef DTYPE_t* X_i = NULL
+        cdef int* X_argsorted_i = NULL
+        cdef DTYPE_t X_a, X_b
+
         # FIXME implement best split
+        for feature_idx from 0 <= feature_idx < n_features:
+            i = features[feature_idx]
+
+            # Get i-th col of X and X_sorted
+            X_i = X_ptr + X_stride * i
+            X_argsorted_i = X_argsorted_ptr + X_argsorted_stride * i
+
+            # Reset the criterion for this feature
+            criterion.reset()
+
+            # Index of smallest sample in X_argsorted_i that is in the sample mask
+            a = 0
+
+            while sample_mask_ptr[X_argsorted_i[a]] == 0:
+                a = a + 1
+
+            # Check that the feature is not constant
+            b = _smallest_sample_larger_than(a, X_i, X_argsorted_i,
+                                             sample_mask_ptr, n_total_samples)
+
+            if b == -1:
+                continue # Skip that feature and don't count it as visited
+
+            # Consider splits between two consecutive samples
+            while True:
+                # Find the following larger sample
+                b = _smallest_sample_larger_than(a, X_i, X_argsorted_i,
+                                                 sample_mask_ptr, n_total_samples)
+                if b == -1:
+                    break
+
+                # Better split than the best so far?
+                if not criterion.update(a, b,
+                                        y_ptr, y_stride,
+                                        X_argsorted_i,
+                                        sample_weight_ptr,
+                                        sample_mask_ptr):
+                    a = b
+                    continue
+
+                # Only consider splits that respect min_leaf
+                n_left = criterion.n_left
+                if (n_left < min_samples_leaf or
+                    (n_node_samples - n_left) < min_samples_leaf):
+                    a = b
+                    continue
+
+                error = criterion.eval()
+
+                if error < best_error:
+                    X_a = X_i[X_argsorted_i[a]]
+                    X_b = X_i[X_argsorted_i[b]]
+
+                    t = X_a + (X_b - X_a) / 2.0
+                    if t == X_b:
+                        t = X_a
+
+                    best_i = i
+                    best_t = t
+                    best_error = error
+
+                # Proceed to the next interval
+                a = b
+
+            # Count one more visited feature
+            visited_features += 1
+
+            if visited_features >= max_features:
+                break
+
+        # Reorganize samples in part into part[start:best_pos] + part[best_pos:end]
+        if best_pos < end:
+            partition_start = start
+            partition_end = end
+            p = start
+
+            while p < partition_end:
+                if X[samples[p], best_feature] <= best_threshold:
+                    p += 1
+
+                else:
+                    partition_end -= 1
+                    part_ptr[p], part_ptr[partition_end] = part_ptr[partition_end], part_pttr[p]
+
 
         # Return values
         pos[0] = best_pos

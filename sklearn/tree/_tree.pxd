@@ -9,7 +9,7 @@ cimport numpy as np
 ctypedef np.npy_float32 DTYPE_t          # Type of X
 ctypedef np.npy_float64 DOUBLE_t         # Type of y, sample_weight
 ctypedef np.npy_intp SIZE_t              # Type for indices and counters
-
+ctypedef np.int8_t BOOL_t                # Type of sample_mask
 
 # =============================================================================
 # Criterion
@@ -89,6 +89,18 @@ cdef class Splitter:
 
     cdef void node_value(self, double* dest)
 
+
+cdef PresortedBestSplitter(Splitter):
+
+    cdef DTYPE_t* X_ptr
+    cdef int* X_argsorted
+    cdef BOOL_t* sample_mask_ptr
+    cdef DOUBLE_t* sample_weight_ptr
+    cdef SIZE_t X_stride
+    cdef SIZE_t X_argsorted_stride
+
+    cdef np.ndarray part
+    cdef DOUBLE_t* part_ptr
 
 # =============================================================================
 # Tree
