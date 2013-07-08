@@ -2,16 +2,13 @@
 # cython: cdivision=True
 # cython: boundscheck=False
 # cython: wraparound=False
+### cython: profile=True
 
 # Author: Gilles Louppe, Peter Prettenhofer, Brian Holt, Noel Dawe, Satrajit Gosh
 # Licence: BSD 3 clause
 
-# TODO: http://docs.cython.org/src/tutorial/profiling_tutorial.html
-# TODO: handle negative weights
-# TODO: allow splitter objects
 
-
-from libc.stdlib cimport calloc, free, malloc, realloc
+from libc.stdlib cimport calloc, free, malloc, realloc, rand, srand, RAND_MAX
 from libc.string cimport memcpy
 from libc.math cimport log
 
@@ -83,7 +80,7 @@ cdef class ClassificationCriterion(Criterion):
     cdef double* label_count_right
     cdef double* label_count_total
 
-    def __cinit__(self, SIZE_t n_outputs, object n_classes):
+    def __cinit__(self, SIZE_t n_outputs, np.ndarray[SIZE_t, ndim=1] n_classes):
         # Default values
         self.y = NULL
         self.y_stride = 0
@@ -681,7 +678,7 @@ cdef class RegressionCriterion(Criterion):
         cdef SIZE_t p
         cdef SIZE_t k
         cdef DOUBLE_t w = 1.0
-        cdef DOUBLE_t y_ik = 0.0
+        cdef DOUBLE_t y_ik, w_y_ik
 
         # Note: We assume start <= pos < new_pos <= end
 
@@ -693,11 +690,13 @@ cdef class RegressionCriterion(Criterion):
 
             for k from 0 <= k < n_outputs:
                 y_ik = y[i * y_stride + k]
-                sq_sum_left[k] += w * (y_ik * y_ik)
-                sq_sum_right[k] -= w * (y_ik * y_ik)
+                w_y_ik = w * y_ik
 
-                mean_left[k] = ((weighted_n_left * mean_left[k] + w * y_ik) / (weighted_n_left + w))
-                mean_right[k] = ((weighted_n_right * mean_right[k] - w * y_ik) / (weighted_n_right - w))
+                sq_sum_left[k] += w_y_ik * y_ik
+                sq_sum_right[k] -= w_y_ik * y_ik
+
+                mean_left[k] = ((weighted_n_left * mean_left[k] + w_y_ik) / (weighted_n_left + w))
+                mean_right[k] = ((weighted_n_right * mean_right[k] - w_y_ik) / (weighted_n_right - w))
 
             weighted_n_left += w
             weighted_n_right -= w
@@ -835,8 +834,12 @@ cdef class Splitter:
         self.y_stride = <SIZE_t> y.strides[0] / <SIZE_t> y.itemsize
         self.sample_weight = sample_weight
 
+        # Reset random number generator
+        srand(self.random_state.randint(0, RAND_MAX))
+
     cdef void find_split(self, SIZE_t start,
                                SIZE_t end,
+                               bint is_leaf,
                                SIZE_t* pos,
                                SIZE_t* feature,
                                double* threshold,
@@ -855,38 +858,22 @@ cdef class BestSplitter(Splitter):
                 (self.criterion, self.max_features, self.min_samples_leaf, self.random_state),
                 self.__getstate__())
 
-    cdef void init(self, np.ndarray[DTYPE_t, ndim=2] X,
-                         np.ndarray[DOUBLE_t, ndim=2, mode="c"] y,
-                         DOUBLE_t* sample_weight):
-        """Initialize the splitter."""
-        Splitter.init(self, X, y, sample_weight)
-
-        # Shuffle samples
-        cdef SIZE_t* samples = self.samples
-        cdef SIZE_t n_samples = self.n_samples
-        cdef object random_state = self.random_state
-        cdef SIZE_t n, i, j
-
-        for n from 0 <= n < n_samples:
-            i = n_samples - n - 1
-            j = random_state.randint(0, n_samples - n)
-            samples[i], samples[j] = samples[j], samples[i]
-
     cdef void find_split(self, SIZE_t start,
                                SIZE_t end,
+                               bint is_leaf,
                                SIZE_t* pos,
                                SIZE_t* feature,
                                double* threshold,
                                double* impurity):
         """Find the best split on node samples[start:end]."""
-        # Break early if node is pure
+        # Break early if node is a leaf
         cdef Criterion criterion = self.criterion
         cdef SIZE_t* samples = self.samples
 
         criterion.init(self.y, self.y_stride, self.sample_weight, samples, start, end)
         cdef double node_impurity = criterion.node_impurity()
 
-        if end - start <= 1 or node_impurity == 0.0:
+        if is_leaf or node_impurity == 0.0:
             pos[0] = end
             impurity[0] = node_impurity
             return
@@ -924,7 +911,7 @@ cdef class BestSplitter(Splitter):
         for f_idx from 0 <= f_idx < n_features:
             # Draw a feature at random
             f_i = n_features - f_idx - 1
-            f_j = random_state.randint(0, n_features - f_idx)
+            f_j = rand_int(n_features - f_idx)
             features[f_i], features[f_j] = features[f_j], features[f_i]
             current_feature = features[f_i]
 
@@ -936,7 +923,7 @@ cdef class BestSplitter(Splitter):
             p = start
 
             while p < end:
-                while p + 1 < end and X[samples[p + 1], current_feature] == X[samples[p], current_feature]:
+                while p + 1 < end and X[samples[p + 1], current_feature] <= X[samples[p], current_feature] + 1.e-7:
                     p += 1
 
                 # p + 1 >= end or X[samples[p + 1], current_feature] > X[samples[p], current_feature]
@@ -954,14 +941,15 @@ cdef class BestSplitter(Splitter):
                     criterion.update(current_pos)
                     current_impurity = criterion.children_impurity()
 
-                    current_threshold = (X[samples[p - 1], current_feature] + X[samples[p], current_feature]) / 2.0
-                    if current_threshold == X[samples[p], current_feature]:
-                        current_threshold = X[samples[p - 1], current_feature]
-
                     if current_impurity < best_impurity:
                         best_impurity = current_impurity
                         best_pos = current_pos
                         best_feature = current_feature
+
+                        current_threshold = (X[samples[p - 1], current_feature] + X[samples[p], current_feature]) / 2.0
+                        if current_threshold == X[samples[p], current_feature]:
+                            current_threshold = X[samples[p - 1], current_feature]
+
                         best_threshold = current_threshold
 
             if best_pos == end: # No valid split was ever found
@@ -986,8 +974,6 @@ cdef class BestSplitter(Splitter):
                 else:
                     partition_end -= 1
                     samples[p], samples[partition_end] = samples[partition_end], samples[p]
-
-            assert partition_end == best_pos
 
         # Return values
         pos[0] = best_pos
@@ -1045,19 +1031,20 @@ cdef class RandomSplitter(Splitter):
 
     cdef void find_split(self, SIZE_t start,
                                SIZE_t end,
+                               bint is_leaf,
                                SIZE_t* pos,
                                SIZE_t* feature,
                                double* threshold,
                                double* impurity):
         """Find the best random split on node samples[start:end]."""
-        # Break early if node is pure
+        # Break early if node is a leaf
         cdef Criterion criterion = self.criterion
         cdef SIZE_t* samples = self.samples
 
         criterion.init(self.y, self.y_stride, self.sample_weight, samples, start, end)
         cdef double node_impurity = criterion.node_impurity()
 
-        if end - start <= 1 or node_impurity == 0.0:
+        if is_leaf or node_impurity == 0.0:
             pos[0] = end
             impurity[0] = node_impurity
             return
@@ -1093,7 +1080,7 @@ cdef class RandomSplitter(Splitter):
         for f_idx from 0 <= f_idx < n_features:
             # Draw a feature at random
             f_i = n_features - f_idx - 1
-            f_j = random_state.randint(0, n_features - f_idx)
+            f_j = rand_int(n_features - f_idx)
             features[f_i], features[f_j] = features[f_j], features[f_i]
             current_feature = features[f_i]
 
@@ -1112,7 +1099,7 @@ cdef class RandomSplitter(Splitter):
                 continue
 
             # Draw a random threshold
-            current_threshold = min_feature_value + random_state.rand() * (max_feature_value - min_feature_value)
+            current_threshold = min_feature_value + rand_double() * (max_feature_value - min_feature_value)
             if current_threshold == max_feature_value:
                 current_threshold = min_feature_value
 
@@ -1130,8 +1117,6 @@ cdef class RandomSplitter(Splitter):
                     samples[p], samples[partition_end] = samples[partition_end], samples[p]
 
             current_pos = partition_end
-
-            assert current_pos < end
 
             # Reject if min_samples_leaf is not guaranteed
             if ((current_pos - start) < min_samples_leaf) or \
@@ -1168,8 +1153,6 @@ cdef class RandomSplitter(Splitter):
                 else:
                     partition_end -= 1
                     samples[p], samples[partition_end] = samples[partition_end], samples[p]
-
-            assert partition_end == best_pos
 
         # Return values
         pos[0] = best_pos
@@ -1275,7 +1258,7 @@ cdef class Tree:
         def __get__(self):
             return sizet_ptr_to_ndarray(self.n_node_samples, self.node_count)
 
-    def __cinit__(self, int n_features, object n_classes, int n_outputs,
+    def __cinit__(self, int n_features, np.ndarray[SIZE_t, ndim=1] n_classes, int n_outputs,
                         Splitter splitter, SIZE_t max_depth, SIZE_t min_samples_split,
                         SIZE_t min_samples_leaf, object random_state):
         """Constructor."""
@@ -1485,14 +1468,14 @@ cdef class Tree:
             parent = stack[stack_n_values + 3]
             is_left = stack[stack_n_values + 4]
 
-            splitter.find_split(start, end, &pos, &feature, &threshold, &impurity)
-
             n_node_samples = end - start
-            is_leaf = (pos >= end) or \
-                      (depth >= self.max_depth) or \
+            is_leaf = (depth >= self.max_depth) or \
                       (n_node_samples < self.min_samples_split) or \
                       (n_node_samples < 2 * self.min_samples_leaf)
 
+            splitter.find_split(start, end, is_leaf, &pos, &feature, &threshold, &impurity)
+
+            is_leaf = is_leaf or (pos >= end)
             node_id = self.add_node(parent, is_left, is_leaf, feature,
                                     threshold, impurity, n_node_samples)
 
@@ -1671,3 +1654,12 @@ cdef inline np.ndarray double_ptr_to_ndarray(double* data, SIZE_t size):
     cdef np.npy_intp shape[1]
     shape[0] = <np.npy_intp> size
     return np.PyArray_SimpleNewFromData(1, shape, np.NPY_DOUBLE, data)
+
+cdef inline SIZE_t rand_int(SIZE_t end):
+    """Generate a random integer in [0; end)."""
+    return rand() % end
+
+cdef inline double rand_double():
+    """Generate a random double in [0; 1)."""
+    return <double> rand() / <double> RAND_MAX
+

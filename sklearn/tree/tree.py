@@ -20,6 +20,7 @@ from ..feature_selection.from_model import _LearntSelectorMixin
 from ..utils import array2d, check_random_state
 from ..utils.validation import check_arrays
 
+from ._tree import Criterion, Splitter, Tree
 from . import _tree
 
 
@@ -27,9 +28,6 @@ __all__ = ["DecisionTreeClassifier",
            "DecisionTreeRegressor",
            "ExtraTreeClassifier",
            "ExtraTreeRegressor"]
-
-
-# TODO: deprecate sample_mask, X_argsorted, min_density
 
 
 # =============================================================================
@@ -156,6 +154,8 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
             self.classes_ = [None] * self.n_outputs_
             self.n_classes_ = [1] * self.n_outputs_
 
+        self.n_classes_ = np.array(self.n_classes_, dtype=np.intp)
+
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
 
@@ -214,21 +214,27 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
                                 2 * self.min_samples_leaf)
 
         # Build tree
-        if is_classification:
-            criterion = CRITERIA_CLF[self.criterion](self.n_outputs_,
-                                                     self.n_classes_)
-        else:
-            criterion = CRITERIA_REG[self.criterion](self.n_outputs_)
+        criterion = self.criterion
+        if not isinstance(criterion, Criterion):
+            if is_classification:
+                criterion = CRITERIA_CLF[self.criterion](self.n_outputs_,
+                                                         self.n_classes_)
+            else:
+                criterion = CRITERIA_REG[self.criterion](self.n_outputs_)
 
-        self.splitter_ = SPLITTERS[self.splitter](criterion,
-                                                  max_features,
-                                                  self.min_samples_leaf,
-                                                  random_state)
+        splitter = self.splitter
+        if not isinstance(self.splitter, Splitter):
+            splitter = SPLITTERS[self.splitter](criterion,
+                                                max_features,
+                                                self.min_samples_leaf,
+                                                random_state)
 
-        self.tree_ = _tree.Tree(self.n_features_, self.n_classes_,
-                                self.n_outputs_, self.splitter_, max_depth,
-                                min_samples_split, self.min_samples_leaf,
-                                random_state)
+        self.criterion_ = criterion
+        self.splitter_ = splitter
+        self.tree_ = Tree(self.n_features_, self.n_classes_,
+                          self.n_outputs_, splitter, max_depth,
+                          min_samples_split, self.min_samples_leaf,
+                          random_state)
 
         self.tree_.build(X, y, sample_weight=sample_weight)
 
