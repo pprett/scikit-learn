@@ -1178,6 +1178,58 @@ cdef class RandomSplitter(Splitter):
         impurity[0] = node_impurity
 
 
+cdef class PresortedBestSplitter(Splitter):
+    """Splitter for finding the best split using presorted X.
+
+    Presorting can be much faster if the trees to be grown are shallow or a large number
+    of trees are grown (e.g. in boosting).
+
+    This splitter argsorts each column of X and uses a binary mask to represent partitions.
+    """
+    def __reduce__(self):
+        return (PresortedBestSplitter,
+                (self.criterion, self.max_features, self.min_samples_leaf, self.random_state),
+                self.__getstate__())
+
+    cdef void init(self, np.ndarray[DTYPE_t, ndim=2] X,
+                         np.ndarray[DOUBLE_t, ndim=2, mode="c"] y,
+                         DOUBLE_t* sample_weight):
+        """Initialize the splitter."""
+        Splitter.init(self, X, y, sample_weight)
+
+        self.X_argsorted = np.asfortranarray(np.argsort(X.T, axis=1).astype(np.int32).T)
+        self.sample_mask = None
+        self.sample_index = np.arange(X.shape[0])
+
+    cdef void find_split(self, SIZE_t start,
+                               SIZE_t end,
+                               SIZE_t* pos,
+                               SIZE_t* feature,
+                               double* threshold,
+                               double* impurity):
+        """Find the best split on node samples[start:end]."""
+        # Break early if node is pure
+        cdef Criterion criterion = self.criterion
+        cdef SIZE_t* samples = self.samples
+
+        criterion.init(self.y, self.y_stride, self.sample_weight, samples, start, end)
+        cdef double node_impurity = criterion.node_impurity()
+
+        if end - start <= 1 or node_impurity == 0.0:
+            pos[0] = end
+            impurity[0] = node_impurity
+            return
+
+        # FIXME implement best split
+
+        # Return values
+        pos[0] = best_pos
+        feature[0] = best_feature
+        threshold[0] = best_threshold
+        impurity[0] = node_impurity
+
+
+
 # =============================================================================
 # Tree
 # =============================================================================
