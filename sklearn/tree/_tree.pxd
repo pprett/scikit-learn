@@ -71,7 +71,7 @@ cdef class Splitter:
     cdef SIZE_t end                      # End position for the current ndoe
 
 
-    cdef np.ndarray X
+    cdef DTYPE_t[:, :] X
     cdef DOUBLE_t* y
     cdef SIZE_t y_stride
     cdef DOUBLE_t* sample_weight
@@ -82,7 +82,7 @@ cdef class Splitter:
     # subsets `samples[start:pos]` and `start[pos:end]`.
 
     # Methods
-    cdef void init(self, np.ndarray X,
+    cdef void init(self, DTYPE_t[:,:] X,
                          np.ndarray y,
                          DOUBLE_t* sample_weight)
 

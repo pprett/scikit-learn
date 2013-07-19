@@ -129,12 +129,8 @@ class BaseDecisionTree(six.with_metaclass(ABCMeta, BaseEstimator,
 
         # Convert data
         if check_input:
-            X, y = check_arrays(X, y)
-
-        if ((getattr(X, "dtype", None) != DTYPE) or
-            (X.ndim != 2) or
-            (not X.flags.contiguous)):
-            X = np.ascontiguousarray(array2d(X), dtype=DTYPE)
+            X, = check_arrays(X, dtype=DTYPE, sparse_format='dense')
+            y, = check_arrays(y)  # FIXME must y be c-continouse?
 
         # Determine output settings
         n_samples, self.n_features_ = X.shape
