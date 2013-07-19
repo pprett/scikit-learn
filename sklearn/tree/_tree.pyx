@@ -1532,7 +1532,7 @@ cdef class Tree:
         self._resize(self.node_count)
         free(stack)
 
-    cpdef predict(self, np.ndarray[DTYPE_t, ndim=2] X):
+    cpdef predict(self, DTYPE_t[:, :] X):
         """Predict target for X."""
         cdef SIZE_t* children_left = self.children_left
         cdef SIZE_t* children_right = self.children_right
@@ -1601,7 +1601,7 @@ cdef class Tree:
 
             return out_multi
 
-    cpdef apply(self, np.ndarray[DTYPE_t, ndim=2] X):
+    cpdef apply(self, DTYPE_t[:, :] X):
         """Finds the terminal region (=leaf node) for each sample in X."""
         cdef SIZE_t* children_left = self.children_left
         cdef SIZE_t* children_right = self.children_right
