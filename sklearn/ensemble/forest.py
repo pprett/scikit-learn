@@ -252,11 +252,8 @@ class BaseForest(six.with_metaclass(ABCMeta, BaseEnsemble,
         random_state = check_random_state(self.random_state)
 
         # Convert data
-        X, y = check_arrays(X, y, sparse_format="dense")
-        if ((getattr(X, "dtype", None) != DTYPE) or
-            (X.ndim != 2) or
-            (not X.flags.contiguous)):
-            X = np.ascontiguousarray(array2d(X), dtype=DTYPE)
+        X,  = check_arrays(X, sparse_format="dense", dtype=DTYPE)
+        y,  = check_arrays(y)
 
         # Remap output
         n_samples, self.n_features_ = X.shape
