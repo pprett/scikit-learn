@@ -29,17 +29,13 @@ import numpy as np
 import pylab as pl
 from sklearn import ensemble
 from sklearn import datasets
-from sklearn.utils.fixes import unique
-
+from sklearn.cross_validation import train_test_split
 
 X, y = datasets.make_hastie_10_2(n_samples=12000, random_state=1)
 X = X.astype(np.float32)
 
-# map labels from {-1, 1} to {0, 1}
-labels, y = unique(y, return_inverse=True)
-
-X_train, X_test = X[:2000], X[2000:]
-y_train, y_test = y[:2000], y[2000:]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.84,
+                                                    random_state=1)
 
 original_params = {'n_estimators': 1000, 'max_depth': 2, 'random_state': 1,
                    'min_samples_split': 5}
@@ -66,7 +62,6 @@ for label, color, setting in [('No shrinkage', 'orange',
     test_deviance = np.zeros((params['n_estimators'],), dtype=np.float64)
 
     for i, y_pred in enumerate(clf.staged_decision_function(X_test)):
-        # clf.loss_ assumes that y_test[i] in {0, 1}
         test_deviance[i] = clf.loss_(y_test, y_pred)
 
     pl.plot((np.arange(test_deviance.shape[0]) + 1)[::5], test_deviance[::5],
