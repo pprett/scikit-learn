@@ -141,7 +141,8 @@ class LossFunction(six.with_metaclass(ABCMeta, object)):
         """
 
     def update_terminal_regions(self, tree, X, y, residual, y_pred,
-                                sample_mask, learning_rate=1.0, k=0):
+                                sample_mask, learning_rate=1.0, k=0,
+                                line_search=True):
         """Update the terminal regions (=leaves) of the given tree and
         updates the current predictions of the model. Traverses tree
         and invokes template method `_update_terminal_region`.
@@ -166,11 +167,12 @@ class LossFunction(six.with_metaclass(ABCMeta, object)):
         masked_terminal_regions = terminal_regions.copy()
         masked_terminal_regions[~sample_mask] = -1
 
-        # update each leaf (= perform line search)
-        for leaf in np.where(tree.children_left == TREE_LEAF)[0]:
-            self._update_terminal_region(tree, masked_terminal_regions,
-                                         leaf, X, y, residual,
-                                         y_pred[:, k])
+        if line_search:
+            # update each leaf (= perform line search)
+            for leaf in np.where(tree.children_left == TREE_LEAF)[0]:
+                self._update_terminal_region(tree, masked_terminal_regions,
+                                             leaf, X, y, residual,
+                                             y_pred[:, k])
 
         # update predictions (both in-bag and out-of-bag)
         y_pred[:, k] += (learning_rate
@@ -204,7 +206,8 @@ class LeastSquaresError(RegressionLossFunction):
         return y - pred.ravel()
 
     def update_terminal_regions(self, tree, X, y, residual, y_pred,
-                                sample_mask, learning_rate=1.0, k=0):
+                                sample_mask, learning_rate=1.0, k=0,
+                                line_search=True):
         """Least squares does not need to update terminal regions.
 
         But it has to update the predictions.
@@ -444,7 +447,7 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
     @abstractmethod
     def __init__(self, loss, learning_rate, n_estimators, min_samples_split,
                  min_samples_leaf, max_depth, init, subsample, max_features,
-                 random_state, alpha=0.9, verbose=0):
+                 random_state, alpha=0.9, verbose=0, line_search=True):
 
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
@@ -459,6 +462,7 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.alpha = alpha
         self.verbose = verbose
         self.estimators_ = np.empty((0, 0), dtype=np.object)
+        self.line_search = line_search
 
     def _fit_stage(self, i, X, y, y_pred, sample_mask,
                    random_state):
@@ -488,9 +492,10 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             tree.fit(X, residual,
                      sample_weight=sample_weight, check_input=False)
 
-            # update tree leaves
+            # update tree leaves and y_pred
             loss.update_terminal_regions(tree.tree_, X, y, residual, y_pred,
-                                         sample_mask, self.learning_rate, k=k)
+                                         sample_mask, self.learning_rate, k=k,
+                                         line_search=self.line_search)
 
             # add tree to ensemble
             self.estimators_[i, k] = tree
@@ -797,6 +802,11 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
         Enable verbose output. If 1 then it prints '.' for every tree built.
         If greater than 1 then it prints the score for every tree.
 
+    line_search : bool, default: True
+        Whether or not to perform the line search to update the terminal
+        nodes of the leafs (see [Friedman 2001]). Warning: use this
+        only if you know what you do.
+
     Attributes
     ----------
     `feature_importances_` : array, shape = [n_features]
@@ -847,12 +857,12 @@ class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):
     def __init__(self, loss='deviance', learning_rate=0.1, n_estimators=100,
                  subsample=1.0, min_samples_split=2, min_samples_leaf=1,
                  max_depth=3, init=None, random_state=None,
-                 max_features=None, verbose=0):
+                 max_features=None, verbose=0, line_search=True):
 
         super(GradientBoostingClassifier, self).__init__(
             loss, learning_rate, n_estimators, min_samples_split,
             min_samples_leaf, max_depth, init, subsample, max_features,
-            random_state, verbose=verbose)
+            random_state, verbose=verbose, line_search=line_search)
 
     def fit(self, X, y):
         """Fit the gradient boosting model.
@@ -1034,6 +1044,11 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
         Enable verbose output. If 1 then it prints '.' for every tree built.
         If greater than 1 then it prints the score for every tree.
 
+    line_search : bool, default: True
+        Whether or not to perform the line search to update the terminal
+        nodes of the leafs (see [Friedman 2001]). Warning: use this
+        only if you know what you do.
+
     Attributes
     ----------
     `feature_importances_` : array, shape = [n_features]
@@ -1084,12 +1099,12 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
     def __init__(self, loss='ls', learning_rate=0.1, n_estimators=100,
                  subsample=1.0, min_samples_split=2, min_samples_leaf=1,
                  max_depth=3, init=None, random_state=None,
-                 max_features=None, alpha=0.9, verbose=0):
+                 max_features=None, alpha=0.9, verbose=0, line_search=True):
 
         super(GradientBoostingRegressor, self).__init__(
             loss, learning_rate, n_estimators, min_samples_split,
             min_samples_leaf, max_depth, init, subsample, max_features,
-            random_state, alpha, verbose)
+            random_state, alpha, verbose, line_search)
 
     def fit(self, X, y):
         """Fit the gradient boosting model.

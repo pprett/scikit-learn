@@ -525,3 +525,17 @@ def test_oob_multilcass_iris():
     assert_array_almost_equal(clf.oob_improvement_[:5],
                               np.array([12.68, 10.45, 8.18, 6.43, 5.02]),
                               decimal=2)
+
+def test_line_search():
+    """
+    Check if turning off line search works.
+
+    loss='lr' doesn't use update_terminal_nodes anyways.
+    """
+    clf = GradientBoostingRegressor(loss='ls', n_estimators=100, random_state=1,
+                                    line_search=True).fit(boston.data, boston.target)
+    clf2 = GradientBoostingRegressor(loss='ls', n_estimators=100, random_state=1,
+                                     line_search=False).fit(boston.data, boston.target)
+    assert_array_equal(clf.predict(boston.data), clf2.predict(boston.data))
+
+
