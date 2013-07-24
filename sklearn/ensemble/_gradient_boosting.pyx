@@ -19,8 +19,6 @@ ctypedef np.int32_t int32
 ctypedef np.float64_t float64
 ctypedef np.int8_t int8
 
-from numpy import bool as np_bool
-
 # no namespace lookup for numpy dtype and array creation
 from numpy import zeros as np_zeros
 from numpy import ones as np_ones
