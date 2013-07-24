@@ -5,7 +5,7 @@ Gradient Boosting Out-of-Bag estimates
 
 Out-of-bag (OOB) estimates can be a useful heuristic to estimate
 the "optimal" number of boosting iterations.
-OOB estimates are almost identical to cross-validation estimates but
+OOB estimates are an alternative to cross-validation estimates but
 they can be computed on-the-fly without the need for repeated model
 fitting.
 OOB estimates are only available for Stochastic Gradient Boosting
@@ -21,7 +21,9 @@ loss for the first hundred iterations but then diverges in a
 pessimistic way.
 The figure also shows the performance of 3-fold cross validation which
 usually gives a better estimate of the test loss
-but is computationally more demanding.
+but is computationally more demanding. Nevertheless, we recommend to use
+cross validation instead of OOB unless its computationally not viable and
+you have sufficient data (n_samples > 10 ** 5).
 """
 print(__doc__)
 
@@ -35,27 +37,17 @@ from matplotlib import pyplot as plt
 from sklearn import ensemble
 from sklearn.cross_validation import KFold
 from sklearn.cross_validation import train_test_split
+from sklearn import datasets
 
 
-# Generate data (adapted from G. Ridgeway's gbm example)
-n_samples = 1000
-random_state = np.random.RandomState(13)
-x1 = random_state.uniform(size=n_samples)
-x2 = random_state.uniform(size=n_samples)
-x3 = random_state.randint(0, 4, size=n_samples)
-
-p = 1 / (1.0 + np.exp(-(np.sin(3 * x1) - 4 * x2 + x3)))
-y = random_state.binomial(1, p, size=n_samples)
-
-X = np.c_[x1, x2, x3]
-
+X, y = datasets.make_hastie_10_2(n_samples=12000, random_state=1)
 X = X.astype(np.float32)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5,
-                                                    random_state=9)
+                                                    random_state=1)
 
 # Fit classifier with out-of-bag estimates
-params = {'n_estimators': 1200, 'max_depth': 3, 'subsample': 0.5,
-          'learning_rate': 0.01, 'min_samples_leaf': 1, 'random_state': 3}
+params = {'n_estimators': 1000, 'max_depth': 2, 'random_state': 1,
+          'min_samples_leaf': 5, 'subsample': 0.5, 'learning_rate': 0.8}
 clf = ensemble.GradientBoostingClassifier(**params)
 
 clf.fit(X_train, y_train)
@@ -75,7 +67,7 @@ def heldout_score(clf, X_test, y_test):
 
 
 def cv_estimate(n_folds=3):
-    cv = KFold(n=X_train.shape[0], n_folds=n_folds)
+    cv = KFold(n=X_train.shape[0], n_folds=n_folds, shuffle=True, random_state=13)
     cv_clf = ensemble.GradientBoostingClassifier(**params)
     val_scores = np.zeros((n_estimators,), dtype=np.float64)
     for train, test in cv:
