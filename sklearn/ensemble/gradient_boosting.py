@@ -125,7 +125,7 @@ class LossFunction(six.with_metaclass(ABCMeta, object)):
         raise NotImplementedError()
 
     @abstractmethod
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
         """Compute the loss of prediction ``pred`` and ``y``. """
 
     @abstractmethod
@@ -197,7 +197,7 @@ class LeastSquaresError(RegressionLossFunction):
     def init_estimator(self):
         return MeanEstimator()
 
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
         return np.mean((y - pred.ravel()) ** 2.0)
 
     def negative_gradient(self, y, pred, **kargs):
@@ -222,7 +222,7 @@ class LeastAbsoluteError(RegressionLossFunction):
     def init_estimator(self):
         return QuantileEstimator(alpha=0.5)
 
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
         return np.abs(y - pred.ravel()).mean()
 
     def negative_gradient(self, y, pred, **kargs):
@@ -248,7 +248,7 @@ class HuberLossFunction(RegressionLossFunction):
     def init_estimator(self):
         return QuantileEstimator(alpha=0.5)
 
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
         pred = pred.ravel()
         diff = y - pred
         gamma = self.gamma
@@ -298,7 +298,7 @@ class QuantileLossFunction(RegressionLossFunction):
     def init_estimator(self):
         return QuantileEstimator(self.alpha)
 
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
         pred = pred.ravel()
         diff = y - pred
         alpha = self.alpha
@@ -339,15 +339,18 @@ class BinomialDeviance(LossFunction):
     def init_estimator(self):
         return LogOddsEstimator()
 
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
         """Compute the deviance (= 2 * negative log-likelihood). """
-        # logaddexp(0, v) == log(1.0 + exp(v))
+        if check_input:
+            _, y = unique(y, return_inverse=True)
         pred = pred.ravel()
+        # logaddexp(0, v) == log(1.0 + exp(v))
         return -2.0 * np.mean((y * pred) - np.logaddexp(0.0, pred))
 
     def negative_gradient(self, y, pred, **kargs):
         """Compute the residual (= negative gradient). """
-        return y - 1.0 / (1.0 + np.exp(-pred.ravel()))
+        p = 1.0 / (1.0 + np.exp(-pred.ravel()))
+        return y - p
 
     def _update_terminal_region(self, tree, terminal_regions, leaf, X, y,
                                 residual, pred):
@@ -364,7 +367,8 @@ class BinomialDeviance(LossFunction):
         y = y.take(terminal_region, axis=0)
 
         numerator = residual.sum()
-        denominator = np.sum((y - residual) * (1 - y + residual))
+        p = y - residual
+        denominator = np.sum(p * (1 - p))
 
         if denominator == 0.0:
             tree.value[leaf, 0, 0] = 0.0
@@ -390,7 +394,9 @@ class MultinomialDeviance(LossFunction):
     def init_estimator(self):
         return PriorProbabilityEstimator()
 
-    def __call__(self, y, pred):
+    def __call__(self, y, pred, check_input=True):
+        if check_input:
+            _, y = unique(y, return_inverse=True)
         # create one-hot label encoding
         Y = np.zeros((y.shape[0], self.K), dtype=np.float64)
         for k in range(self.K):
@@ -592,7 +598,8 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                                                   random_state)
                 # OOB score before this stage
                 old_oob_score = loss_(y[~sample_mask],
-                                      y_pred[~sample_mask])
+                                      y_pred[~sample_mask],
+                                      check_input=False)
 
             # fit next stage of trees
             y_pred = self._fit_stage(i, X, y, y_pred, sample_mask,
@@ -601,20 +608,23 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             # track deviance (= loss)
             if do_oob:
                 self.train_score_[i] = loss_(y[sample_mask],
-                                             y_pred[sample_mask])
+                                             y_pred[sample_mask],
+                                             check_input=False)
                 self._oob_score_[i] = loss_(y[~sample_mask],
-                                            y_pred[~sample_mask])
+                                            y_pred[~sample_mask],
+                                            check_input=False)
+                # improvement of oob score when adding i-th stage
                 self.oob_improvement_[i] = old_oob_score - self._oob_score_[i]
 
                 if self.verbose > 1:
                     print("built tree %d of %d, train score = %.6e, "
                           "oob improvement = %.6e" % (i + 1, self.n_estimators,
-                                                self.train_score_[i],
-                                                self.oob_improvement_[i]))
+                                                      self.train_score_[i],
+                                                      self.oob_improvement_[i]))
 
             else:
                 # no need to fancy index w/ no subsampling
-                self.train_score_[i] = self.loss_(y, y_pred)
+                self.train_score_[i] = self.loss_(y, y_pred, check_input=False)
                 if self.verbose > 1:
                     print("built tree %d of %d, train score = %.6e" %
                           (i + 1, self.n_estimators, self.train_score_[i]))

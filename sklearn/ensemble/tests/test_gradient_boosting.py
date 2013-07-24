@@ -306,8 +306,9 @@ def test_max_feature_regression():
                                       max_depth=2, learning_rate=.1,
                                       max_features=2, random_state=1)
     gbrt.fit(X_train, y_train)
-    deviance = gbrt.loss_(y_test, gbrt.decision_function(X_test))
-    assert_true(deviance < 0.5, "GB failed with deviance %.4f" % deviance)
+    deviance = gbrt.loss_(y_test, gbrt.decision_function(X_test),
+                          check_input=True)
+    assert_true(deviance < 0.9, "GB failed with deviance %.4f" % deviance)
 
 
 def test_staged_predict():
