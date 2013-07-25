@@ -396,6 +396,11 @@ that controls overfitting via :ref:`shrinkage <gradient_boosting_shrinkage>`.
    of classes we strongly recommend to use
    :class:`RandomForestClassifier` as an alternative to GBRT.
 
+.. warning:: The binomial deviance loss function sometimes encounters numerical
+             stability issues. In such a case you will be reported a warning
+             of the form ``. Numerical issues can usually mitigated by lowering
+             the ``learning_rate`` .
+
 Regression
 ----------
 
@@ -502,6 +507,9 @@ Where the step length :math:`\gamma_m` is chosen using line search:
 The algorithms for regression and classification
 only differ in the concrete loss function used.
 
+.. note:: You can turn off the line search by setting ``line_search=False``,
+          however, you should only do this if you know what you are doing.
+
 .. _gradient_boosting_loss:
 
 Loss Functions
@@ -540,6 +548,9 @@ the parameter ``loss``:
       prior probability of each class. At each iteration ``n_classes``
       regression trees have to be constructed which makes GBRT rather
       inefficient for data sets with a large number of classes.
+
+You can find more detailed information on (most) of the above loss functions
+in [R2007]_.
 
 Regularization
 ----------------

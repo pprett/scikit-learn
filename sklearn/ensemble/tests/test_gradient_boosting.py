@@ -5,20 +5,17 @@ Testing for the gradient boosting module (sklearn.ensemble.gradient_boosting).
 import numpy as np
 import warnings
 
-from sklearn.utils.testing import assert_equal
-from sklearn.utils.testing import assert_array_equal
-from sklearn.utils.testing import assert_array_almost_equal
-from sklearn.utils.testing import assert_raises
-from sklearn.utils.testing import assert_true
-
-
-from sklearn.metrics import mean_squared_error
-from sklearn.utils import check_random_state, tosequence
-
+from sklearn import datasets
+from sklearn.cross_validation import train_test_split
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import GradientBoostingRegressor
-
-from sklearn import datasets
+from sklearn.metrics import mean_squared_error
+from sklearn.utils import check_random_state, tosequence
+from sklearn.utils.testing import assert_array_almost_equal
+from sklearn.utils.testing import assert_array_equal
+from sklearn.utils.testing import assert_equal
+from sklearn.utils.testing import assert_raises
+from sklearn.utils.testing import assert_true
 
 # toy sample
 X = [[-2, -1], [-1, -1], [-1, -2], [1, 1], [1, 2], [2, 1]]
@@ -584,7 +581,28 @@ def test_line_search():
     loss='lr' doesn't use update_terminal_nodes anyways.
     """
     clf = GradientBoostingRegressor(loss='ls', n_estimators=100, random_state=1,
-                                    line_search=True).fit(boston.data, boston.target)
+                                    line_search=True).fit(boston.data,
+                                                          boston.target)
     clf2 = GradientBoostingRegressor(loss='ls', n_estimators=100, random_state=1,
-                                     line_search=False).fit(boston.data, boston.target)
+                                     line_search=False).fit(boston.data,
+                                                            boston.target)
     assert_array_equal(clf.predict(boston.data), clf2.predict(boston.data))
+
+
+def test_train_deviance_incr_warning():
+    """Check if a warning is shown if train_score suddenly jumps. """
+    X, y = datasets.make_hastie_10_2(n_samples=12000, random_state=1)
+    X = X.astype(np.float32)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.84,
+                                                        random_state=1)
+    # on this specific train-test split and using those random seeds
+    # a numerical error occurs
+    params = {'n_estimators': 30, 'max_depth': 5, 'subsample': 0.5,
+              'learning_rate': 1.0, 'min_samples_leaf': 1, 'random_state': 1}
+
+    clf = GradientBoostingClassifier(**params)
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        clf.fit(X_train, y_train)
+        assert_equal(len(w), 1)

@@ -638,6 +638,11 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                 # no need to fancy index w/ no subsampling
                 self.train_score_[i] = self.loss_(y, y_pred)
 
+            if i > 0:
+                if (self.train_score_[i] - self.train_score_[i - 1]) > 10**3:
+                    warn('Train deviance increased suddenly, '
+                         'try lowering the learning_rate')
+
             if self.verbose > 0:
                 if (i + 1) % verbose_mod == 0:
                     oob_impr = self.oob_improvement_[i] if do_oob else 0
