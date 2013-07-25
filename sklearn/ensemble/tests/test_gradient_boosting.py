@@ -526,6 +526,57 @@ def test_oob_multilcass_iris():
                               np.array([12.68, 10.45, 8.18, 6.43, 5.02]),
                               decimal=2)
 
+
+def test_verbose_output():
+    """Check verbose=1 does not cause error. """
+    from sklearn.externals.six.moves import cStringIO as StringIO
+    import sys
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+    clf = GradientBoostingClassifier(n_estimators=100, random_state=1,
+                                     verbose=1, subsample=0.8)
+    clf.fit(X, y)
+    verbose_output = sys.stdout
+    sys.stdout = old_stdout
+
+    # check output
+    verbose_output.seek(0)
+    header = verbose_output.readline().rstrip()
+    # with OOB
+    true_header = ' '.join(['{:>10}'] + ['{:>16}'] * 3).format(
+        'Iter', 'Train Loss', 'OOB Improve', 'Remaining Time')
+    assert_equal(true_header, header)
+
+    n_lines = sum(1 for l in verbose_output.readlines())
+    # one for 1-10 and then 9 for 20-100
+    assert_equal(10 + 9, n_lines)
+
+
+def test_more_verbose_output():
+    """Check verbose=2 does not cause error. """
+    from sklearn.externals.six.moves import cStringIO as StringIO
+    import sys
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
+    clf = GradientBoostingClassifier(n_estimators=100, random_state=1,
+                                     verbose=2)
+    clf.fit(X, y)
+    verbose_output = sys.stdout
+    sys.stdout = old_stdout
+
+    # check output
+    verbose_output.seek(0)
+    header = verbose_output.readline().rstrip()
+    # no OOB
+    true_header = ' '.join(['{:>10}'] + ['{:>16}'] * 2).format(
+        'Iter', 'Train Loss', 'Remaining Time')
+    assert_equal(true_header, header)
+
+    n_lines = sum(1 for l in verbose_output.readlines())
+    # 100 lines for n_estimators==100
+    assert_equal(100, n_lines)
+
+
 def test_line_search():
     """
     Check if turning off line search works.
@@ -537,5 +588,3 @@ def test_line_search():
     clf2 = GradientBoostingRegressor(loss='ls', n_estimators=100, random_state=1,
                                      line_search=False).fit(boston.data, boston.target)
     assert_array_equal(clf.predict(boston.data), clf2.predict(boston.data))
-
-

@@ -38,6 +38,7 @@ def configuration(parent_package='', top_path=None):
     config.add_subpackage('gaussian_process')
     config.add_subpackage('gaussian_process/tests')
     config.add_subpackage('neighbors')
+    config.add_subpackage('neural_network')
     config.add_subpackage('manifold')
     config.add_subpackage('metrics')
     config.add_subpackage('semi_supervised')
@@ -46,6 +47,8 @@ def configuration(parent_package='', top_path=None):
     config.add_subpackage('metrics/tests')
     config.add_subpackage('metrics/cluster')
     config.add_subpackage('metrics/cluster/tests')
+    config.add_subpackage('cross_decomposition')
+
 
     # add cython extension module for hmm
     config.add_extension(

@@ -671,9 +671,9 @@ Model Selection Interface
 -------------------------
 .. autosummary::
    :toctree: generated/
-   :template: class_with_call.rst
+   :template: function.rst
 
-   metrics.Scorer
+   metrics.make_scorer
 
 Classification metrics
 ----------------------
@@ -881,17 +881,16 @@ Pairwise metrics
    neighbors.kneighbors_graph
    neighbors.radius_neighbors_graph
 
+.. _neural_network_ref:
 
-.. _pls_ref:
+:mod:`sklearn.neural_network`: Neural network models
+=====================================================
 
-:mod:`sklearn.pls`: Partial Least Squares
-=========================================
-
-.. automodule:: sklearn.pls
+.. automodule:: sklearn.neural_network
    :no-members:
    :no-inherited-members:
 
-**User guide:** See the :ref:`pls` section for further details.
+**User guide:** See the :ref:`neural_network` section for further details.
 
 .. currentmodule:: sklearn
 
@@ -899,10 +898,30 @@ Pairwise metrics
    :toctree: generated/
    :template: class.rst
 
-   pls.PLSRegression
-   pls.PLSCanonical
-   pls.CCA
-   pls.PLSSVD
+   neural_network.BernoulliRBM
+
+
+.. _cross_decomposition_ref:
+
+:mod:`sklearn.cross_decomposition`: Cross Decomposition
+==========================================================
+
+.. automodule:: sklearn.cross_decomposition
+   :no-members:
+   :no-inherited-members:
+
+**User guide:** See the :ref:`cross_decomposition` section for further details.
+
+.. currentmodule:: sklearn
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   cross_decomposition.PLSRegression
+   cross_decomposition.PLSCanonical
+   cross_decomposition.CCA
+   cross_decomposition.PLSSVD
 
 
 .. _pipeline_ref:
@@ -956,6 +975,7 @@ Pairwise metrics
 
    preprocessing.add_dummy_feature
    preprocessing.binarize
+   preprocessing.label_binarize
    preprocessing.normalize
    preprocessing.scale
 

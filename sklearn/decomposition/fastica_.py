@@ -5,8 +5,8 @@ Reference: Tables 8.3 and 8.4 page 196 in the book:
 Independent Component Analysis, by  Hyvarinen et al.
 """
 
-# Author: Pierre Lafaye de Micheaux, Stefan van der Walt, Gael Varoquaux,
-#         Bertrand Thirion, Alexandre Gramfort
+# Authors: Pierre Lafaye de Micheaux, Stefan van der Walt, Gael Varoquaux,
+#          Bertrand Thirion, Alexandre Gramfort, Denis A. Engemann
 # License: BSD 3 clause
 import warnings
 import numpy as np
@@ -44,8 +44,7 @@ def _sym_decorrelation(W):
     """ Symmetric decorrelation
     i.e. W <- (W * W.T) ^{-1/2} * W
     """
-    K = np.dot(W, W.T)
-    s, u = linalg.eigh(K)
+    s, u = linalg.eigh(np.dot(W, W.T))
     # u (resp. s) contains the eigenvectors (resp. square roots of
     # the eigenvalues) of W * W.T
     return np.dot(np.dot(u * (1. / np.sqrt(s)), u.T), W)
@@ -58,7 +57,7 @@ def _ica_def(X, tol, g, fun_args, max_iter, w_init):
     """
 
     n_components = w_init.shape[0]
-    W = np.zeros((n_components, n_components), dtype=float)
+    W = np.zeros((n_components, n_components), dtype=X.dtype)
 
     # j is the index of the extracted component
     for j in range(n_components):
@@ -66,8 +65,7 @@ def _ica_def(X, tol, g, fun_args, max_iter, w_init):
         w /= np.sqrt((w ** 2).sum())
 
         for _ in moves.xrange(max_iter):
-            wtx = np.dot(w.T, X)
-            gwtx, g_wtx = g(wtx, fun_args)
+            gwtx, g_wtx = g(np.dot(w.T, X), fun_args)
 
             w1 = (X * gwtx).mean(axis=1) - g_wtx.mean() * w
 
@@ -91,59 +89,57 @@ def _ica_par(X, tol, g, fun_args, max_iter, w_init):
     Used internally by FastICA --main loop
 
     """
-    n, p = X.shape
-
     W = _sym_decorrelation(w_init)
-
-    for _ in moves.xrange(max_iter):
-        wtx = np.dot(W, X)
-        gwtx, g_wtx = g(wtx, fun_args)
-
-        W1 = (np.dot(gwtx, X.T) / float(p)
-              - np.dot(np.diag(g_wtx.mean(axis=1)), W))
-
-        W1 = _sym_decorrelation(W1)
-
+    del w_init
+    p_ = float(X.shape[1])
+    for ii in moves.xrange(max_iter):
+        gwtx, g_wtx = g(np.dot(W, X), fun_args)
+        W1 = _sym_decorrelation(np.dot(gwtx, X.T) / p_
+                               - g_wtx[:, np.newaxis] * W)
+        del gwtx, g_wtx
         lim = max(abs(abs(np.diag(np.dot(W1, W.T))) - 1))
         W = W1
         if lim < tol:
             break
+    else:
+        warnings.warn('FastICA did not converge.' +
+                      ' You might want' +
+                      ' to increase the number of iterations.')
 
     return W
 
 
 # Some standard non-linear functions.
 # XXX: these should be optimized, as they can be a bottleneck.
-
 def _logcosh(x, fun_args=None):
     alpha = fun_args.get('alpha', 1.0)  # comment it out?
-    gx = np.tanh(alpha * x)
+    gx = np.tanh(alpha * x, out=x)
     # then compute g_x = alpha * (1 - gx ** 2) avoiding extra allocation
     g_x = gx ** 2
     g_x -= 1.
     g_x *= -alpha
-    return gx, g_x
+    return gx, g_x.mean(axis=-1)
 
 
 def _exp(x, fun_args):
     exp = np.exp(-(x ** 2) / 2)
     gx = x * exp
     g_x = (1 - x ** 2) * exp
-    return gx, g_x
+    return gx, g_x.mean(axis=-1)
 
 
 def _cube(x, fun_args):
-    return x ** 3, 3 * x ** 2
+    return x ** 3, (3 * x ** 2).mean(axis=-1)
 
 
 def fastica(X, n_components=None, algorithm="parallel", whiten=True,
-            fun="logcosh", fun_args={}, max_iter=200, tol=1e-04, w_init=None,
-            random_state=None, return_X_mean=False):
+            fun="logcosh", fun_args=None, max_iter=200, tol=1e-04, w_init=None,
+            random_state=None, return_X_mean=False, compute_sources=True):
     """Perform Fast Independent Component Analysis.
 
     Parameters
     ----------
-    X : array-like, shape = [n_samples, n_features]
+    X : array-like, shape (n_samples, n_features)
         Training vector, where n_samples is the number of samples and
         n_features is the number of features.
     n_components : int, optional
@@ -169,7 +165,7 @@ def fastica(X, n_components=None, algorithm="parallel", whiten=True,
             return x ** 3, 3 * x ** 2
     fun_args : dictionary, optional
         Arguments to send to the functional form.
-        If empty and if fun='logcosh', fun_args will take value
+        If empty or None and if fun='logcosh', fun_args will take value
         {'alpha' : 1.0}
     max_iter : int, optional
         Maximum number of iterations to perform
@@ -183,27 +179,30 @@ def fastica(X, n_components=None, algorithm="parallel", whiten=True,
         If True, only the sources matrix is returned.
     random_state : int or RandomState
         Pseudo number generator state used for random sampling.
-    return_X_mean : bool
+    return_X_mean : bool, optional
         If True, X_mean is returned too.
+    compute_sources : bool, optional
+        If False, sources are not computes but only the rotation matrix. This
+        can save memory when working with big data. Defaults to True.
 
     Returns
     -------
-    K : (n_components, p) array or None.
+    K : array, shape (n_components, n_features) | None.
         If whiten is 'True', K is the pre-whitening matrix that projects data
-        onto the first n.comp principal components. If whiten is 'False', K is
-        'None'.
+        onto the first n_components principal components. If whiten is 'False',
+        K is 'None'.
 
-    W : (n_components, n_components) array
+    W : array, shape (n_components, n_components)
         Estimated un-mixing matrix.
         The mixing matrix can be obtained by::
 
             w = np.dot(W, K.T)
             A = w.T * (w * w.T).I
 
-    S : (n_components, n) array
-        estimated source matrix
+    S : array, shape (n_components, n_samples) | None
+        Estimated source matrix
 
-    X_mean : array, shape=(n_features,)
+    X_mean : array, shape (n_features, )
         The mean over features. Returned only if return_X_mean is True.
 
     Notes
@@ -227,6 +226,7 @@ def fastica(X, n_components=None, algorithm="parallel", whiten=True,
 
     """
     random_state = check_random_state(random_state)
+    fun_args = {} if fun_args is None else fun_args
     # make interface compatible with other decompositions
     # a copy is required only for non whitened data
     X = array2d(X, copy=whiten).T
@@ -280,10 +280,12 @@ def fastica(X, n_components=None, algorithm="parallel", whiten=True,
     else:
         # X must be casted to floats to avoid typing issues with numpy
         # 2.0 and the line below
-        X1 = as_float_array(X, copy=False)  # copy has been taken care of above
+        X1 = as_float_array(X, copy=False)  # copy has been taken care of
 
     if w_init is None:
-        w_init = random_state.normal(size=(n_components, n_components))
+        w_init = np.asarray(random_state.normal(size=(n_components,
+                            n_components)), dtype=X1.dtype)
+
     else:
         w_init = np.asarray(w_init)
         if w_init.shape != (n_components, n_components):
@@ -306,17 +308,23 @@ def fastica(X, n_components=None, algorithm="parallel", whiten=True,
     del X1
 
     if whiten:
-        S = np.dot(np.dot(W, K), X)
-        if return_X_mean:
-            return K, W, S.T, X_mean
+        if compute_sources:
+            S = np.dot(np.dot(W, K), X).T
         else:
-            return K, W, S.T
+            S = None
+        if return_X_mean:
+            return K, W, S, X_mean
+        else:
+            return K, W, S
     else:
-        S = np.dot(W, X)
-        if return_X_mean:
-            return None, W, S.T, None
+        if compute_sources:
+            S = np.dot(W, X).T
         else:
-            return None, W, S.T
+            S = None
+        if return_X_mean:
+            return None, W, S, None
+        else:
+            return None, W, S
 
 
 class FastICA(BaseEstimator, TransformerMixin):
@@ -356,12 +364,14 @@ class FastICA(BaseEstimator, TransformerMixin):
 
     Attributes
     ----------
-    `components_` : 2D array, [n_components, n_features]
-        The unmixing matrix
-    `mixing_` : array, shape = [n_features, n_components]
-        Mixing matrix.
-    `sources_` : 2D array, [n_samples, n_components]
-        The estimated latent sources of the data.
+    `components_` : 2D array, shape (n_components, n_features)
+        The unmixing matrix.
+    `mixing_` : array, shape (n_features, n_components)
+        The mixing matrix.
+    `sources_` : 2D array, shape (n_samples, n_components)
+        The estimated latent sources of the data. This attribute is deprecated
+        and will be removed in 0.16. Use `fit_transform` instead and store
+        the result.
 
     Notes
     -----
@@ -369,8 +379,8 @@ class FastICA(BaseEstimator, TransformerMixin):
     `A. Hyvarinen and E. Oja, Independent Component Analysis:
     Algorithms and Applications, Neural Networks, 13(4-5), 2000,
     pp. 411-430`
-    """
 
+    """
     def __init__(self, n_components=None, algorithm='parallel', whiten=True,
                  fun='logcosh', fun_args=None, max_iter=200, tol=1e-4,
                  w_init=None, random_state=None):
@@ -385,6 +395,45 @@ class FastICA(BaseEstimator, TransformerMixin):
         self.w_init = w_init
         self.random_state = random_state
 
+    def _fit(self, X, compute_sources=False):
+        """Fit the model
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            Training data, where n_samples is the number of samples
+            and n_features is the number of features.
+
+        compute_sources : bool
+            If False, sources are not computes but only the rotation matrix.
+            This can save memory when working with big data. Defaults to False.
+
+        Returns
+        -------
+            X_new : array-like, shape (n_samples, n_components)
+        """
+        fun_args = {} if self.fun_args is None else self.fun_args
+        whitening, unmixing, sources, X_mean = fastica(
+            X=X, n_components=self.n_components, algorithm=self.algorithm,
+            whiten=self.whiten, fun=self.fun, fun_args=fun_args,
+            max_iter=self.max_iter, tol=self.tol, w_init=self.w_init,
+            random_state=self.random_state, return_X_mean=True,
+            compute_sources=compute_sources)
+
+        if self.whiten:
+            self.components_ = np.dot(unmixing, whitening)
+            self.mean_ = X_mean
+            self.whitening_ = whitening
+        else:
+            self.components_ = unmixing
+
+        self.mixing_ = linalg.pinv(self.components_)
+
+        if compute_sources:
+            self.__sources = sources
+
+        return sources
+
     def fit_transform(self, X, y=None):
         """Fit the model and recover the sources from X.
 
@@ -398,22 +447,7 @@ class FastICA(BaseEstimator, TransformerMixin):
         -------
         X_new : array-like, shape (n_samples, n_components)
         """
-        fun_args = {} if self.fun_args is None else self.fun_args
-        whitening_, unmixing_, sources_, X_mean = fastica(
-            X=X, n_components=self.n_components, algorithm=self.algorithm,
-            whiten=self.whiten, fun=self.fun, fun_args=fun_args,
-            max_iter=self.max_iter, tol=self.tol, w_init=self.w_init,
-            random_state=self.random_state, return_X_mean=True)
-        if self.whiten:
-            self.components_ = np.dot(unmixing_, whitening_)
-            self.mean_ = X_mean
-            self.whitening_ = whitening_
-        else:
-            self.components_ = unmixing_
-
-        self.mixing_ = linalg.pinv(self.components_)
-        self.sources_ = sources_
-        return sources_
+        return self._fit(X, compute_sources=True)
 
     def fit(self, X, y=None):
         """Fit the model to X.
@@ -428,7 +462,7 @@ class FastICA(BaseEstimator, TransformerMixin):
         -------
         self
         """
-        self.fit_transform(X)
+        self._fit(X, compute_sources=True)  # will become False in 0.16
         return self
 
     def transform(self, X, y=None, copy=True):
@@ -461,6 +495,12 @@ class FastICA(BaseEstimator, TransformerMixin):
         mixing_matrix : array, shape (n_features, n_components)
         """
         return self.mixing_
+
+    @property
+    @deprecated('To be removed in 0.16.  Use `fit_transform` and store the '
+                'output instead.')
+    def sources_(self):
+        return self.__sources
 
     def inverse_transform(self, X, copy=True):
         """Transform the sources back to the mixed data (apply mixing matrix).
