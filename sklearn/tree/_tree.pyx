@@ -1544,7 +1544,7 @@ cdef class Tree:
                        (n_node_samples < 2 * self.min_samples_leaf))
 
             splitter.node_reset(start, end, &impurity)
-            is_leaf = is_leaf or (impurity < 1e-9)
+            is_leaf = is_leaf or (impurity < 1e-10)
 
             if not is_leaf:
                 splitter.node_split(&pos, &feature, &threshold)
@@ -1556,7 +1556,7 @@ cdef class Tree:
             if node_id < 100:
                 print(node_id, feature, threshold, impurity)
 
-            if node_id < 100 and impurity < 1e-9:
+            if node_id < 100 and impurity < 1e-10:
                 print(node_id, 'is pure')
 
             if is_leaf:
