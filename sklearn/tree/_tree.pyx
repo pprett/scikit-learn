@@ -963,7 +963,7 @@ cdef class BestSplitter(Splitter):
                     criterion.update(current_pos)
                     current_impurity = criterion.children_impurity()
 
-                    if current_impurity < best_impurity:
+                    if current_impurity < (best_impurity - 1e-7):
                         best_impurity = current_impurity
                         best_pos = current_pos
                         best_feature = current_feature
