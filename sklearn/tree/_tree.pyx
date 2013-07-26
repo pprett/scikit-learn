@@ -1478,6 +1478,8 @@ cdef class Tree:
         if y.dtype != DOUBLE or not y.flags.contiguous:
             y = np.asarray(y, dtype=DOUBLE, order="C")
 
+        print('cond: %.8f' % np.diff(y).sum())
+
         cdef DOUBLE_t* sample_weight_ptr = NULL
         if sample_weight is not None:
             if ((sample_weight.dtype != DOUBLE) or
