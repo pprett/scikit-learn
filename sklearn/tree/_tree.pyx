@@ -1623,6 +1623,8 @@ cdef class Tree:
                 for c from 0 <= c < n_classes[0]:
                     out[i, c] = value[offset + c]
 
+                print(i, node_id)
+
             return out
 
         else: # n_outputs > 1
