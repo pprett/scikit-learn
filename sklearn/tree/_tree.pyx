@@ -991,7 +991,7 @@ cdef class BestSplitter(Splitter):
             p = start
 
             while p < partition_end:
-                if X[samples[p], best_feature] <= best_threshold + 1e-7:
+                if X[samples[p], best_feature] <= best_threshold:
                     p += 1
 
                 else:
@@ -1035,7 +1035,7 @@ cdef void sort(np.ndarray[DTYPE_t, ndim=2, mode="c"] X, SIZE_t current_feature,
 
         while child < n:
             if ((child + 1 < n) and
-                (X[samples[child + 1], current_feature] > X[samples[child], current_feature] + 1.e-7)):
+                (X[samples[child + 1], current_feature] > X[samples[child], current_feature])):
                 child += 1
 
             if X[samples[child], current_feature] > tmp_value:
