@@ -991,7 +991,7 @@ cdef class BestSplitter(Splitter):
             p = start
 
             while p < partition_end:
-                if X[samples[p], best_feature] <= best_threshold:
+                if X[samples[p], best_feature] <= best_threshold + 1e-7:
                     p += 1
 
                 else:
