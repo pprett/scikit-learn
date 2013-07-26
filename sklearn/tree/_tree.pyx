@@ -1005,7 +1005,7 @@ cdef class BestSplitter(Splitter):
         pos[0] = best_pos
         feature[0] = best_feature
         threshold[0] = best_threshold
-        print(best_pos, best_feature, best_threshold)
+
 
 cdef void sort(np.ndarray[DTYPE_t, ndim=2, mode="c"] X, SIZE_t current_feature,
                SIZE_t* samples, SIZE_t length):
@@ -1552,6 +1552,8 @@ cdef class Tree:
 
             node_id = self._add_node(parent, is_left, is_leaf, feature,
                                      threshold, impurity, n_node_samples)
+
+            print(node_id, feature, threshold)
 
             if node_id < 100 and impurity == 0.0:
                 print(node_id, 'is pure')
