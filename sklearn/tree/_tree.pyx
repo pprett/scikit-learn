@@ -934,7 +934,7 @@ cdef class BestSplitter(Splitter):
             features[f_i] = features[f_j]
             features[f_j] = tmp
 
-            current_feature = features[f_i]
+            current_feature = f_idx  #features[f_i]
 
             # Sort samples along that feature
             sort(X, current_feature, samples+start, end-start)

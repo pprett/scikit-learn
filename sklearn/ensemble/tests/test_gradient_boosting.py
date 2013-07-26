@@ -512,8 +512,9 @@ def test_oob_improvement_raise():
 
 def test_oob_multilcass_iris():
     """Check OOB improvement on multi-class dataset."""
-    clf = GradientBoostingClassifier(n_estimators=100, loss='deviance',
-                                     random_state=1, subsample=0.5)
+    clf = GradientBoostingClassifier(n_estimators=10, loss='deviance',
+                                     random_state=1, subsample=0.5,
+                                     verbose=2)
     clf.fit(iris.data, iris.target)
     score = clf.score(iris.data, iris.target)
     assert score > 0.9, "Failed with subsample %.1f " \
