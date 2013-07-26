@@ -1553,8 +1553,8 @@ cdef class Tree:
             node_id = self._add_node(parent, is_left, is_leaf, feature,
                                      threshold, impurity, n_node_samples)
 
-            if node_id < 100:
-                print(node_id, feature, threshold, impurity)
+            #if node_id < 100:
+            #    print(node_id, feature, threshold, impurity)
 
             if node_id < 100 and impurity < 1e-6:
                 print(node_id, 'is pure')
