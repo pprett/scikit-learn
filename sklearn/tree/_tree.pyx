@@ -1556,7 +1556,7 @@ cdef class Tree:
             #if node_id < 100:
             #    print(node_id, feature, threshold, impurity)
 
-            if node_id < 100 and impurity < 1e-6:
+            if impurity < 1e-6:
                 print(node_id, 'is pure')
 
             if is_leaf:
