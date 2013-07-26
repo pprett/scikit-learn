@@ -1560,7 +1560,7 @@ cdef class Tree:
                 print(node_id, 'is pure')
 
             if node_id == 698:
-                print(node_id, feature, threshold, impurity)
+                print(node_id, feature, threshold, impurity, n_node_samples)
 
             if is_leaf:
                 # Don't store value for internal nodes
