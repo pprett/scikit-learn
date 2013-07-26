@@ -1613,6 +1613,8 @@ cdef class Tree:
                 # While node_id not a leaf
                 while children_left[node_id] != _TREE_LEAF:
                     # ... and children_right[node_id] != _TREE_LEAF:
+                    if i == 126:
+                        print(node_id, feature[node_id], threshold[node_id], X[i, feature[node_id]] <= threshold[node_id])
                     if X[i, feature[node_id]] <= threshold[node_id]:
                         node_id = children_left[node_id]
                     else:
