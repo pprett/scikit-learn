@@ -1613,7 +1613,7 @@ cdef class Tree:
                 # While node_id not a leaf
                 while children_left[node_id] != _TREE_LEAF:
                     # ... and children_right[node_id] != _TREE_LEAF:
-                    if X[i, feature[node_id]] <= threshold[node_id]:
+                    if X[i, feature[node_id]] <= threshold[node_id] + 1e-7:
                         node_id = children_left[node_id]
                     else:
                         node_id = children_right[node_id]
