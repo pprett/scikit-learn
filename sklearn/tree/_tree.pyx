@@ -1561,7 +1561,7 @@ cdef class Tree:
 
             if node_id == 698:
                 print(node_id, feature, threshold, impurity, n_node_samples)
-                print(parent, self.threshold[parent], self.feature[parent], self.n_node_samples[parent])
+                print(parent, self.feature[parent], self.threshold[parent], self.feature[parent], self.n_node_samples[parent])
 
             if is_leaf:
                 # Don't store value for internal nodes

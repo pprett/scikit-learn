@@ -73,8 +73,8 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
             criterion = "impurity"
 
         if tree.children_left[node_id] == _tree.TREE_LEAF:
-            return "%s = %.4f\\nsamples = %s\\nvalue = %s" \
-                   % (criterion,
+            return "%d\\n%s = %.4f\\nsamples = %s\\nvalue = %s" \
+                   % (node_id, criterion,
                       tree.impurity[node_id],
                       tree.n_node_samples[node_id],
                       value)
@@ -84,8 +84,8 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
             else:
                 feature = "X[%s]" % tree.feature[node_id]
 
-            return "%s <= %.4f\\n%s = %s\\nsamples = %s" \
-                   % (feature,
+            return "%d\\n%s <= %.4f\\n%s = %s\\nsamples = %s" \
+                   % (node_id, feature,
                       tree.threshold[node_id],
                       criterion,
                       tree.impurity[node_id],
