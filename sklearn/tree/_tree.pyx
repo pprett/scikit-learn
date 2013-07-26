@@ -1005,6 +1005,7 @@ cdef class BestSplitter(Splitter):
         pos[0] = best_pos
         feature[0] = best_feature
         threshold[0] = best_threshold
+        print(best_pos, best_feature, best_threshold)
 
 cdef void sort(np.ndarray[DTYPE_t, ndim=2, mode="c"] X, SIZE_t current_feature,
                SIZE_t* samples, SIZE_t length):
