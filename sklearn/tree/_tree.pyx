@@ -1586,6 +1586,7 @@ cdef class Tree:
 
         self._resize(self.node_count)
         free(stack)
+        print(self.node_count)
 
     cpdef predict(self, np.ndarray[DTYPE_t, ndim=2] X):
         """Predict target for X."""
