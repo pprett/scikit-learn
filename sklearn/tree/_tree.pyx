@@ -968,7 +968,8 @@ cdef class BestSplitter(Splitter):
                         best_pos = current_pos
                         best_feature = current_feature
 
-                        current_threshold = (X[samples[p - 1], current_feature] + X[samples[p], current_feature]) / 2.0
+                        #current_threshold = (X[samples[p - 1], current_feature] + X[samples[p], current_feature]) / 2.0
+                        current_threshold = ((X[samples[p], current_feature] - X[samples[p - 1], current_feature]) / 2.0) + X[samples[p - 1], current_feature]
                         if current_threshold == X[samples[p], current_feature]:
                             current_threshold = X[samples[p - 1], current_feature]
 
