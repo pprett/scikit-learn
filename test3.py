@@ -11,6 +11,7 @@ X_train, X_test, y_train, y_test = train_test_split(boston.data, boston.target,
 
 est = DecisionTreeRegressor(random_state=1)
 
+print np.diff(y_train).sum()
 est.fit(X_train, y_train)
 print np.diff(y_train).sum()
 print est.score(X_test, y_test)
