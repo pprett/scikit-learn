@@ -1012,7 +1012,7 @@ cdef void sort(np.ndarray[DTYPE_t, ndim=2, mode="c"] X, SIZE_t current_feature,
       X[sample[i], current_feature] as key."""
     # Heapsort, adapted from Numerical Recipes in C
     cdef SIZE_t tmp
-    cdef DOUBLE_t tmp_value
+    cdef DTYPE_t tmp_value
     cdef SIZE_t n = length
     cdef SIZE_t parent = length / 2
     cdef SIZE_t index, child
