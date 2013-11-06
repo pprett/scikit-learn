@@ -17,6 +17,7 @@ cimport numpy as np
 cdef extern from "numpy/npy_math.h":
     bint isfinite "npy_isfinite"(double) nogil
 
+from sklearn.utils.dtype cimport DTYPE
 from sklearn.utils.weight_vector cimport WeightVector
 from sklearn.utils.seq_dataset cimport SequentialDataset
 
@@ -399,7 +400,7 @@ def plain_sgd(np.ndarray[double, ndim=1, mode='c'] weights,
 
     cdef WeightVector w = WeightVector(weights)
 
-    cdef double *x_data_ptr = NULL
+    cdef DTYPE *x_data_ptr = NULL
     cdef int *x_ind_ptr = NULL
 
     # helper variable
@@ -518,7 +519,7 @@ cdef bint any_nonfinite(double *w, int n):
     return 0
 
 
-cdef double sqnorm(double * x_data_ptr, int * x_ind_ptr, int xnnz) nogil:
+cdef double sqnorm(DTYPE * x_data_ptr, int * x_ind_ptr, int xnnz) nogil:
     cdef double x_norm = 0.0
     cdef int j
     cdef double z

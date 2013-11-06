@@ -55,7 +55,7 @@ cdef class WeightVector(object):
         self.n_features = w.shape[0]
         self.sq_norm = ddot(<int>w.shape[0], wdata, 1, wdata, 1)
 
-    cdef void add(self, double *x_data_ptr, int *x_ind_ptr, int xnnz,
+    cdef void add(self, DTYPE *x_data_ptr, int *x_ind_ptr, int xnnz,
                   double c) nogil:
         """Scales sample x by constant c and adds it to the weight vector.
 
@@ -63,7 +63,7 @@ cdef class WeightVector(object):
 
         Parameters
         ----------
-        x_data_ptr : double*
+        x_data_ptr : DTYPE*
             The array which holds the feature values of ``x``.
         x_ind_ptr : np.intc*
             The array which holds the feature indices of ``x``.
@@ -74,7 +74,7 @@ cdef class WeightVector(object):
         """
         cdef int j
         cdef int idx
-        cdef double val
+        cdef DTYPE val
         cdef double innerprod = 0.0
         cdef double xsqnorm = 0.0
 
@@ -91,13 +91,13 @@ cdef class WeightVector(object):
 
         self.sq_norm += (xsqnorm * c * c) + (2.0 * innerprod * wscale * c)
 
-    cdef double dot(self, double *x_data_ptr, int *x_ind_ptr,
+    cdef double dot(self, DTYPE *x_data_ptr, int *x_ind_ptr,
                     int xnnz) nogil:
         """Computes the dot product of a sample x and the weight vector.
 
         Parameters
         ----------
-        x_data_ptr : double*
+        x_data_ptr : DTYPE*
             The array which holds the feature values of ``x``.
         x_ind_ptr : np.intc*
             The array which holds the feature indices of ``x``.

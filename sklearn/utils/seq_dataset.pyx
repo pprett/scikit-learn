@@ -17,14 +17,14 @@ np.import_array()
 cdef class SequentialDataset:
     """Base class for datasets with sequential data access. """
 
-    cdef void next(self, double **x_data_ptr, int **x_ind_ptr,
+    cdef void next(self, DTYPE **x_data_ptr, int **x_ind_ptr,
                    int *nnz, double *y, double *sample_weight) nogil:
         """Get the next example ``x`` from the dataset.
 
         Parameters
         ----------
-        x_data_ptr : double**
-            A pointer to the double array which holds the feature
+        x_data_ptr : DTYPE**
+            A pointer to the DTYPE array which holds the feature
             values of the next example.
         x_ind_ptr : np.intc**
             A pointer to the int array which holds the feature
@@ -48,20 +48,20 @@ cdef class SequentialDataset:
 cdef class ArrayDataset(SequentialDataset):
     """Dataset backed by a two-dimensional numpy array.
 
-    The dtype of the numpy array is expected to be ``np.float64`` (double)
+    The dtype of the numpy array is expected to be DTYPE
     and C-style memory layout.
     """
 
-    def __cinit__(self, np.ndarray[double, ndim=2, mode='c'] X,
+    def __cinit__(self, np.ndarray[DTYPE, ndim=2, mode='c'] X,
                   np.ndarray[double, ndim=1, mode='c'] Y,
                   np.ndarray[double, ndim=1, mode='c'] sample_weights):
         """A ``SequentialDataset`` backed by a two-dimensional numpy array.
 
         Parameters
         ----------
-        X : ndarray, dtype=double, ndim=2, mode='c'
+        X : ndarray, dtype=DTYPE, ndim=2, mode='c'
             The samples; a two-dimensional c-continuous numpy array of
-            dtype double.
+            dtype DTYPE.
         Y : ndarray, dtype=double, ndim=1, mode='c'
             The target values; a one-dimensional c-continuous numpy array of
             dtype double.
@@ -83,7 +83,7 @@ cdef class ArrayDataset(SequentialDataset):
         self.feature_indices_ptr = <int *> feature_indices.data
         self.current_index = -1
         self.stride = X.strides[0] / X.itemsize
-        self.X_data_ptr = <double *>X.data
+        self.X_data_ptr = <DTYPE *>X.data
         self.Y_data_ptr = <double *>Y.data
         self.sample_weight_data = <double *>sample_weights.data
 
@@ -94,7 +94,7 @@ cdef class ArrayDataset(SequentialDataset):
         self.index = index
         self.index_data_ptr = <int *> index.data
 
-    cdef void next(self, double **x_data_ptr, int **x_ind_ptr,
+    cdef void next(self, DTYPE **x_data_ptr, int **x_ind_ptr,
                    int *nnz, double *y, double *sample_weight) nogil:
         cdef int current_index = self.current_index
         if current_index >= (self.n_samples - 1):
@@ -119,7 +119,7 @@ cdef class ArrayDataset(SequentialDataset):
 cdef class CSRDataset(SequentialDataset):
     """A ``SequentialDataset`` backed by a scipy sparse CSR matrix. """
 
-    def __cinit__(self, np.ndarray[double, ndim=1, mode='c'] X_data,
+    def __cinit__(self, np.ndarray[DTYPE, ndim=1, mode='c'] X_data,
                   np.ndarray[int, ndim=1, mode='c'] X_indptr,
                   np.ndarray[int, ndim=1, mode='c'] X_indices,
                   np.ndarray[double, ndim=1, mode='c'] Y,
@@ -132,9 +132,9 @@ cdef class CSRDataset(SequentialDataset):
 
         Parameters
         ----------
-        X_data : ndarray, dtype=double, ndim=1, mode='c'
+        X_data : ndarray, dtype=DTYPE, ndim=1, mode='c'
             The data array of the CSR matrix; a one-dimensional c-continuous
-            numpy array of dtype double.
+            numpy array of dtype DTYPE.
         X_indptr : ndarray, dtype=np.intc, ndim=1, mode='c'
             The index pointer array of the CSR matrix; a one-dimensional
             c-continuous numpy array of dtype np.intc.
@@ -150,7 +150,7 @@ cdef class CSRDataset(SequentialDataset):
         """
         self.n_samples = Y.shape[0]
         self.current_index = -1
-        self.X_data_ptr = <double *>X_data.data
+        self.X_data_ptr = <DTYPE *>X_data.data
         self.X_indptr_ptr = <int *>X_indptr.data
         self.X_indices_ptr = <int *>X_indices.data
         self.Y_data_ptr = <double *>Y.data
@@ -161,7 +161,7 @@ cdef class CSRDataset(SequentialDataset):
         self.index = idx
         self.index_data_ptr = <int *>idx.data
 
-    cdef void next(self, double **x_data_ptr, int **x_ind_ptr,
+    cdef void next(self, DTYPE **x_data_ptr, int **x_ind_ptr,
                    int *nnz, double *y, double *sample_weight) nogil:
         cdef int current_index = self.current_index
         if current_index >= (self.n_samples - 1):
