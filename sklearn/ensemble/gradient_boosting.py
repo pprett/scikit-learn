@@ -522,8 +522,8 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
                  random_state, alpha=0.9, verbose=0, max_leaf_nodes=None):
 
         self.n_estimators = n_estimators
-        self.learning_rate = learning_rate
         self.loss = loss
+        self.learning_rate = learning_rate
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
         self.subsample = subsample
@@ -536,6 +536,26 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         self.max_leaf_nodes = max_leaf_nodes
 
         self.estimators_ = np.empty((0, 0), dtype=np.object)
+
+    def __setstate__(self, state):
+        """Override setstate to make learning_rate change backwards compatible. """
+        self.__dict__.update(state)
+        self._set_learning_rate(self.learning_rate)
+
+    def _set_learning_rate(self, learning_rate):
+        """Set the ``learning_rate`` attribute.
+
+        Accepts either floats or seq of float. Converts to a float array
+        of shape ``n_estimators``.
+        """
+        if isinstance(learning_rate, np.float):
+            learning_rate = np.repeat(learning_rate, self.n_estimators)
+
+        learning_rate = np.asarray(learning_rate, dtype=np.float64, order='C')
+        if learning_rate.ndim > 1 or learning_rate.shape[0] != self.n_estimators:
+            raise ValueError('learning_rate should either be float or seq of len %d but is %d'
+                             % (self.n_estimators, learning_rate.shape[0]))
+        self.learning_rate = learning_rate
 
     def _fit_stage(self, i, X, y, y_pred, sample_mask,
                    criterion, splitter, random_state):
@@ -569,7 +589,7 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
 
             # update tree leaves
             loss.update_terminal_regions(tree.tree_, X, y, residual, y_pred,
-                                         sample_mask, self.learning_rate, k=k)
+                                         sample_mask, self.learning_rate[i], k=k)
 
             # add tree to ensemble
             self.estimators_[i, k] = tree
@@ -581,7 +601,7 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         if self.n_estimators <= 0:
             raise ValueError("n_estimators must be greater than 0")
 
-        if self.learning_rate <= 0.0:
+        if np.any(self.learning_rate <= 0.0):
             raise ValueError("learning_rate must be greater than 0")
 
         if (self.loss not in self._SUPPORTED_LOSS or
@@ -679,10 +699,16 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
     def _resize_state(self):
         """Add additional ``n_estimators`` entries to all attributes. """
         # self.n_estimators is the number of additional est to fit
-        total_n_estimators = self.n_estimators + self.estimators_.shape[0]
+        old_n_estimators = self.estimators_.shape[0]
+        total_n_estimators = self.n_estimators + old_n_estimators
 
         self.estimators_.resize((total_n_estimators, self.loss_.K))
         self.train_score_.resize(total_n_estimators)
+
+        # resize learning rates - forward fill with last known value
+        self.learning_rate.resize(total_n_estimators)
+        self.learning_rate[old_n_estimators:] = self.learning_rate[old_n_estimators - 1]
+
         if (self.subsample < 1 or hasattr(self, '_oob_score_')
             or hasattr(self, 'oob_improvement_')):
             # if do oob resize arrays or create new if not available
@@ -787,6 +813,9 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             begin_at_stage = self.estimators_.shape[0]
             y_pred = self.decision_function(X)
             self._resize_state()
+            self.n_estimators = self.estimators_.shape[0]
+
+        self._set_learning_rate(self.learning_rate)
 
         # fit the boosting stages
         n_stages = self._fit_stages(X, y, y_pred, random_state,
@@ -824,7 +853,7 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
             verbose_reporter.init(self, begin_at_stage)
 
         # perform boosting iterations
-        for i in range(begin_at_stage, begin_at_stage + self.n_estimators):
+        for i in range(begin_at_stage, self.n_estimators):
 
             # subsampling
             if do_oob:
@@ -916,7 +945,7 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         X = array2d(X, dtype=DTYPE, order="C")
         score = self._init_decision_function(X)
         for i in range(self.n_estimators):
-            predict_stage(self.estimators_, i, X, self.learning_rate, score)
+            predict_stage(self.estimators_, i, X, self.learning_rate[i], score)
             yield score
 
     @property

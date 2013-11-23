@@ -113,12 +113,13 @@ cdef void _predict_regression_tree_inplace_fast(DTYPE_t *X,
 
 @cython.nonecheck(False)
 def predict_stages(np.ndarray[object, ndim=2] estimators,
-                   np.ndarray[DTYPE_t, ndim=2, mode='c'] X, double scale,
+                   np.ndarray[DTYPE_t, ndim=2, mode='c'] X,
+                   np.ndarray[float64, ndim=1] scale,
                    np.ndarray[float64, ndim=2] out):
     """Add predictions of ``estimators`` to ``out``.
 
-    Each estimator is scaled by ``scale`` before its prediction
-    is added to ``out``.
+    Each estimator ``i`` is scaled by ``scale[i]`` before its prediction
+    is added to ``out[i]``.
     """
     cdef Py_ssize_t i
     cdef Py_ssize_t k
@@ -142,7 +143,7 @@ def predict_stages(np.ndarray[object, ndim=2] estimators,
                 tree.feature,
                 tree.threshold,
                 tree.value,
-                scale, k, K, n_samples, n_features,
+                scale[i], k, K, n_samples, n_features,
                 <float64*>((<np.ndarray>out).data))
             ## out += scale * tree.predict(X).reshape((X.shape[0], 1))
 
