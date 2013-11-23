@@ -834,6 +834,28 @@ def test_max_leaf_nodes_max_depth():
         assert_equal(tree.max_depth, 1)
 
 
+def test_seq_learning_rate():
+    """Test if sequence is accepted as learning_rate """
+    est = GradientBoostingClassifier(n_estimators=20, max_depth=1,
+                                     learning_rate=[0.1] * 20)
+    est.fit(X, y)
+    pred_1 = est.predict(X)
+
+    est = GradientBoostingClassifier(n_estimators=20, max_depth=1,
+                                     learning_rate=0.1)
+    est.fit(X, y)
+    pred_2 = est.predict(X)
+    assert_almost_equal(pred_1, pred_2)
+
+
+def test_invalid_seq_learning_rate():
+    """Test if invalid sequence is not accepted as learning_rate """
+    # wrong size of learning_rate (one less than n_estimators)
+    est = GradientBoostingClassifier(n_estimators=20, max_depth=1,
+                                     learning_rate=[0.1] * 19)
+    assert_raises(ValueError, est.fit, X, y)
+
+
 if __name__ == "__main__":
     import nose
     nose.runmodule()
