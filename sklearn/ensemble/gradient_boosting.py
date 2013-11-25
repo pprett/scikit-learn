@@ -35,6 +35,7 @@ from .base import BaseEnsemble
 from ..base import BaseEstimator
 from ..base import ClassifierMixin
 from ..base import RegressorMixin
+from ..base import TransformerMixin
 from ..utils import check_random_state, array2d, check_arrays, column_or_1d
 from ..utils.extmath import logsumexp
 from ..utils.fixes import unique
@@ -513,7 +514,7 @@ class VerboseReporter(object):
                 self.verbose_mod *= 10
 
 
-class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
+class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble, TransformerMixin)):
     """Abstract base class for Gradient Boosting. """
 
     @abstractmethod
@@ -980,6 +981,38 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble)):
         except AttributeError:
             raise ValueError("Estimator not fitted, "
                              "call `fit` before `oob_score_`.")
+
+    def transform(self, X):
+        """Transform ``X`` to new representation induced by the base learner predictions.
+
+        Transforms ``X`` to ``X_p`` where ``X_p[i]`` is an array of
+        ``n_estimators * k`` values, one for each tree in
+        ``self.estimators_`` . Regression and binary
+        classification are special cases with ``k == 1``,
+        otherwise ``k == n_classes``.
+
+        Parameters
+        ----------
+        X : array-like of shape = [n_samples, n_features]
+            The input samples.
+
+        Returns
+        -------
+        out : array, shape = [n_samples, n_estimators * k]
+            New feature space are the predictions of the individual regression
+            trees (there are ``n_estimators * k`` trees).
+        """
+        # check state of estimator - discard init predictions
+        X = array2d(X, dtype=DTYPE, order="C")
+        self._init_decision_function(X)
+        n_samples = X.shape[0]
+        n_estimators, n_classes = self.estimators_.shape
+        out = np.zeros((n_estimators, n_samples, n_classes), dtype=np.float64)
+        for i in range(self.n_estimators):
+            predict_stage(self.estimators_, i, X, 1.0, out[i])
+        out = np.swapaxes(out, 0, 1)
+        out = out.reshape((n_samples, -1), order='C')
+        return out
 
 
 class GradientBoostingClassifier(BaseGradientBoosting, ClassifierMixin):

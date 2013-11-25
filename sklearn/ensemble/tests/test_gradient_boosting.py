@@ -856,6 +856,22 @@ def test_invalid_seq_learning_rate():
     assert_raises(ValueError, est.fit, X, y)
 
 
+def test_transform():
+    """Test if transform gives same results as decision_function. """
+    est = GradientBoostingClassifier(n_estimators=20, max_depth=1)
+    est.fit(X, y)
+    X_p = est.transform(X)
+    # pred == (transform(X) * learning_rate).sum(axis=1) + init.predict(X)
+    pred_p = est.init_.predict(np.asarray(X)).ravel() + np.sum(X_p * est.learning_rate, axis=1)
+    pred = est.decision_function(X).ravel()
+    assert_array_almost_equal(pred_p, pred)
+
+
+def test_transform_invalid():
+    est = GradientBoostingClassifier(n_estimators=20, max_depth=1)
+    assert_raises(ValueError, est.transform, X)
+
+
 if __name__ == "__main__":
     import nose
     nose.runmodule()
