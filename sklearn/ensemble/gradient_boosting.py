@@ -1539,3 +1539,21 @@ class GradientBoostingRegressor(BaseGradientBoosting, RegressorMixin):
         """
         for y in self.staged_decision_function(X):
             yield y.ravel()
+
+
+def postprocess(est, X, y):
+    """Post-process ``est`` using Lasso to prune boosting stages. """
+    X = np.asarray(X)
+    X_p = est.transform(X)
+    pred_init = est.init_.predict(X)
+    ## FIXME make sure this works for multi-class classification
+    y_p = (y - pred_init).ravel()
+    lasso_cv = LassoCV()
+    lasso_cv.fit(X_p, y_p)
+
+    # take nnz coef and prune stages in ``est`` and set ``learning_rate``
+    nnz_idx = np.where(lasso_cv.coef_)[0]
+    est.estimators_ = est.estimators_[nnz_idx, :]
+    est.n_estimators = nnz_idx.shape[0]
+    est.learning_rate = lasso_cv.coef_[nnz_idx]
+    return est
