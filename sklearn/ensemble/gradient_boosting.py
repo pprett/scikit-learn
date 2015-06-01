@@ -514,6 +514,9 @@ class BinomialDeviance(ClassificationLossFunction):
         proba = self._score_to_proba(score)
         return np.argmax(proba, axis=1)
 
+    def _proba_to_score(self, proba):
+        score = -1.0 * np,log(1.0 / proba[:, 1] - 1)
+        return score
 
 class MultinomialDeviance(ClassificationLossFunction):
     """Multinomial deviance loss function for multi-class classification.
@@ -1082,7 +1085,13 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble,
         if X.shape[1] != self.n_features:
             raise ValueError("X.shape[1] should be {0:d}, not {1:d}.".format(
                 self.n_features, X.shape[1]))
-        score = self.init_.predict(X).astype(np.float64)
+        if is_classifier(self.init_):
+            if self.loss_.K == 1:
+                 score = self.init_.predict_proba(X)[:, -1][:, np.newaxis]
+            else:
+                 score = self.init_.predict_proba(X)
+        else:
+            score = self.init_.predict(X).astype(np.float64)
         return score
 
     def _decision_function(self, X):
