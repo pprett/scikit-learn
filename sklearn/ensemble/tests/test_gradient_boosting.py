@@ -11,6 +11,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble.gradient_boosting import ZeroEstimator
+from sklearn.ensemble.gradient_boosting import PriorProbabilityEstimator
+from sklearn.ensemble.gradient_boosting import LogPriorProbabilityEstimator
 from sklearn.metrics import mean_squared_error
 from sklearn.cross_validation import train_test_split
 from sklearn.utils import check_random_state, tosequence
@@ -1038,6 +1040,27 @@ def test_init_classifier_multiclass():
     init = DecisionTreeClassifier()
     est = GradientBoostingClassifier(n_estimators=2, init=init)
     est.fit(X, y)
+
+
+def test_classifier_multiclass():
+    """Test that init works for multiclass classification problems. """
+    # Test if fit clears state.
+    X, y = iris.data, iris.target
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=13)
+    from sklearn.externals.joblib import hash
+    print(hash(X_train))
+
+    rng = 1123132
+    est = GradientBoostingClassifier(n_estimators=2, learning_rate=1.0, init='zero', random_state=rng)
+    score = est.fit(X_train, y_train).score(X_test, y_test)
+    print(score)
+
+    est = GradientBoostingClassifier(n_estimators=2, learning_rate=1.0, init=LogPriorProbabilityEstimator(), random_state=rng)
+    score = est.fit(X_train, y_train).score(X_test, y_test)
+    print(score)
+    est = GradientBoostingClassifier(n_estimators=2, learning_rate=1.0, init=PriorProbabilityEstimator(), random_state=rng)
+    score = est.fit(X_train, y_train).score(X_test, y_test)
+    print(score)
 
 
 # def test_init_classifier_regression():

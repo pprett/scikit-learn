@@ -139,6 +139,16 @@ class PriorProbabilityEstimator(BaseEstimator):
         return y
 
 
+class LogPriorProbabilityEstimator(PriorProbabilityEstimator):
+    """An estimator predicting the log probability of each
+    class in the training data.
+    """
+
+    def predict(self, X):
+        y = super(LogPriorProbabilityEstimator, self).predict(X)
+        return np.log(y)
+
+
 class ZeroEstimator(BaseEstimator):
     """An estimator that simply predicts zero. """
 
@@ -534,7 +544,7 @@ class MultinomialDeviance(ClassificationLossFunction):
         super(MultinomialDeviance, self).__init__(n_classes)
 
     def init_estimator(self):
-        return PriorProbabilityEstimator()
+        return LogPriorProbabilityEstimator()
 
     def __call__(self, y, pred, sample_weight=None):
         # create one-hot label encoding
