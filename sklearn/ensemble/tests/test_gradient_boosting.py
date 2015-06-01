@@ -7,7 +7,9 @@ import numpy as np
 from sklearn import datasets
 from sklearn.base import clone
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble.gradient_boosting import ZeroEstimator
 from sklearn.metrics import mean_squared_error
 from sklearn.utils import check_random_state, tosequence
@@ -1012,6 +1014,24 @@ def test_non_uniform_weights_toy_edge_case_clf():
         gb = GradientBoostingClassifier(n_estimators=5)
         gb.fit(X, y, sample_weight=sample_weight)
         assert_array_equal(gb.predict([[1, 0]]), [1])
+
+
+def test_init_classifier_binary():
+    """Test that init works for binary classifiaction models. """
+    # Test if fit clears state.
+    X, y = datasets.make_hastie_10_2(n_samples=100, random_state=1)
+    init = DecisionTreeClassifier()
+    est = GradientBoostingClassifier(n_estimators=2, init=init)
+    est.fit(X, y)
+
+
+def test_init_classifier_multiclass():
+    """Test that init works for multiclass classifiaction models. """
+    # Test if fit clears state.
+    X, y = iris.data, iris.target
+    init = DecisionTreeClassifier()
+    est = GradientBoostingClassifier(n_estimators=2, init=init)
+    est.fit(X, y)
 
 
 if __name__ == "__main__":
