@@ -34,6 +34,7 @@ from .base import BaseEnsemble
 from ..base import BaseEstimator
 from ..base import ClassifierMixin
 from ..base import RegressorMixin
+from ..base import is_classifier
 from ..utils import check_random_state, check_array, check_X_y, column_or_1d
 from ..utils import check_consistent_length, deprecated
 from ..utils.extmath import logsumexp
@@ -960,7 +961,15 @@ class BaseGradientBoosting(six.with_metaclass(ABCMeta, BaseEnsemble,
             self.init_.fit(X, y, sample_weight)
 
             # init predictions
-            y_pred = self.init_.predict(X)
+            if is_classifier(self.init_):
+                print(self.loss_.K)
+                if self.loss_.K == 1:
+                    # special case for binary classification
+                    y_pred = self.init_.predict_proba(X)[:, -1][:, np.newaxis]
+                else:
+                    y_pred = self.init_.predict_proba(X)
+            else:
+                y_pred = self.init_.predict(X)
             begin_at_stage = 0
         else:
             # add more estimators to fitted model

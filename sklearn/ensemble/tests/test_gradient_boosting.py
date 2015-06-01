@@ -12,6 +12,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble.gradient_boosting import ZeroEstimator
 from sklearn.metrics import mean_squared_error
+from sklearn.cross_validation import train_test_split
 from sklearn.utils import check_random_state, tosequence
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_array_almost_equal
@@ -1017,21 +1018,35 @@ def test_non_uniform_weights_toy_edge_case_clf():
 
 
 def test_init_classifier_binary():
-    """Test that init works for binary classifiaction models. """
+    """Test that init works for binary classification problems. """
     # Test if fit clears state.
     X, y = datasets.make_hastie_10_2(n_samples=100, random_state=1)
-    init = DecisionTreeClassifier()
-    est = GradientBoostingClassifier(n_estimators=2, init=init)
-    est.fit(X, y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=13)
+    score_desired = GradientBoostingClassifier(n_estimators=3, init='zero', learning_rate=1.0, max_depth=3)\
+        .fit(X_train, y_train).score(X_test, y_test)
+    init = DecisionTreeClassifier(max_depth=3)
+    score_act = GradientBoostingClassifier(n_estimators=2, init=init, learning_rate=1.0, max_depth=3).fit(X_train, y_train).score(X_test, y_test)
+    print(score_desired)
+    print(score_act)
+    assert_almost_equal(score_act, score_desired)
 
 
 def test_init_classifier_multiclass():
-    """Test that init works for multiclass classifiaction models. """
+    """Test that init works for multiclass classification problems. """
     # Test if fit clears state.
     X, y = iris.data, iris.target
     init = DecisionTreeClassifier()
     est = GradientBoostingClassifier(n_estimators=2, init=init)
     est.fit(X, y)
+
+
+# def test_init_classifier_regression():
+#     """Test that init works for regression problems. """
+#     # Test if fit clears state.
+#     X, y = iris.data, iris.target
+#     init = DecisionTreeClassifier()
+#     est = GradientBoostingClassifier(n_estimators=2, init=init)
+#     est.fit(X, y)
 
 
 if __name__ == "__main__":
